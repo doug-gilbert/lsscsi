@@ -45,7 +45,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "0.30  2018/06/12 [svn: r154]";
+static const char * version_str = "0.31  2018/07/24 [svn: r155]";
 
 #define FT_OTHER 0
 #define FT_BLOCK 1
@@ -962,8 +962,12 @@ enclosure_device_scan(const char * dir_name, const struct lsscsi_opts * op)
                       NULL);
         if (num < 0) {
                 if (op->verbose > 0) {
-                        snprintf(errpath, LMAX_PATH, "%s: scandir: %s",
-                                 __func__, dir_name);
+                        int n = 0;
+                        int elen = sizeof(errpath);
+
+                        n += scnpr(errpath + n, elen - n, "%s: scandir: ",
+                                    __func__);
+                        scnpr(errpath + n, elen - n, "%s", dir_name);
                         perror(errpath);
                 }
                 return false;
@@ -986,8 +990,12 @@ scan_for_first(const char * dir_name, const struct lsscsi_opts * op)
         num = scandir(dir_name, &namelist, first_dir_scan_select, NULL);
         if (num < 0) {
                 if (op->verbose > 0) {
-                        snprintf(errpath, LMAX_PATH, "%s: scandir: %s",
-                                 __func__, dir_name);
+                        int n = 0;
+                        int elen = sizeof(errpath);
+
+                        n += scnpr(errpath + n, elen - n, "%s: scandir: ",
+                                    __func__);
+                        scnpr(errpath + n, elen - n, "%s", dir_name);
                         perror(errpath);
                 }
                 return -1;
@@ -2455,7 +2463,7 @@ transport_tport(const char * devname, const struct lsscsi_opts * op,
                 int b_len, char * b)
 {
         bool ata_dev;
-        int off, n;
+        int n, off, bufflen, wdlen;
         char * cp;
         char buff[LMAX_DEVPATH];
         char wd[LMAX_PATH];
@@ -2467,16 +2475,17 @@ transport_tport(const char * devname, const struct lsscsi_opts * op,
         if (! parse_colon_list(devname, &hctl))
                 return false;
 
+        bufflen = sizeof(buff);
+        wdlen = sizeof(wd);
         /* check for SAS host */
-        snprintf(buff, sizeof(buff), "%s%shost%d", sysfsroot, sas_host,
-                 hctl.h);
+        snprintf(buff, bufflen, "%s%shost%d", sysfsroot, sas_host, hctl.h);
         if ((stat(buff, &a_stat) >= 0) && S_ISDIR(a_stat.st_mode)) {
                 /* SAS transport layer representation */
                 transport_id = TRANSPORT_SAS;
-                snprintf(buff, sizeof(buff), "%s%s%s", sysfsroot,
-                         class_scsi_dev, devname);
+                snprintf(buff, bufflen, "%s%s%s", sysfsroot, class_scsi_dev,
+                         devname);
                 if (if_directory_chdir(buff, "device")) {
-                        if (NULL == getcwd(wd, sizeof(wd)))
+                        if (NULL == getcwd(wd, wdlen))
                                 return false;
                         cp = strrchr(wd, '/');
                         if (NULL == cp)
@@ -2489,7 +2498,7 @@ transport_tport(const char * devname, const struct lsscsi_opts * op,
                         cp = basename(wd);
                         my_strcopy(sas_hold_end_device, cp,
                                    sizeof(sas_hold_end_device));
-                        snprintf(buff, sizeof(buff), "%s%s%s", sysfsroot,
+                        snprintf(buff, bufflen, "%s%s%s", sysfsroot,
                                  sas_device, cp);
 
                         snprintf(b, b_len, "sas:");
@@ -2511,8 +2520,7 @@ transport_tport(const char * devname, const struct lsscsi_opts * op,
         }
 
         /* not SAS, so check for SPI host */
-        snprintf(buff, sizeof(buff), "%s%shost%d", sysfsroot, spi_host,
-                 hctl.h);
+        snprintf(buff, bufflen, "%s%shost%d", sysfsroot, spi_host, hctl.h);
         if ((stat(buff, &a_stat) >= 0) && S_ISDIR(a_stat.st_mode)) {
                 transport_id = TRANSPORT_SPI;
                 snprintf(b, b_len, "spi:%d", hctl.t);
@@ -2520,10 +2528,9 @@ transport_tport(const char * devname, const struct lsscsi_opts * op,
         }
 
         /* no, so check for FC host */
-        snprintf(buff, sizeof(buff), "%s%shost%d", sysfsroot, fc_host,
-                 hctl.h);
+        snprintf(buff, bufflen, "%s%shost%d", sysfsroot, fc_host, hctl.h);
         if ((stat(buff, &a_stat) >= 0) && S_ISDIR(a_stat.st_mode)) {
-                if (get_value(buff, "symbolic_name", wd, sizeof(wd))) {
+                if (get_value(buff, "symbolic_name", wd, wdlen)) {
                         if (strstr(wd, " over ")) {
                                 transport_id = TRANSPORT_FCOE;
                                 snprintf(b, b_len, "fcoe:");
@@ -2533,7 +2540,7 @@ transport_tport(const char * devname, const struct lsscsi_opts * op,
                         transport_id = TRANSPORT_FC;
                         snprintf(b, b_len, "fc:");
                 }
-                snprintf(buff, sizeof(buff), "%s%starget%d:%d:%d", sysfsroot,
+                snprintf(buff, bufflen, "%s%starget%d:%d:%d", sysfsroot,
                          fc_transport, hctl.h, hctl.c, hctl.t);
                 off = strlen(b);
                 if (get_value(buff, "port_name", b + off, b_len - off)) {
@@ -2549,8 +2556,7 @@ transport_tport(const char * devname, const struct lsscsi_opts * op,
         }
 
         /* no, so check for SRP host */
-        snprintf(buff, sizeof(buff), "%s%shost%d", sysfsroot, srp_host,
-                 hctl.h);
+        snprintf(buff, bufflen, "%s%shost%d", sysfsroot, srp_host, hctl.h);
         if (stat(buff, &a_stat) >= 0 && S_ISDIR(a_stat.st_mode)) {
                 transport_id = TRANSPORT_SRP;
                 snprintf(b, b_len, "srp:");
@@ -2559,8 +2565,7 @@ transport_tport(const char * devname, const struct lsscsi_opts * op,
         }
 
         /* SAS class representation or SBP? */
-        snprintf(buff, sizeof(buff), "%s%s/%s", sysfsroot, bus_scsi_devs,
-                 devname);
+        snprintf(buff, bufflen, "%s%s/%s", sysfsroot, bus_scsi_devs, devname);
         if (if_directory_chdir(buff, "sas_device")) {
                 transport_id = TRANSPORT_SAS_CLASS;
                 snprintf(b, b_len, "sas:");
@@ -2569,36 +2574,39 @@ transport_tport(const char * devname, const struct lsscsi_opts * op,
                         return true;
                 else
                         pr2serr("%s: no sas_addr, wd=%s\n", __func__, buff);
-        } else if (get_value(buff, "ieee1394_id", wd, sizeof(wd))) {
+        } else if (get_value(buff, "ieee1394_id", wd, wdlen)) {
                 /* IEEE1394 SBP device */
                 transport_id = TRANSPORT_SBP;
-                snprintf(b, b_len, "sbp:%s", wd);
+                n = 0;
+                n += scnpr(b + n, b_len - n, "%s", "sbp:");
+                scnpr(b + n, b_len - n, "%s:", wd);
                 return true;
         }
 
         /* iSCSI device? */
-        snprintf(buff, sizeof(buff), "%s%shost%d/device", sysfsroot,
-                 iscsi_host, hctl.h);
+        snprintf(buff, bufflen, "%s%shost%d/device", sysfsroot, iscsi_host,
+                 hctl.h);
         if ((stat(buff, &a_stat) >= 0) && S_ISDIR(a_stat.st_mode)) {
                 if (1 != iscsi_target_scan(buff, &hctl))
                         return false;
                 transport_id = TRANSPORT_ISCSI;
-                snprintf(buff, sizeof(buff), "%s%ssession%d", sysfsroot,
+                snprintf(buff, bufflen, "%s%ssession%d", sysfsroot,
                          iscsi_session, iscsi_tsession_num);
                 if (! get_value(buff, "targetname", nm, sizeof(nm)))
                         return false;
                 if (! get_value(buff, "tpgt", tpgt, sizeof(tpgt)))
                         return false;
-                n = atoi(tpgt);
                 // output target port name as per sam4r08, annex A, table A.3
-                snprintf(b, b_len, "%s,t,0x%x", nm, n);
+                n = 0;
+                n += scnpr(b + n, b_len - n, "%s", nm);
+                scnpr(b + n, b_len - n, ",t,0x%x", (uint32_t)atoi(tpgt));
 // >>>       That reference says maximum length of targetname is 223 bytes
 //           (UTF-8) excluding trailing null.
                 return true;
         }
 
         /* USB device? */
-        cp = get_usb_devname(NULL, devname, wd, sizeof(wd) - 1);
+        cp = get_usb_devname(NULL, devname, wd, wdlen - 1);
         if (cp) {
                 transport_id = TRANSPORT_USB;
                 snprintf(b, b_len, "usb:%s", cp);
@@ -2606,9 +2614,8 @@ transport_tport(const char * devname, const struct lsscsi_opts * op,
         }
 
         /* ATA or SATA device, crude check: driver name */
-        snprintf(buff, sizeof(buff), "%s%shost%d", sysfsroot, scsi_host,
-                 hctl.h);
-        if (get_value(buff, "proc_name", wd, sizeof(wd))) {
+        snprintf(buff, bufflen, "%s%shost%d", sysfsroot, scsi_host, hctl.h);
+        if (get_value(buff, "proc_name", wd, wdlen)) {
                 ata_dev = false;
                 if (0 == strcmp("ahci", wd)) {
                         transport_id = TRANSPORT_SATA;
@@ -2626,8 +2633,8 @@ transport_tport(const char * devname, const struct lsscsi_opts * op,
                 }
                 if (ata_dev) {
                         off = strlen(b);
-                        snprintf(b + off, b_len - off, "%s",
-                                 get_lu_name(devname, wd, sizeof(wd), false));
+                        scnpr(b + off, b_len - off, "%s",
+                                 get_lu_name(devname, wd, wdlen, false));
                         return true;
                 }
         }
@@ -2639,6 +2646,7 @@ transport_tport(const char * devname, const struct lsscsi_opts * op,
 static void
 transport_tport_longer(const char * devname, const struct lsscsi_opts * op)
 {
+        int n, blen, b2len, vlen, wdlen;
         char * cp;
         char path_name[LMAX_DEVPATH];
         char buff[LMAX_DEVPATH];
@@ -2647,38 +2655,42 @@ transport_tport_longer(const char * devname, const struct lsscsi_opts * op)
         char value[LMAX_NAME];
         struct addr_hctl hctl;
 
+        blen = sizeof(buff);
+        b2len = sizeof(b2);
+        vlen = sizeof(value);
+        wdlen = sizeof(wd);
 #if 0
-        snprintf(buff, sizeof(buff), "%s/scsi_device:%s", path_name, devname);
+        snprintf(buff, blen, "%s/scsi_device:%s", path_name, devname);
         if (! if_directory_chdir(buff, "device"))
                 return;
-        if (NULL == getcwd(wd, sizeof(wd)))
+        if (NULL == getcwd(wd, wdlen))
                 return;
 #else
         snprintf(path_name, sizeof(path_name), "%s%s%s", sysfsroot,
                  class_scsi_dev, devname);
-        my_strcopy(buff, path_name, sizeof(buff));
+        my_strcopy(buff, path_name, blen);
 #endif
         switch (transport_id) {
         case TRANSPORT_SPI:
                 printf("  transport=spi\n");
                 if (! parse_colon_list(devname, &hctl))
                         break;
-                snprintf(buff, sizeof(buff), "%s%starget%d:%d:%d", sysfsroot,
+                snprintf(buff, blen, "%s%starget%d:%d:%d", sysfsroot,
                          spi_transport, hctl.h, hctl.c, hctl.t);
                 printf("  target_id=%d\n", hctl.t);
-                if (get_value(buff, "dt", value, sizeof(value)))
+                if (get_value(buff, "dt", value, vlen))
                         printf("  dt=%s\n", value);
-                if (get_value(buff, "max_offset", value, sizeof(value)))
+                if (get_value(buff, "max_offset", value, vlen))
                         printf("  max_offset=%s\n", value);
-                if (get_value(buff, "max_width", value, sizeof(value)))
+                if (get_value(buff, "max_width", value, vlen))
                         printf("  max_width=%s\n", value);
-                if (get_value(buff, "min_period", value, sizeof(value)))
+                if (get_value(buff, "min_period", value, vlen))
                         printf("  min_period=%s\n", value);
-                if (get_value(buff, "offset", value, sizeof(value)))
+                if (get_value(buff, "offset", value, vlen))
                         printf("  offset=%s\n", value);
-                if (get_value(buff, "period", value, sizeof(value)))
+                if (get_value(buff, "period", value, vlen))
                         printf("  period=%s\n", value);
-                if (get_value(buff, "width", value, sizeof(value)))
+                if (get_value(buff, "width", value, vlen))
                         printf("  width=%s\n", value);
                 break;
         case TRANSPORT_FC:
@@ -2687,7 +2699,7 @@ transport_tport_longer(const char * devname, const struct lsscsi_opts * op)
                        transport_id == TRANSPORT_FC ? "fc:" : "fcoe:");
                 if (! if_directory_chdir(path_name, "device"))
                         return;
-                if (NULL == getcwd(wd, sizeof(wd)))
+                if (NULL == getcwd(wd, wdlen))
                         return;
                 cp = strrchr(wd, '/');
                 if (NULL == cp)
@@ -2698,42 +2710,43 @@ transport_tport_longer(const char * devname, const struct lsscsi_opts * op)
                         return;
                 *cp = '\0';
                 cp = basename(wd);
-                snprintf(buff, sizeof(buff), "%s%s", "fc_remote_ports/", cp);
+                snprintf(buff, blen, "%s%s", "fc_remote_ports/", cp);
                 if (if_directory_chdir(wd, buff)) {
-                        if (NULL == getcwd(buff, sizeof(buff)))
+                        if (NULL == getcwd(buff, blen))
                                 return;
                 } else {  /* newer transport */
                         /* /sys  /class/fc_remote_ports/  rport-x:y-z  / */
-                        snprintf(buff, sizeof(buff), "%s%s%s/", sysfsroot,
+                        snprintf(buff, blen, "%s%s%s/", sysfsroot,
                                  fc_remote_ports, cp);
                 }
-                snprintf(b2, sizeof(b2), "%s%s", path_name, "/device/");
-                if (get_value(b2, "vendor", value, sizeof(value)))
+                n = 0;
+                n += scnpr(b2 + n, b2len - n, "%s", path_name);
+                scnpr(b2 + n, b2len - n, "%s", "/device/");
+                if (get_value(b2, "vendor", value, vlen))
                         printf("  vendor=%s\n", value);
-                if (get_value(b2, "model", value, sizeof(value)))
+                if (get_value(b2, "model", value, vlen))
                         printf("  model=%s\n", value);
                 printf("  %s\n",cp);    /* rport */
-                if (get_value(buff, "node_name", value, sizeof(value)))
+                if (get_value(buff, "node_name", value, vlen))
                         printf("  node_name=%s\n", value);
-                if (get_value(buff, "port_name", value, sizeof(value)))
+                if (get_value(buff, "port_name", value, vlen))
                         printf("  port_name=%s\n", value);
-                if (get_value(buff, "port_id", value, sizeof(value)))
+                if (get_value(buff, "port_id", value, vlen))
                         printf("  port_id=%s\n", value);
-                if (get_value(buff, "port_state", value, sizeof(value)))
+                if (get_value(buff, "port_state", value, vlen))
                         printf("  port_state=%s\n", value);
-                if (get_value(buff, "roles", value, sizeof(value)))
+                if (get_value(buff, "roles", value, vlen))
                         printf("  roles=%s\n", value);
 // xxxxxxxxxxxx  following call to print_enclosure_device fails since b2 is
 // inappropriate, comment out since might be useless (check with FCP folks)
                 // print_enclosure_device(devname, b2, op);
-                if (get_value(buff, "scsi_target_id", value, sizeof(value)))
+                if (get_value(buff, "scsi_target_id", value, vlen))
                         printf("  scsi_target_id=%s\n", value);
-                if (get_value(buff, "supported_classes", value,
-                              sizeof(value)))
+                if (get_value(buff, "supported_classes", value, vlen))
                         printf("  supported_classes=%s\n", value);
-                if (get_value(buff, "fast_io_fail_tmo", value, sizeof(value)))
+                if (get_value(buff, "fast_io_fail_tmo", value, vlen))
                         printf("  fast_io_fail_tmo=%s\n", value);
-                if (get_value(buff, "dev_loss_tmo", value, sizeof(value)))
+                if (get_value(buff, "dev_loss_tmo", value, vlen))
                         printf("  dev_loss_tmo=%s\n", value);
                 if (op->verbose > 2) {
                         printf("  fetched from directory: %s\n", buff);
@@ -2744,51 +2757,50 @@ transport_tport_longer(const char * devname, const struct lsscsi_opts * op)
                 printf("  transport=srp\n");
                 if (! parse_colon_list(devname, &hctl))
                         break;
-                if (get_srp_orig_dgid(hctl.h, value, sizeof(value)))
+                if (get_srp_orig_dgid(hctl.h, value, vlen))
                         printf("  orig_dgid=%s\n", value);
-                if (get_srp_dgid(hctl.h, value, sizeof(value)))
+                if (get_srp_dgid(hctl.h, value, vlen))
                         printf("  dgid=%s\n", value);
                 break;
         case TRANSPORT_SAS:
                 printf("  transport=sas\n");
-                snprintf(buff, sizeof(buff), "%s%s%s", sysfsroot, sas_device,
-                         sas_hold_end_device);
-
-                snprintf(b2, sizeof(b2), "%s%s", path_name, "/device/");
-                if (get_value(b2, "vendor", value, sizeof(value)))
+                n = 0;
+                n += scnpr(b2 + n, b2len - n, "%s", sysfsroot);
+                n += scnpr(b2 + n, b2len - n, "%s", sas_device);
+                scnpr(b2 + n, b2len - n, "%s", sas_hold_end_device);
+                n = 0;
+                n += scnpr(b2 + n, b2len - n, "%s", path_name);
+                scnpr(b2 + n, b2len - n, "%s", "/device/");
+                if (get_value(b2, "vendor", value, vlen))
                         printf("  vendor=%s\n", value);
-                if (get_value(b2, "model", value, sizeof(value)))
+                if (get_value(b2, "model", value, vlen))
                         printf("  model=%s\n", value);
-
-                snprintf(b2, sizeof(b2), "%s%s%s", sysfsroot, sas_end_device,
-                         sas_hold_end_device);
-                if (get_value(buff, "bay_identifier", value, sizeof(value)))
+                n = 0;
+                n += scnpr(b2 + n, b2len - n, "%s", sysfsroot);
+                n += scnpr(b2 + n, b2len - n, "%s", sas_end_device);
+                scnpr(b2 + n, b2len - n, "%s", sas_hold_end_device);
+                if (get_value(buff, "bay_identifier", value, vlen))
                         printf("  bay_identifier=%s\n", value);
                 print_enclosure_device(devname, b2, op);
-                if (get_value(buff, "enclosure_identifier", value,
-                              sizeof(value)))
+                if (get_value(buff, "enclosure_identifier", value, vlen))
                         printf("  enclosure_identifier=%s\n", value);
-                if (get_value(buff, "initiator_port_protocols", value,
-                              sizeof(value)))
+                if (get_value(buff, "initiator_port_protocols", value, vlen))
                         printf("  initiator_port_protocols=%s\n", value);
-                if (get_value(b2, "initiator_response_timeout", value,
-                              sizeof(value)))
+                if (get_value(b2, "initiator_response_timeout", value, vlen))
                         printf("  initiator_response_timeout=%s\n", value);
-                if (get_value(b2, "I_T_nexus_loss_timeout", value,
-                              sizeof(value)))
+                if (get_value(b2, "I_T_nexus_loss_timeout", value, vlen))
                         printf("  I_T_nexus_loss_timeout=%s\n", value);
-                if (get_value(buff, "phy_identifier", value, sizeof(value)))
+                if (get_value(buff, "phy_identifier", value, vlen))
                         printf("  phy_identifier=%s\n", value);
-                if (get_value(b2, "ready_led_meaning", value, sizeof(value)))
+                if (get_value(b2, "ready_led_meaning", value, vlen))
                         printf("  ready_led_meaning=%s\n", value);
-                if (get_value(buff, "sas_address", value, sizeof(value)))
+                if (get_value(buff, "sas_address", value, vlen))
                         printf("  sas_address=%s\n", value);
-                if (get_value(buff, "target_port_protocols", value,
-                              sizeof(value)))
+                if (get_value(buff, "target_port_protocols", value, vlen))
                         printf("  target_port_protocols=%s\n", value);
-                if (get_value(b2, "tlr_enabled", value, sizeof(value)))
+                if (get_value(b2, "tlr_enabled", value, vlen))
                         printf("  tlr_enabled=%s\n", value);
-                if (get_value(b2, "tlr_supported", value, sizeof(value)))
+                if (get_value(b2, "tlr_supported", value, vlen))
                         printf("  tlr_supported=%s\n", value);
                 if (op->verbose > 2) {
                         printf("fetched from directory: %s\n", buff);
@@ -2798,69 +2810,68 @@ transport_tport_longer(const char * devname, const struct lsscsi_opts * op)
         case TRANSPORT_SAS_CLASS:
                 printf("  transport=sas\n");
                 printf("  sub_transport=sas_class\n");
-                snprintf(buff, sizeof(buff), "%s%s", path_name,
-                         "/device/sas_device");
-                if (get_value(buff, "device_name", value, sizeof(value)))
+                n = 0;
+                n += scnpr(buff + n, blen - n, "%s", path_name);
+                scnpr(buff + n, blen - n, "%s", "/device/sas_device");
+                if (get_value(buff, "device_name", value, vlen))
                         printf("  device_name=%s\n", value);
-                if (get_value(buff, "dev_type", value, sizeof(value)))
+                if (get_value(buff, "dev_type", value, vlen))
                         printf("  dev_type=%s\n", value);
-                if (get_value(buff, "iproto", value, sizeof(value)))
+                if (get_value(buff, "iproto", value, vlen))
                         printf("  iproto=%s\n", value);
-                if (get_value(buff, "iresp_timeout", value, sizeof(value)))
+                if (get_value(buff, "iresp_timeout", value, vlen))
                         printf("  iresp_timeout=%s\n", value);
-                if (get_value(buff, "itnl_timeout", value, sizeof(value)))
+                if (get_value(buff, "itnl_timeout", value, vlen))
                         printf("  itnl_timeout=%s\n", value);
-                if (get_value(buff, "linkrate", value, sizeof(value)))
+                if (get_value(buff, "linkrate", value, vlen))
                         printf("  linkrate=%s\n", value);
-                if (get_value(buff, "max_linkrate", value, sizeof(value)))
+                if (get_value(buff, "max_linkrate", value, vlen))
                         printf("  max_linkrate=%s\n", value);
-                if (get_value(buff, "max_pathways", value, sizeof(value)))
+                if (get_value(buff, "max_pathways", value, vlen))
                         printf("  max_pathways=%s\n", value);
-                if (get_value(buff, "min_linkrate", value, sizeof(value)))
+                if (get_value(buff, "min_linkrate", value, vlen))
                         printf("  min_linkrate=%s\n", value);
-                if (get_value(buff, "pathways", value, sizeof(value)))
+                if (get_value(buff, "pathways", value, vlen))
                         printf("  pathways=%s\n", value);
-                if (get_value(buff, "ready_led_meaning", value,
-                              sizeof(value)))
+                if (get_value(buff, "ready_led_meaning", value, vlen))
                         printf("  ready_led_meaning=%s\n", value);
-                if (get_value(buff, "rl_wlun", value, sizeof(value)))
+                if (get_value(buff, "rl_wlun", value, vlen))
                         printf("  rl_wlun=%s\n", value);
-                if (get_value(buff, "sas_addr", value, sizeof(value)))
+                if (get_value(buff, "sas_addr", value, vlen))
                         printf("  sas_addr=%s\n", value);
-                if (get_value(buff, "tproto", value, sizeof(value)))
+                if (get_value(buff, "tproto", value, vlen))
                         printf("  tproto=%s\n", value);
-                if (get_value(buff, "transport_layer_retries", value,
-                              sizeof(value)))
+                if (get_value(buff, "transport_layer_retries", value, vlen))
                         printf("  transport_layer_retries=%s\n", value);
                 if (op->verbose > 2)
                         printf("fetched from directory: %s\n", buff);
                 break;
         case TRANSPORT_ISCSI:
                 printf("  transport=iSCSI\n");
-                snprintf(buff, sizeof(buff), "%s%ssession%d", sysfsroot,
-                         iscsi_session, iscsi_tsession_num);
-                if (get_value(buff, "targetname", value, sizeof(value)))
+                n = 0;
+                n += scnpr(buff + n, blen - n, "%s", sysfsroot);
+                n += scnpr(buff + n, blen - n, "%s", iscsi_session);
+                n += scnpr(buff + n, blen - n, "%s", "session");
+                scnpr(buff + n, blen - n, "%d", iscsi_tsession_num);
+                if (get_value(buff, "targetname", value, vlen))
                         printf("  targetname=%s\n", value);
-                if (get_value(buff, "tpgt", value, sizeof(value)))
+                if (get_value(buff, "tpgt", value, vlen))
                         printf("  tpgt=%s\n", value);
-                if (get_value(buff, "data_pdu_in_order", value,
-                              sizeof(value)))
+                if (get_value(buff, "data_pdu_in_order", value, vlen))
                         printf("  data_pdu_in_order=%s\n", value);
-                if (get_value(buff, "data_seq_in_order", value,
-                              sizeof(value)))
+                if (get_value(buff, "data_seq_in_order", value, vlen))
                         printf("  data_seq_in_order=%s\n", value);
-                if (get_value(buff, "erl", value, sizeof(value)))
+                if (get_value(buff, "erl", value, vlen))
                         printf("  erl=%s\n", value);
-                if (get_value(buff, "first_burst_len", value, sizeof(value)))
+                if (get_value(buff, "first_burst_len", value, vlen))
                         printf("  first_burst_len=%s\n", value);
-                if (get_value(buff, "initial_r2t", value, sizeof(value)))
+                if (get_value(buff, "initial_r2t", value, vlen))
                         printf("  initial_r2t=%s\n", value);
-                if (get_value(buff, "max_burst_len", value, sizeof(value)))
+                if (get_value(buff, "max_burst_len", value, vlen))
                         printf("  max_burst_len=%s\n", value);
-                if (get_value(buff, "max_outstanding_r2t", value,
-                              sizeof(value)))
+                if (get_value(buff, "max_outstanding_r2t", value, vlen))
                         printf("  max_outstanding_r2t=%s\n", value);
-                if (get_value(buff, "recovery_tmo", value, sizeof(value)))
+                if (get_value(buff, "recovery_tmo", value, vlen))
                         printf("  recovery_tmo=%s\n", value);
 // >>>       Would like to see what are readable attributes in this directory.
 //           Ignoring connections for the time being. Could add with an entry
@@ -2873,9 +2884,9 @@ transport_tport_longer(const char * devname, const struct lsscsi_opts * op)
                 printf("  transport=sbp\n");
                 if (! if_directory_chdir(path_name, "device"))
                         return;
-                if (NULL == getcwd(wd, sizeof(wd)))
+                if (NULL == getcwd(wd, wdlen))
                         return;
-                if (get_value(wd, "ieee1394_id", value, sizeof(value)))
+                if (get_value(wd, "ieee1394_id", value, vlen))
                         printf("  ieee1394_id=%s\n", value);
                 if (op->verbose > 2)
                         printf("fetched from directory: %s\n", buff);
@@ -2883,7 +2894,7 @@ transport_tport_longer(const char * devname, const struct lsscsi_opts * op)
         case TRANSPORT_USB:
                 printf("  transport=usb\n");
                 printf("  device_name=%s\n", get_usb_devname(NULL, devname,
-                       value, sizeof(value)));
+                       value, vlen));
                 break;
         case TRANSPORT_ATA:
                 printf("  transport=ata\n");
@@ -3631,10 +3642,14 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
         char devname[64];
         char ctl_model[48];
         char b[80];
+        const int blen = sizeof(b);
+        const int bufflen = sizeof(buff);
         const int vlen = sizeof(value);
         struct addr_hctl hctl;
 
-        snprintf(buff, sizeof(buff), "%s/%s", nvme_ctl_abs, nvme_ns_rel);
+        n = 0;
+        n += scnpr(buff + n, bufflen - n, "%s/", nvme_ctl_abs);
+        scnpr(buff + n, bufflen - n, "%s", nvme_ns_rel);
         if ((0 == strncmp(nvme_ns_rel, "nvme", 4)) &&
             (1 == sscanf(nvme_ns_rel + 4, "%d", &cdev_minor)))
                 ;
@@ -3702,7 +3717,7 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
 
                         if (0 == strcmp("pcie" , value)) {
 
-                                if (get_value(buff, svp, b, sizeof(b)) &&
+                                if (get_value(buff, svp, b, blen) &&
                                     get_value(buff, sdp, bb, sizeof(bb))) {
                                         snprintf(value , vlen, "pcie %s:%s",
                                                  b, bb);
@@ -3727,7 +3742,7 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
                                 sizeof(ctl_model)))
                         snprintf(ctl_model, sizeof(ctl_model), "-    ");
                 n = trim_lead_trail(ctl_model, true, true);
-                snprintf(b, sizeof(b), "__%u", nsid);
+                snprintf(b, blen, "__%u", nsid);
                 m = strlen(b);
                 if (n > (41 - m))
                         memcpy(ctl_model + 41 - m, b, m + 1);
@@ -3942,6 +3957,7 @@ one_nhost_entry(const char * dir_name, const char * nvme_ctl_rel,
                 bool sing = (op->long_opt > 2);
                 const char * sep = sing ? "\n" : "";
 
+                printf("\n"); /* leave host single line the same, like SCSI */
                 if (get_value(buff, "cntlid", value, vlen))
                         printf("%s  cntlid=%s%s", sep, value, sep);
                 else if (vb)
@@ -4104,19 +4120,23 @@ nhost_scandir_sort(const struct dirent ** a, const struct dirent ** b)
 static void
 list_sdevices(const struct lsscsi_opts * op)
 {
-        int num, k;
+        int num, k, n, blen, nlen;
         struct dirent ** namelist;
         char buff[LMAX_DEVPATH];
         char name[LMAX_NAME];
 
-        snprintf(buff, sizeof(buff), "%s%s", sysfsroot, bus_scsi_devs);
+        blen = sizeof(buff);
+        nlen = sizeof(name);
+        snprintf(buff, blen, "%s%s", sysfsroot, bus_scsi_devs);
 
         num = scandir(buff, &namelist, sdev_dir_scan_select,
                       sdev_scandir_sort);
         if (num < 0) {  /* scsi mid level may not be loaded */
                 if (op->verbose > 0) {
-                        snprintf(name, sizeof(name), "%s: scandir: %s",
-                                 __func__, buff);
+                        n = 0;
+                        n += scnpr(name + n, nlen - n, "%s: scandir: ",
+                                   __func__);
+                        scnpr(name + n, nlen - n, "%s", buff);
                         perror(name);
                         printf("SCSI mid level module may not be loaded\n");
                 }
@@ -4128,7 +4148,7 @@ list_sdevices(const struct lsscsi_opts * op)
                 printf("Attached devices: %s\n", (num ? "" : "none"));
 
         for (k = 0; k < num; ++k) {
-                my_strcopy(name, namelist[k]->d_name, sizeof(name));
+                my_strcopy(name, namelist[k]->d_name, nlen);
                 transport_id = TRANSPORT_UNKNOWN;
                 one_sdev_entry(buff, name, op);
                 free(namelist[k]);
@@ -4144,36 +4164,46 @@ list_sdevices(const struct lsscsi_opts * op)
 static void
 list_ndevices(const struct lsscsi_opts * op)
 {
-        int num, num2, k, j;
+        int num, num2, k, j, n, blen, b2len, elen;
         struct dirent ** name_list;
         struct dirent ** namelist2;
         char buff[LMAX_DEVPATH];
         char buff2[LMAX_DEVPATH];
         char ebuf[120];
 
-        snprintf(buff, sizeof(buff), "%s%s", sysfsroot, class_nvme);
+        blen = sizeof(buff);
+        b2len = sizeof(buff2);
+        elen = sizeof(ebuf);
+        n = 0;
+        n += scnpr(buff + n, blen - n, "%s", sysfsroot);
+        scnpr(buff + n, blen - n, "%s", class_nvme);
 
         num = scandir(buff, &name_list, ndev_dir_scan_select,
                       nhost_scandir_sort);
         if (num < 0) {  /* NVMe module may not be loaded */
                 if (op->verbose > 0) {
-                        snprintf(ebuf, sizeof(ebuf), "%s: scandir: %s",
-                                 __func__, buff);
+                        n = 0;
+                        n += scnpr(ebuf + n, elen - n, "%s: scandir: ",
+                                   __func__);
+                        scnpr(ebuf + n, elen - n, "%s", buff);
                         perror(ebuf);
                         printf("NVMe module may not be loaded\n");
                 }
                 return;
         }
         for (k = 0; k < num; ++k) {
-                snprintf(buff2, sizeof(buff2), "%s%s", buff,
-                         name_list[k]->d_name);
+                n = 0;
+                n += scnpr(buff2 + n, b2len - n, "%s", buff);
+                scnpr(buff2 + n, b2len - n, "%s", name_list[k]->d_name);
                 free(name_list[k]);
                 num2 = scandir(buff2, &namelist2, ndev_dir_scan_select2,
                                sdev_scandir_sort);
                 if (num2 < 0) {
                         if (op->verbose > 0) {
-                                snprintf(ebuf, sizeof(ebuf), "%s: scandir"
-                                         "(2): %s", __func__, buff);
+                                n = 0;
+                                n += scnpr(ebuf + n, elen - n,
+                                           "%s: scandir(2): ", __func__);
+                                scnpr(ebuf + n, elen - n, "%s", buff);
                                 perror(ebuf);
                         }
                         /* already freed name_list[k] so move to next */
@@ -4202,74 +4232,68 @@ static void
 longer_h_entry(const char * path_name, const struct lsscsi_opts * op)
 {
         char value[LMAX_NAME];
+        const int vlen = sizeof(value);
 
         if (op->transport_info) {
                 transport_init_longer(path_name, op);
                 return;
         }
         if (op->long_opt >= 3) {
-                if (get_value(path_name, "can_queue", value, sizeof(value)))
+                if (get_value(path_name, "can_queue", value, vlen))
                         printf("  can_queue=%s\n", value);
                 else if (op->verbose)
                         printf("  can_queue=?\n");
-                if (get_value(path_name, "cmd_per_lun", value, sizeof(value)))
+                if (get_value(path_name, "cmd_per_lun", value, vlen))
                         printf("  cmd_per_lun=%s\n", value);
                 else if (op->verbose)
                         printf("  cmd_per_lun=?\n");
-                if (get_value(path_name, "host_busy", value, sizeof(value)))
+                if (get_value(path_name, "host_busy", value, vlen))
                         printf("  host_busy=%s\n", value);
                 else if (op->verbose)
                         printf("  host_busy=?\n");
-                if (get_value(path_name, "sg_tablesize", value,
-                              sizeof(value)))
+                if (get_value(path_name, "sg_tablesize", value, vlen))
                         printf("  sg_tablesize=%s\n", value);
                 else if (op->verbose)
                         printf("  sg_tablesize=?\n");
-                if (get_value(path_name, "state", value, sizeof(value)))
+                if (get_value(path_name, "state", value, vlen))
                         printf("  state=%s\n", value);
                 else if (op->verbose)
                         printf("  state=?\n");
-                if (get_value(path_name, "unchecked_isa_dma", value,
-                              sizeof(value)))
+                if (get_value(path_name, "unchecked_isa_dma", value, vlen))
                         printf("  unchecked_isa_dma=%s\n", value);
                 else if (op->verbose)
                         printf("  unchecked_isa_dma=?\n");
-                if (get_value(path_name, "unique_id", value, sizeof(value)))
+                if (get_value(path_name, "unique_id", value, vlen))
                         printf("  unique_id=%s\n", value);
                 else if (op->verbose)
                         printf("  unique_id=?\n");
         } else if (op->long_opt > 0) {
-                if (get_value(path_name, "cmd_per_lun", value, sizeof(value)))
+                if (get_value(path_name, "cmd_per_lun", value, vlen))
                         printf("  cmd_per_lun=%-4s ", value);
                 else
                         printf("  cmd_per_lun=???? ");
 
-                if (get_value(path_name, "host_busy", value, sizeof(value)))
+                if (get_value(path_name, "host_busy", value, vlen))
                         printf("host_busy=%-4s ", value);
                 else
                         printf("host_busy=???? ");
 
-                if (get_value(path_name, "sg_tablesize", value,
-                              sizeof(value)))
+                if (get_value(path_name, "sg_tablesize", value, vlen))
                         printf("sg_tablesize=%-4s ", value);
                 else
                         printf("sg_tablesize=???? ");
 
-                if (get_value(path_name, "unchecked_isa_dma", value,
-                              sizeof(value)))
+                if (get_value(path_name, "unchecked_isa_dma", value, vlen))
                         printf("unchecked_isa_dma=%-2s ", value);
                 else
                         printf("unchecked_isa_dma=?? ");
                 printf("\n");
                 if (2 == op->long_opt) {
-                        if (get_value(path_name, "can_queue", value,
-                                      sizeof(value)))
+                        if (get_value(path_name, "can_queue", value, vlen))
                                 printf("  can_queue=%-4s ", value);
-                        if (get_value(path_name, "state", value,
-                                      sizeof(value)))
+                        if (get_value(path_name, "state", value, vlen))
                                 printf("  state=%-8s ", value);
-                        if (get_value(path_name, "unique_id", value,
-                                      sizeof(value)))
+                        if (get_value(path_name, "unique_id", value, vlen))
                                 printf("  unique_id=%-2s ", value);
                         printf("\n");
                 }
@@ -4280,12 +4304,15 @@ static void
 one_host_entry(const char * dir_name, const char * devname,
                const struct lsscsi_opts * op)
 {
+        int n;
         unsigned int host_id;
         const char * nullname1 = "<NULL>";
         const char * nullname2 = "(null)";
         char buff[LMAX_DEVPATH];
         char value[LMAX_NAME];
         char wd[LMAX_PATH];
+        const int blen = sizeof(buff);
+        const int vlen = sizeof(value);
 
         if (op->classic) {
                 // one_classic_host_entry(dir_name, devname, op);
@@ -4296,8 +4323,11 @@ one_host_entry(const char * dir_name, const char * devname,
                 printf("[%u]  ", host_id);
         else
                 printf("[?]  ");
-        snprintf(buff, sizeof(buff), "%s/%s", dir_name, devname);
-        if ((get_value(buff, "proc_name", value, sizeof(value))) &&
+        n = 0;
+        n += scnpr(buff + n, blen - n, "%s", dir_name);
+        n += scnpr(buff + n, blen - n, "%s", "/");
+        scnpr(buff + n, blen - n, "%s", devname);
+        if ((get_value(buff, "proc_name", value, vlen)) &&
             (strncmp(value, nullname1, 6)) && (strncmp(value, nullname2, 6)))
                 printf("  %-12s  ", value);
         else if (if_directory_chdir(buff, "device/../driver")) {
@@ -4309,7 +4339,7 @@ one_host_entry(const char * dir_name, const char * devname,
         } else
                 printf("  proc_name=????  ");
         if (op->transport_info) {
-                if (transport_init(devname, /* op, */ sizeof(value), value))
+                if (transport_init(devname, /* op, */ vlen, value))
                         printf("%s\n", value);
                 else
                         printf("\n");
@@ -4385,8 +4415,12 @@ list_shosts(const struct lsscsi_opts * op)
         num = scandir(buff, &namelist, host_dir_scan_select,
                       shost_scandir_sort);
         if (num < 0) {
-                snprintf(name, sizeof(name), "%s: scandir: %s",
-                         __func__, buff);
+                int n, nlen;
+
+                n = 0;
+                nlen = sizeof(name);
+                n += scnpr(name + n, nlen - n, "%s: scandir: ", __func__);
+                scnpr(name + n, nlen - n, "%s", name);
                 perror(name);
                 return;
         }
@@ -4408,19 +4442,25 @@ list_shosts(const struct lsscsi_opts * op)
 static void
 list_nhosts(const struct lsscsi_opts * op)
 {
-        int num, k;
+        int num, k, n;
         struct dirent ** namelist;
         char buff[LMAX_DEVPATH];
         char ebuf[120];
+        const int blen = sizeof(buff);
+        const int elen = sizeof(ebuf);
 
-        snprintf(buff, sizeof(buff), "%s%s", sysfsroot, class_nvme);
+        n = 0;
+        n += scnpr(buff + n, blen - 1, "%s", sysfsroot);
+        scnpr(buff + n, blen - 1, "%s", class_nvme);
 
         num = scandir(buff, &namelist, ndev_dir_scan_select,
                       nhost_scandir_sort);
         if (num < 0) {  /* NVMe module may not be loaded */
                 if (op->verbose > 0) {
-                        snprintf(ebuf, sizeof(ebuf), "%s: scandir: %s",
-                                 __func__, buff);
+                        n = 0;
+                        n += scnpr(ebuf + n, elen - n, "%s: scandir: ",
+                                   __func__);
+                        scnpr(ebuf + n, elen - n, "%s", buff);
                         perror(ebuf);
                         printf("NVMe module may not be loaded\n");
                 }

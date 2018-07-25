@@ -54,6 +54,9 @@ fi
 
 
 %changelog
+* Tue Jul 24 2018 - dgilbert at interlog dot com
+- fixes, minor tweaks
+  * lsscsi-0.31
 * Tue Jun 12 2018 - dgilbert at interlog dot com
 - add NVMe support, minor tweaks
   * lsscsi-0.30
@@ -129,7 +132,7 @@ fi
 * Sat Jan 18 2003 - dgilbert at interlog dot com
 - output st and osst device file names (rather than "-")
   * lsscsi-0.05
-* Thu Jan 14 2003 - dgilbert at interlog dot com
+* Tue Jan 14 2003 - dgilbert at interlog dot com
 - fix multiple listings of st devices (needed for lk 2.5.57)
   * lsscsi-0.04
 * Thu Jan 09 2003 - dgilbert at interlog dot com
