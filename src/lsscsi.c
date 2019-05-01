@@ -3,7 +3,7 @@
  * applicable to kernel versions 2.6.1 and greater. In lsscsi version 0.30
  * support was added to additionally list NVMe devices and controllers.
  *
- *  Copyright (C) 2003-2018 D. Gilbert
+ *  Copyright (C) 2003-2019 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -45,7 +45,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "0.31  2018/07/24 [svn: r155]";
+static const char * version_str = "0.31  2019/05/01 [svn: r156]";
 
 #define FT_OTHER 0
 #define FT_BLOCK 1

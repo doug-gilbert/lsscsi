@@ -1,7 +1,7 @@
 Linux utility for listing SCSI devices.
 
-Version 0.31 2018/07/24 [svn: r155]
-  - cleanup gcc-8 warnings
+Version 0.31 2019/05/01 [svn: r156]
+  - cleanup gcc-8 warnings, no cleanup needed for gcc-9
 
 Version 0.30 2018/06/12 [svn: r154]
   - add support for NVMe devices and controllers

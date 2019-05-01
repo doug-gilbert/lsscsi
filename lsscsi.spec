@@ -1,5 +1,5 @@
 %define name    lsscsi
-%define version 0.30
+%define version 0.31
 %define release 1
 
 Summary: 	List SCSI devices (or hosts) plus NVMe namespaces and ctls
