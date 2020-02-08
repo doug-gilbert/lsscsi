@@ -1,6 +1,9 @@
 The author of lsscsi would like to thank the following people who
 have made contributions:
 
+Carl Jacobsen <carl at carlrj dot com>
+    Correct author's hexadecimal counting issues [20200103]
+
 Dan Horak <dhorak at redhat dot com>
     Cope with proc_name from "<NULL>" to "(null") around
     lk 2.6.32 and FC transport syntax change [20100506]
@@ -47,4 +50,4 @@ Stefan Richter <stefanr at s5r6 dot in-berlin dot de>
     transport help with ieee1394 [20061231]
 
 Doug Gilbert
-22nd January 2014
+3rd January 2020

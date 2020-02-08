@@ -3,7 +3,7 @@
  * applicable to kernel versions 2.6.1 and greater. In lsscsi version 0.30
  * support was added to additionally list NVMe devices and controllers.
  *
- *  Copyright (C) 2003-2019 D. Gilbert
+ *  Copyright (C) 2003-2020 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -45,7 +45,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "0.31  2019/05/01 [svn: r156]";
+static const char * version_str = "0.31  2020/02/08 [svn: r157]";
 
 #define FT_OTHER 0
 #define FT_BLOCK 1
@@ -181,7 +181,7 @@ static const char * scsi_device_types[] =
         "Zoned Block",
         "Reserved (0x15)", "Reserved (0x16)", "Reserved (0x17)",
         "Reserved (0x18)", "Reserved (0x19)", "Reserved (0x1a)",
-        "Reserved (0x1b)", "Reserved (0x1c)", "Reserved (0x1e)",
+        "Reserved (0x1b)", "Reserved (0x1c)", "Reserved (0x1d)",
         "Well known LU",
         "No device",
 };
@@ -192,7 +192,7 @@ static const char * scsi_short_device_types[] =
         "scanner", "optical", "mediumx", "comms  ", "(0xa)  ", "(0xb)  ",
         "storage", "enclosu", "sim dsk", "opti rd", "bridge ", "osd    ",
         "adi    ", "sec man", "zbc    ", "(0x15) ", "(0x16) ", "(0x17) ",
-        "(0x18) ", "(0x19) ", "(0x1a) ", "(0x1b) ", "(0x1c) ", "(0x1e) ",
+        "(0x18) ", "(0x19) ", "(0x1a) ", "(0x1b) ", "(0x1c) ", "(0x1d) ",
         "wlun   ", "no dev ",
 };
 
@@ -3764,6 +3764,8 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
                 else
                         printf(" [dev?]");
         }
+	if (op->generic)
+		printf("  %-9s", "-");	/* no NVMe generic devices (yet) */
 
         if (op->ssize) {
                 uint64_t blk512s;
@@ -4807,13 +4809,13 @@ main(int argc, char **argv)
         if (do_hosts) {
                 list_shosts(op);
 #if (HAVE_NVME && (! IGNORE_NVME))
-                if (! op->no_nvme)
+                if ((! op->no_nvme) && (! op->classic))
                         list_nhosts(op);
 #endif
         } else if (do_sdevices) {
                 list_sdevices(op);
 #if (HAVE_NVME && (! IGNORE_NVME))
-                if (! op->no_nvme)
+                if ((! op->no_nvme) && (! op->classic))
                         list_ndevices(op);
 #endif
         }

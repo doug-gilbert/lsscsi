@@ -1,7 +1,11 @@
 Linux utility for listing SCSI devices.
 
-Version 0.31 2019/05/01 [svn: r156]
+Version 0.31 2020/02/08 [svn: r157]
   - cleanup gcc-8 warnings, no cleanup needed for gcc-9
+  - exclude NVMe listings when --classic given
+  - fix hex counting issues
+  - supply "-" for generic NVMe device one line output
+    so 'lsscsi -gb' output is consistent
 
 Version 0.30 2018/06/12 [svn: r154]
   - add support for NVMe devices and controllers
