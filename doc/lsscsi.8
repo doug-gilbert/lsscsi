@@ -207,6 +207,9 @@ respectively. When given twice, IEC 80000\-3 prefixes for 'B' are used;
 for example MiB, GiB and TiB stand for 2^20, 2^30 and 2^40
 bytes respectively. The output is rounded to 3 or less significant
 figures in order to fit on a single line.
+It will also output the size of RBC devices, CD/DVD media and host
+managed ZBC disks. Host aware ZBC disks have their "peripheral device
+type" set to 0 (the same as normal disks) so their size is output.
 .br
 If given three times (short form is the more convenient: '\-sss') then
 the disk capacity as a logical block count is given. This is an exact

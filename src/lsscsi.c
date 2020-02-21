@@ -45,7 +45,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "0.31  2020/02/08 [svn: r157]";
+static const char * version_str = "0.31  2020/02/20 [svn: r160]";
 
 #define FT_OTHER 0
 #define FT_BLOCK 1
@@ -3269,6 +3269,14 @@ tag_lun(const uint8_t * lunp, int * tag_arr)
         }
 }
 
+/* Return true for direct access, cd/dvd, rbc and host managed zbc */
+static inline bool
+is_direct_access_dev(int pdt)
+{
+	return ((0x0 == pdt) || (0x5 == pdt) || (0xe == pdt) ||
+		(0x14 == pdt));
+}
+
 /* List one SCSI device (LU) on a line. */
 static void
 one_sdev_entry(const char * dir_name, const char * devname,
@@ -3520,7 +3528,8 @@ one_sdev_entry(const char * dir_name, const char * devname,
 
                 my_strcopy(blkdir, buff, sizeof(blkdir));
                 value[0] = 0;
-                if (! ((0 == type) && block_scan(blkdir) &&
+                if (! (is_direct_access_dev(type) &&
+		       block_scan(blkdir) &&
                        if_directory_chdir(blkdir, ".") &&
                        get_value(".", "size", value, vlen)) ) {
                         printf("  %6s", "-");

@@ -1,7 +1,9 @@
 Linux utility for listing SCSI devices.
 
-Version 0.31 2020/02/08 [svn: r157]
+Version 0.31 2020/02/20 [svn: r160]
   - cleanup gcc-8 warnings, no cleanup needed for gcc-9
+  - fix issue where host managed ZBC devices don't
+    output their size. [Fix also for RBC and CD/DVD.]
   - exclude NVMe listings when --classic given
   - fix hex counting issues
   - supply "-" for generic NVMe device one line output
