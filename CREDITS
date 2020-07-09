@@ -49,5 +49,8 @@ Nate Dailey <Nate dot Dailey at stratus dot com>
 Stefan Richter <stefanr at s5r6 dot in-berlin dot de>
     transport help with ieee1394 [20061231]
 
+Tomas Bzatek <tbzatek at redhat dot com>
+    NVMe improvements [20200708  svn: r163]
+
 Doug Gilbert
-3rd January 2020
+8th July 2020

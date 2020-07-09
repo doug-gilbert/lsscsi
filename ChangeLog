@@ -1,7 +1,10 @@
 Linux utility for listing SCSI devices.
 
-Version 0.32 2020/05/04 [svn: r162]
-  - bump to 0.32
+Version 0.32 2020/07/08 [svn: r163]
+  - improve NVMe device parsing (e.g. /dev/nvme0c1n2)
+  - collect_disk_wwn_nodes: Fix WWN string copy
+  - make WWN printing for NVMe more consistent with
+    output from SCSI devices (e.g. with -u and -t)
 
 Version 0.31 2020/02/20 [svn: r160]
   - cleanup gcc-8 warnings, no cleanup needed for gcc-9

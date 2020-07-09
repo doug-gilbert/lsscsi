@@ -1509,7 +1509,7 @@ collect_disk_wwn_nodes(void)
                 }
 
                 cur_ent = &cur_list->nodes[cur_list->count];
-                my_strcopy(cur_ent->wwn, "0x", 2);
+                my_strcopy(cur_ent->wwn, "0x", 3);
                 my_strcopy(cur_ent->wwn + 2, dep->d_name + 5,
                            sizeof(cur_ent->wwn) - 2);
                 my_strcopy(cur_ent->disk_bname, basename(symlink_path),
@@ -1886,14 +1886,49 @@ static bool
 parse_colon_list(const char * colon_list, struct addr_hctl * outp)
 {
         int k;
+        int val;
         uint64_t z;
         const char * elem_end;
 
         if ((! colon_list) || (! outp))
                 return false;
 #if (HAVE_NVME && (! IGNORE_NVME))
-        if ('N' == toupper((uint8_t)*colon_list))
+        if ('N' == toupper((uint8_t)*colon_list)) {
                 outp->h = NVME_HOST_NUM;
+
+                if ((0 == strncmp(colon_list, "nvme", 4)) &&
+                    (1 == sscanf(colon_list + 4, "%d%n", &outp->c, &k)))
+                        colon_list = colon_list + 4 + k;
+                else
+                        return false;
+
+                while (*colon_list) {
+                        if ('c' == *colon_list) {
+                                if (1 == sscanf(colon_list + 1, "%d%n", &outp->t, &k)) {
+                                        outp->t++;   /*  /sys/class/nvme/nvmeX/cntlid starts from 1  */
+                                        colon_list = colon_list + 1 + k;
+                                } else
+                                        break;
+                        } else if ('n' == *colon_list) {
+                                if (1 == sscanf(colon_list + 1, "%d%n", &val, &k)) {
+                                        outp->l = val;
+                                        colon_list = colon_list + 1 + k;
+                                } else
+                                        break;
+                        } else if ('p' == *colon_list) {
+                                /* partition number, ignoring assignment */
+                                if (1 == sscanf(colon_list + 1, "%*d%n", &k)) {
+                                        colon_list = colon_list + 1 + k;
+                                } else
+                                        break;
+                        } else {
+                                /* unmatched string */
+                                break;
+                        }
+                }
+
+                return true;
+        }
         else
 #endif
         if (1 != sscanf(colon_list, "%d", &outp->h))
@@ -3712,13 +3747,7 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
         else
                 printf("disk    ");
 
-
-        if (op->wwn) {
-                if (get_value(buff, "wwid", value, vlen))
-                        printf("%-41s  ", value);
-                else
-                        printf("%-41s  ", "wwid?");
-        } else if (op->transport_info) {
+        if (op->transport_info) {
                 if (get_value(buff, "device/transport", value, vlen)) {
                         const char * svp = "device/device/subsystem_vendor";
                         const char * sdp = "device/device/subsystem_device";
@@ -3758,6 +3787,13 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
                 else
                         strcat(ctl_model, b);
                 printf("%-41s  ", ctl_model);
+        }
+
+        if (op->wwn) {
+                if (get_value(buff, "wwid", value, vlen))
+                        printf("%-41s  ", value);
+                else
+                        printf("%-41s  ", "wwid?");
         }
 
         if (op->kname)
