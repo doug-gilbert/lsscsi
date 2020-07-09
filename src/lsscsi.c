@@ -45,7 +45,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "0.31  2020/02/20 [svn: r160]";
+static const char * version_str = "0.32  2020/05/04 [svn: r162]";
 
 #define FT_OTHER 0
 #define FT_BLOCK 1

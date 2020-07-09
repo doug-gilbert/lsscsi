@@ -1,4 +1,4 @@
-AC_INIT(lsscsi, 0.31, dgilbert@interlog.com)
+AC_INIT(lsscsi, 0.32, dgilbert@interlog.com)
 
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 AM_MAINTAINER_MODE
