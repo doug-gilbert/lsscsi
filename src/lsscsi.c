@@ -45,7 +45,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "0.32  2020/05/04 [svn: r162]";
+static const char * version_str = "0.32  2020/11/09 [svn: r164]";
 
 #define FT_OTHER 0
 #define FT_BLOCK 1
@@ -132,25 +132,25 @@ struct addr_hctl filter;
 static bool filter_active = false;
 
 struct lsscsi_opts {
-        bool brief;
-        bool classic;
-        bool dev_maj_min;        /* --device */
-        bool generic;
-        bool kname;
-        bool no_nvme;
-        bool pdt;               /* (-D) peripheral device type in hex */
-        bool protection;        /* data integrity */
-        bool protmode;          /* data integrity */
-        bool scsi_id;           /* udev derived from /dev/disk/by-id/scsi* */
-        bool transport_info;
-        bool wwn;
-        int long_opt;           /* --long */
-        int lunhex;
-        int ssize;              /* show storage size, once->base 10 (e.g. 3 GB
-                                 * twice ->base 2 (e.g. 3.1 GiB)
-                                 * thrice for number of logical blocks */
-        int unit;               /* logical unit (LU) name: from vpd_pg83 */
-        int verbose;
+        bool brief;         /* -b */
+        bool classic;       /* -c */
+        bool dev_maj_min;   /* -d */
+        bool generic;       /* -g */
+        bool kname;         /* -k */
+        bool no_nvme;       /* -N */
+        bool pdt;           /* -D= peripheral device type in hex */
+        bool protection;    /* -p: data integrity */
+        bool protmode;      /* -P: data integrity */
+        bool scsi_id;       /* -i: udev derived from /dev/disk/by-id/scsi* */
+        bool transport_info;  /* -t */
+        bool wwn;           /* -w */
+        int long_opt;       /* -l: --long */
+        int lunhex;         /* -x */
+        int ssize;          /* show storage size, once->base 10 (e.g. 3 GB
+                             * twice ->base 2 (e.g. 3.1 GiB); thrice for
+                             * number of logical blocks */
+        int unit;           /* -u: logical unit (LU) name: from vpd_pg83 */
+        int verbose;        /* -v */
 };
 
 static void tag_lun(const uint8_t * lunp, int * tag_arr);
@@ -385,7 +385,7 @@ static int scnpr(char * cp, int cp_max_len, const char * fmt, ...);
 #endif
 
 /* Want safe, 'n += snprintf(b + n, blen - n, ...)' style sequence of
- * functions. Returns number number of chars placed in cp excluding the
+ * functions. Returns the number of chars placed in cp excluding the
  * trailing null char. So for cp_max_len > 0 the return value is always
  * < cp_max_len; for cp_max_len <= 1 the return value is 0 and no chars
  * are written to cp. Note this means that when cp_max_len = 1, this
@@ -1581,14 +1581,18 @@ get_disk_wwn(const char *wd, char * wwn_str, int max_wwn_str_len)
  * Look up a device node in a directory with symlinks to device nodes.
  * @dir: Directory to examine, e.g. "/dev/disk/by-id".
  * @pfx: Prefix of the symlink, e.g. "scsi-".
+ * @priority: Identifier priority of the @pfx prefix from highest to lowest.
  * @dev: Device node to look up, e.g. "/dev/sda".
  * Returns a pointer to the name of the symlink without the prefix if a match
- * has been found.
+ * has been found. When @priority is supplied the best available symlink
+ * is chosen by comparing first character of the identifier within
+ * the @priority set.
  * Side effect: changes the working directory to @dir.
  * Note: The caller must free the pointer returned by this function.
  */
 static char *
-lookup_dev(const char *dir, const char *pfx, const char *dev)
+lookup_dev(const char *dir, const char *pfx, const char *priority,
+           const char *dev)
 {
         unsigned st_rdev;
         DIR *dirp;
@@ -1608,8 +1612,19 @@ lookup_dev(const char *dir, const char *pfx, const char *dev)
                 if (stat(entry->d_name, &stats) >= 0 &&
                     stats.st_rdev == st_rdev &&
                     strncmp(entry->d_name, pfx, strlen(pfx)) == 0) {
-                        result = strdup(entry->d_name + strlen(pfx));
-                        break;
+                        char *nm = entry->d_name + strlen(pfx);
+                        if (!priority || *nm == *priority) {
+                                free(result);
+                                result = strdup(nm);
+                                break;
+                        }
+                        if (!result ||
+                            ((strchr(priority, *nm) != NULL) &&
+                             (strchr(priority, *nm) <
+                              strchr(priority, *result)))) {
+                                free(result);
+                                result = strdup(nm);
+                        }
                 }
         }
         closedir(dirp);
@@ -1633,13 +1648,14 @@ get_disk_scsi_id(const char *dev_node)
         char holder[LMAX_PATH + 6];
         char sys_block[LMAX_PATH];
 
-        scsi_id = lookup_dev(dev_disk_byid_dir, "scsi-", dev_node);
+        scsi_id = lookup_dev(dev_disk_byid_dir, "scsi-", "328S10", dev_node);
         if (scsi_id)
                 goto out;
-        scsi_id = lookup_dev(dev_disk_byid_dir, "dm-uuid-mpath-", dev_node);
+        scsi_id = lookup_dev(dev_disk_byid_dir, "dm-uuid-mpath-", NULL,
+                             dev_node);
         if (scsi_id)
                 goto out;
-        scsi_id = lookup_dev(dev_disk_byid_dir, "usb-", dev_node);
+        scsi_id = lookup_dev(dev_disk_byid_dir, "usb-", NULL, dev_node);
         if (scsi_id)
                 goto out;
         snprintf(sys_block, sizeof(sys_block), "%s/class/block/%s/holders",
@@ -1649,7 +1665,7 @@ get_disk_scsi_id(const char *dev_node)
                 goto out;
         while ((entry = readdir(dir)) != NULL) {
                 snprintf(holder, sizeof(holder), "/dev/%s", entry->d_name);
-                scsi_id = get_disk_scsi_id(holder);
+                scsi_id = get_disk_scsi_id(holder);     /* recurse */
                 if (scsi_id)
                         break;
         }
@@ -1904,13 +1920,17 @@ parse_colon_list(const char * colon_list, struct addr_hctl * outp)
 
                 while (*colon_list) {
                         if ('c' == *colon_list) {
-                                if (1 == sscanf(colon_list + 1, "%d%n", &outp->t, &k)) {
-                                        outp->t++;   /*  /sys/class/nvme/nvmeX/cntlid starts from 1  */
+                                if (1 == sscanf(colon_list + 1, "%d%n",
+                                                &outp->t, &k)) {
+                                        outp->t++;
+                                        /* /sys/class/nvme/nvmeX/cntlid starts
+                                         * from 1  */
                                         colon_list = colon_list + 1 + k;
                                 } else
                                         break;
                         } else if ('n' == *colon_list) {
-                                if (1 == sscanf(colon_list + 1, "%d%n", &val, &k)) {
+                                if (1 == sscanf(colon_list + 1, "%d%n", &val,
+                                                &k)) {
                                         outp->l = val;
                                         colon_list = colon_list + 1 + k;
                                 } else
@@ -3308,8 +3328,8 @@ tag_lun(const uint8_t * lunp, int * tag_arr)
 static inline bool
 is_direct_access_dev(int pdt)
 {
-	return ((0x0 == pdt) || (0x5 == pdt) || (0xe == pdt) ||
-		(0x14 == pdt));
+        return ((0x0 == pdt) || (0x5 == pdt) || (0xe == pdt) ||
+                (0x14 == pdt));
 }
 
 /* List one SCSI device (LU) on a line. */
@@ -3564,7 +3584,7 @@ one_sdev_entry(const char * dir_name, const char * devname,
                 my_strcopy(blkdir, buff, sizeof(blkdir));
                 value[0] = 0;
                 if (! (is_direct_access_dev(type) &&
-		       block_scan(blkdir) &&
+                       block_scan(blkdir) &&
                        if_directory_chdir(blkdir, ".") &&
                        get_value(".", "size", value, vlen)) ) {
                         printf("  %6s", "-");
@@ -3809,8 +3829,8 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
                 else
                         printf(" [dev?]");
         }
-	if (op->generic)
-		printf("  %-9s", "-");	/* no NVMe generic devices (yet) */
+        if (op->generic)
+                printf("  %-9s", "-");  /* no NVMe generic devices (yet) */
 
         if (op->ssize) {
                 uint64_t blk512s;

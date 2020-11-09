@@ -12,5 +12,9 @@ configuring:
 
 causes blocks device names (e.g. /dev/sda) not to be found.
 
+Revisiting this in lk 5.9.6; configuring:
+  CONFIG_SYSFS_DEPRECATED_V2=y
+alone causes blocks device names (e.g. /dev/sda) not to be found.
+
 Douglas Gilbert
-13th May 2016
+9th November 2020

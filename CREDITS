@@ -51,6 +51,7 @@ Stefan Richter <stefanr at s5r6 dot in-berlin dot de>
 
 Tomas Bzatek <tbzatek at redhat dot com>
     NVMe improvements [20200708  svn: r163]
+    which SCSI id (--scsi_id) to output [20200821  svn: r163]
 
 Doug Gilbert
-8th July 2020
+1st September 2020

@@ -1,4 +1,4 @@
-.TH lsscsi "8" "May 2020" "lsscsi\-0.32" LSSCSI
+.TH lsscsi "8" "November 2020" "lsscsi\-0.32" LSSCSI
 .SH NAME
 lsscsi \- list SCSI devices (or hosts), list NVMe devices
 .SH SYNOPSIS
@@ -197,7 +197,14 @@ This is only for disk (and disk like) devices. If no match is found
 then "dm\-uuid\-mpath*" and "usb*" are searched in the same directory.
 If there is still no match then the /sys/class/block/<disk>/holders
 directory is searched. The matching id is printed following the device
-name (e.g.  /dev/sdc) and if there is no match "\-" is output.
+name (e.g.  /dev/sdc) and if there is no match "\-" is output. Note
+that only disk (like) devices are matched by this option; so, for
+example, a SCSI enclosure will have an identifier of '\-'.
+.br
+Prior to revision 164 the first match in /dev/disk/by\-id/scsi* was
+printed. A change was added at that point to check for identifiers
+in a specific order as some are considered "stronger" than others.
+See the ORDER OF SCSI IDENTIFIERS section below.
 .TP
 \fB\-s\fR, \fB\-\-size\fR
 Print disk capacity in human readable form. When given once, normal base
@@ -446,6 +453,39 @@ environment variable LSSCSI_LUNHEX_OPT is checked. If LSSCSI_LUNHEX_OPT is
 present then its associated value becomes the number of times the
 \fI\-\-lunhex\fR is set internally. So, for
 example, 'LSSCSI_LUNHEX_OPT=2  lsscsi' and 'lsscsi \-xx' are equivalent.
+.SH ORDER OF SCSI IDENTIFIERS
+This section only applies to the \fI\-\-scsi_id\fR option and only for
+disk like devices (e.g. not tapes nor enclosures). There are potentially
+several SCSI identifiers and from revision 164 they are checked in the
+following order and only the first found is output.
+.PP
+The SCSI identifier preference order is:
+.br
+  \fB3\fR : NAA based (Network address Authority)
+.br
+  \fB2\fR : EUI-64 based
+.br
+  \fB8\fR : SCSI name string (e.g. iSCSI: iqn.1998-01.com.zzware.iscsi:name1)
+.br
+  \fBS\fR : serial number from SCSI VPD page 0x80
+.br
+  \fB1\fR : T10 Vendor Identifier
+.br
+  \fB0\fR : Vendor Specific
+.br
+Those numbers prefixing each entry are the SCSI 'Designator Types' found
+in the definition of the Device Identification VPD page (0x83) in SPC/-3,
+SPC/-4 and SPC/-5. The 'S' of course if not a number and it refers to
+a different VPD page: the Serial Number VPD page (0x80).
+.PP
+There is a more general \fI\-\-wwn\fR option that should apply to almost all
+devices. The term "WWN" (world\-wide name) comes from the ATA and NVMe
+standards and corresponds to the "Logical Unit (LU) name" in SCSI. The LU
+name in SCSI tends to change by transport. For SAS the LU name is the LU's
+NAA identifier.
+.PP
+Plus there the \fI\-\-unit\fR and the \fI\-\-long\-unit\fR options that may
+be helpful in uniquely identifying storage devices.
 .SH EXAMPLES
 Information about this utility including examples can also be found at:
 http://sg.danny.cz/scsi/lsscsi.html .
@@ -464,10 +504,9 @@ name.
 .PP
 Generic SCSI devices can also be accessed via the bsg driver in Linux.
 By default, the bsg driver's device node names are of the
-form '/dev/bsg/\fIH:C:T:L\fR'. So, for example, the SCSI device shown
-by this utility on a line starting with the tuple '6:0:1:2' could be
-accessed via the bsg driver with the '/dev/bsg/6:0:1:2' device node
-name.
+form '/dev/bsg/\fIH:C:T:L\fR'. So, for example, the SCSI device shown by this
+utility on a line starting with the tuple '6:0:1:2' could be accessed via the
+bsg driver with the '/dev/bsg/6:0:1:2' device node name.
 .PP
 lsscsi version 0.21 or later is required to correctly display SCSI devices
 in Linux kernel 2.6.26 (and possibly later) when the
