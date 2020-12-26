@@ -21,3 +21,5 @@ AM_CFLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -Wall -W
 
 lsscsi_SOURCES =	lsscsi.c
 
+distclean-local:
+	rm -rf .deps

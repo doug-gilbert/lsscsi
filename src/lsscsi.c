@@ -45,7 +45,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "0.32  2020/11/09 [svn: r164]";
+static const char * version_str = "0.32  2020/12/24 [svn: r165]";
 
 #define FT_OTHER 0
 #define FT_BLOCK 1
@@ -2152,7 +2152,7 @@ transport_init(const char * devname, /* const struct lsscsi_opts * op, */
 
         /* SBP (FireWire) host */
         do {
-                char *t, buff2[LMAX_DEVPATH];
+                char *t, buff2[LMAX_DEVPATH - 4];
 
                 /* resolve SCSI host device */
                 snprintf(buff, sizeof(buff), "%s%s%s%s", sysfsroot, scsi_host,
@@ -3338,7 +3338,8 @@ one_sdev_entry(const char * dir_name, const char * devname,
                const struct lsscsi_opts * op)
 {
         bool get_wwn = false;
-        int type, n, vlen;
+        int n, vlen;
+        int dec_pdt = 0;        /* decoded PDT; called 'type' in sysfs */
         int devname_len = 13;
         char buff[LMAX_DEVPATH];
         char extra[LMAX_DEVPATH];
@@ -3371,9 +3372,9 @@ one_sdev_entry(const char * dir_name, const char * devname,
                 char b[16];
 
                 if (get_value(buff, "type", value, vlen) &&
-                    (1 == sscanf(value, "%d", &type)) &&
-                    (type >= 0) && (type < 32))
-                        snprintf(b, sizeof(b), "0x%x", type);
+                    (1 == sscanf(value, "%d", &dec_pdt)) &&
+                    (dec_pdt >= 0) && (dec_pdt < 32))
+                        snprintf(b, sizeof(b), "0x%x", dec_pdt);
                 else
                         snprintf(b, sizeof(b), "-1");
                 printf("%-8s", b);
@@ -3381,12 +3382,12 @@ one_sdev_entry(const char * dir_name, const char * devname,
                 ;
         else if (! get_value(buff, "type", value, vlen)) {
                 printf("type?   ");
-        } else if (1 != sscanf(value, "%d", &type)) {
+        } else if (1 != sscanf(value, "%d", &dec_pdt)) {
                 printf("type??  ");
-        } else if ((type < 0) || (type > 31)) {
+        } else if ((dec_pdt < 0) || (dec_pdt > 31)) {
                 printf("type??? ");
         } else
-                printf("%s ", scsi_short_device_types[type]);
+                printf("%s ", scsi_short_device_types[dec_pdt]);
 
         if (op->wwn)
                 get_wwn = true;
@@ -3583,7 +3584,7 @@ one_sdev_entry(const char * dir_name, const char * devname,
 
                 my_strcopy(blkdir, buff, sizeof(blkdir));
                 value[0] = 0;
-                if (! (is_direct_access_dev(type) &&
+                if (! (is_direct_access_dev(dec_pdt) &&
                        block_scan(blkdir) &&
                        if_directory_chdir(blkdir, ".") &&
                        get_value(".", "size", value, vlen)) ) {
@@ -3969,7 +3970,7 @@ one_nhost_entry(const char * dir_name, const char * nvme_ctl_rel,
                 printf("[N:%u]  ", cdev_minor);
         else
                 printf("[N:?]  ");
-        snprintf(buff, sizeof(buff), "%s%s", dir_name, nvme_ctl_rel);
+        snprintf(buff, sizeof(buff), "%.256s%.32s", dir_name, nvme_ctl_rel);
 
         if (op->kname)
                 snprintf(value, vlen, "%s/%s", dev_dir, nvme_ctl_rel);
@@ -4406,8 +4407,8 @@ one_host_entry(const char * dir_name, const char * devname,
         } else
                 printf("  proc_name=????  ");
         if (op->transport_info) {
-                if (transport_init(devname, /* op, */ vlen, value))
-                        printf("%s\n", value);
+                if (transport_init(devname, /* op, */ blen, buff))
+                        printf("%s\n", buff);
                 else
                         printf("\n");
         } else
