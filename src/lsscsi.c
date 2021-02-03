@@ -3,7 +3,7 @@
  * applicable to kernel versions 2.6.1 and greater. In lsscsi version 0.30
  * support was added to additionally list NVMe devices and controllers.
  *
- *  Copyright (C) 2003-2020 D. Gilbert
+ *  Copyright (C) 2003-2021 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -45,7 +45,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "0.32  2020/12/24 [svn: r165]";
+static const char * version_str = "0.32  2021/02/03 [svn: r166]";
 
 #define FT_OTHER 0
 #define FT_BLOCK 1
@@ -4025,7 +4025,8 @@ one_nhost_entry(const char * dir_name, const char * nvme_ctl_rel,
                 bool sing = (op->long_opt > 2);
                 const char * sep = sing ? "\n" : "";
 
-                printf("\n"); /* leave host single line the same, like SCSI */
+		if (! sing)
+			printf("\n"); /* leave host single line the same, like SCSI */
                 if (get_value(buff, "cntlid", value, vlen))
                         printf("%s  cntlid=%s%s", sep, value, sep);
                 else if (vb)
@@ -4319,6 +4320,10 @@ longer_h_entry(const char * path_name, const struct lsscsi_opts * op)
                         printf("  host_busy=%s\n", value);
                 else if (op->verbose)
                         printf("  host_busy=?\n");
+                if (get_value(path_name, "nr_hw_queues", value, vlen))
+                        printf("  nr_hw_queues=%s\n", value);
+                else if (op->verbose)
+                        printf("  nr_hw_queues=?\n");
                 if (get_value(path_name, "sg_tablesize", value, vlen))
                         printf("  sg_tablesize=%s\n", value);
                 else if (op->verbose)
