@@ -27,7 +27,7 @@ Jean Delvare <jdelvare@suse.de>
     retire /proc/mounts scan for sysfs mount point;
 
 John Garry <john.garry@huawei.com>
-    Print nr_hw_queues when availble for SCSI hosts [20210203]
+    Print nr_hw_queues when available for SCSI hosts [20210203]
 
 Luben Tuikov <ltuikov at yahoo dot com>
     transport help [20061127]
@@ -57,4 +57,4 @@ Tomas Bzatek <tbzatek at redhat dot com>
     which SCSI id (--scsi_id) to output [20200821  svn: r163]
 
 Doug Gilbert
-3rd February 2021
+25th April 2021

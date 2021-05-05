@@ -1,9 +1,0 @@
-Some suggestions:
-
-  - allow multiple sort orders of LUNs, may be useful if there are a
-    lot of LUNs [20130507]
-
-  - add unit option for different size representations [proposed by
-    Pascal Gregis 20121019]
-    - done: -s: SI units for bytes; -ss: IEC 80000-3 prefixes for bytes
-      (e.g. 3.56GiB); -sss: size as logical block count, exact in decimal

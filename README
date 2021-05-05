@@ -1,7 +1,7 @@
 Installation instructions are in the INSTALL file.
 
 For a description of this utility see:
-http://sg.danny.cz/scsi/lsscsi.html
+https://sg.danny.cz/scsi/lsscsi.html
 
 The "man" page (lsscsi.8) in this directory may also be useful.
 
@@ -17,4 +17,4 @@ Revisiting this in lk 5.9.6; configuring:
 alone causes blocks device names (e.g. /dev/sda) not to be found.
 
 Douglas Gilbert
-9th November 2020
+25th April 2021

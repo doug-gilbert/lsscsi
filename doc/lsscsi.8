@@ -1,4 +1,4 @@
-.TH lsscsi "8" "February 2021" "lsscsi\-0.32" LSSCSI
+.TH lsscsi "8" "May 2021" "lsscsi\-0.32" LSSCSI
 .SH NAME
 lsscsi \- list SCSI devices (or hosts), list NVMe devices
 .SH SYNOPSIS
@@ -291,7 +291,7 @@ more output.
 \fB\-V\fR, \fB\-\-version\fR
 outputs version information then exits. If used once outputs to stderr; if
 used twice outputs to stdout and shortens the date to yyyymmdd numeric
-format.
+format. The first number in the version string is the release number.
 .TP
 \fB\-w\fR, \fB\-\-wwn\fR
 outputs the WWN for disks instead of manufacturer, model and revision (or
@@ -302,7 +302,7 @@ referred to as LU name in SCSI jargon; hence this option is more or less
 superseded by the \fI\-\-unit\fR and \fI\-\-long\-unit\fR options.
 .SH TRANSPORTS
 This utility lists SCSI devices which are known as logical units (LU) in
-the SCSI Architecture Model (ref: SAM\-5 at http://www.t10.org) or hosts
+the SCSI Architecture Model (ref: SAM\-5 at https://www.t10.org) or hosts
 when the \fI\-\-hosts\fR option is given. A host is called an initiator in
 SAM\-5. A SCSI command travels out via an initiator, across some transport
 to a target and then onwards to a logical unit. A target device may contain
@@ -488,7 +488,7 @@ Plus there the \fI\-\-unit\fR and the \fI\-\-long\-unit\fR options that may
 be helpful in uniquely identifying storage devices.
 .SH EXAMPLES
 Information about this utility including examples can also be found at:
-http://sg.danny.cz/scsi/lsscsi.html .
+https://sg.danny.cz/scsi/lsscsi.html .
 .SH NOTES
 Information for this command is derived from the sysfs file system,
 which is assumed to be mounted at /sys unless specified otherwise

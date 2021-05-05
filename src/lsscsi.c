@@ -44,8 +44,8 @@
 
 #include "sg_unaligned.h"
 
-
-static const char * version_str = "0.32  2021/02/03 [svn: r166]";
+/* Package release number is first number, whole string is version */
+static const char * release_str = "0.32  2021/05/05 [svn: r167]";
 
 #define FT_OTHER 0
 #define FT_BLOCK 1
@@ -287,12 +287,10 @@ static struct item_t enclosure_device;
 static char sas_low_phy[LMAX_NAME];
 static char sas_hold_end_device[LMAX_NAME];
 
-/* Code analyzer states that the following two pointers may reference local
- * (auto or stack based) locations and thus may be dangling. However they
- * are only use by iscsi_target_scan() (plus functions it * calls) which is
- * invoked only in transport_tport(). And the local (auto or stack based)
- * locations flagged by the analyzer are defined in the function scope of
- * transport_tport(). Hence there is no problem.  */
+/* A code analyzer sees a potential local auto leak via these next two
+ * pointers. While the leak is there, it is not exploited. The warning
+ * is circumvented by writing NULL to them on their way out of
+ * iscsi_target_scan(). */
 static const char * iscsi_dir_name;
 static const struct addr_hctl * iscsi_target_hct;
 
@@ -702,6 +700,8 @@ tuple2string(const struct addr_hctl * tp, int sel_mask, int blen, char * b)
                         n += scnpr(b + n, blen - n, "%s%" PRIu32,
                                    got1 ? ":" : "", (uint32_t)tp->l);
         }
+        if ((0 == n) && (blen > 0))
+                b[0] = '\0';
         return b;
 }
 
@@ -1208,11 +1208,16 @@ iscsi_target_scan(const char * dir_name, const struct addr_hctl * hctl)
         iscsi_tsession_num = -1;
         num = scandir(dir_name, &namelist, iscsi_target_dir_scan_select,
                       NULL);
-        if (num < 0)
-                return -1;
+        if (num < 0) {
+                num = -1;
+                goto fini;
+        }
         for (k = 0; k < num; ++k)
                 free(namelist[k]);
         free(namelist);
+fini:
+        iscsi_dir_name = NULL;          /* so analyzer doesn't see a leak */
+        iscsi_target_hct = NULL;        /* so analyzer doesn't see a leak */
         return num;
 }
 
@@ -4025,8 +4030,8 @@ one_nhost_entry(const char * dir_name, const char * nvme_ctl_rel,
                 bool sing = (op->long_opt > 2);
                 const char * sep = sing ? "\n" : "";
 
-		if (! sing)
-			printf("\n"); /* leave host single line the same, like SCSI */
+                if (! sing)   /* leave host single line the same, like SCSI */
+                        printf("\n");
                 if (get_value(buff, "cntlid", value, vlen))
                         printf("%s  cntlid=%s%s", sep, value, sep);
                 else if (vb)
@@ -4797,17 +4802,17 @@ main(int argc, char **argv)
                 char b[64];
 
                 if (1 == version_count) {
-                        pr2serr("version: %s\n", version_str);
+                        pr2serr("release: %s\n", release_str);
                         return 0;
                 }
-                cp = strchr(version_str, '/');
+                cp = strchr(release_str, '/');
                 if (cp && (3 == sscanf(cp - 4, "%d/%d/%d", &yr, &mon, &day)))
                     ;
                 else {
-                        pr2serr("version:: %s\n", version_str);
+                        pr2serr("version:: %s\n", release_str);
                         return 0;
                 }
-                strncpy(b, version_str, sizeof(b) - 1);
+                strncpy(b, release_str, sizeof(b) - 1);
                 p = (char *)strchr(b, '/');
                 snprintf(p - 4, sizeof(b) - (p - 4 - b), "%d%02d%02d  ",
                          yr, mon, day);

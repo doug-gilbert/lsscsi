@@ -1,8 +1,8 @@
 Linux utility for listing SCSI devices.
 
-Version 0.32 2021/02/03 [svn: r166]
+Changelog for released lsscsi-0.32 [20210505] [svn: r167]
   - improve NVMe device parsing (e.g. /dev/nvme0c1n2)
-  - print nr_hw_queues when availble for SCSI hosts
+  - print nr_hw_queues when available for SCSI hosts
   - Remove blank line after NVMe device name with -HL
   - collect_disk_wwn_nodes: Fix WWN string copy
   - make WWN printing for NVMe more consistent with
@@ -11,7 +11,7 @@ Version 0.32 2021/02/03 [svn: r166]
   - clean up warnings for gcc-10
   - build with autoconf 2.70
 
-Version 0.31 2020/02/20 [svn: r160]
+Changelog for released lsscsi-0.31 [20200220] [svn: r160]
   - cleanup gcc-8 warnings, no cleanup needed for gcc-9
   - fix issue where host managed ZBC devices don't
     output their size. [Fix also for RBC and CD/DVD.]
@@ -20,7 +20,7 @@ Version 0.31 2020/02/20 [svn: r160]
   - supply "-" for generic NVMe device one line output
     so 'lsscsi -gb' output is consistent
 
-Version 0.30 2018/06/12 [svn: r154]
+Changelog for released lsscsi-0.30 [20180612] [svn: r154]
   - add support for NVMe devices and controllers
     - to build without: ./configure --disable-nvme-supp
     - deselect at runtime: lsscsi --no-nvme
@@ -39,7 +39,7 @@ Version 0.30 2018/06/12 [svn: r154]
     separator resulting in garbled output, fix
   - debian: bump compat file contents from 7 to 10
 
-Version 0.29 2016/05/14 [svn: r137]
+Changelog for released lsscsi-0.29 [20160514] [svn: r137]
   - '-u' now decodes locally assigned UUIDs (spc5r08)
   - as last try use T10 Vendor ID for lu name
   - if no lu name found, print 'none'
@@ -56,7 +56,7 @@ Version 0.29 2016/05/14 [svn: r137]
   - autogen.sh: upgrade to 20091223 version
   - automake: upgrade to 1.15 (ubuntu 16.04)
 
-Version 0.28 2014/09/30 [svn: r120]
+Changelog for released lsscsi-0.28 [20140930] [svn: r120]
   - fix handling of scsi_level 0 (no compliance)
   - add SRP transport identifier
   - add --unit option for LU identifier (>= lk 3.15)
@@ -66,7 +66,7 @@ Version 0.28 2014/09/30 [svn: r120]
   - add pdt strings for security manager and zbc
   - upgrade automake to version 1.14.1
 
-Version 0.27 2013/05/08 [svn: r111]
+Changelog for released lsscsi-0.27 [20130508] [svn: r111]
   - rework buffer handling for systems with many disks
   - add --lunhex option for displaying LUNs in hex
   - accept LUNs from sysfs as large as a 64 bit unsigned
@@ -74,17 +74,18 @@ Version 0.27 2013/05/08 [svn: r111]
   - accept LSSCSI_LUNHEX_OPT environment variable
   - add scsi_id option for /dev/disk/by-id/scsi*
 
-Version 0.26 2012/01/31 [svn: r97]
+Changelog for released lsscsi-0.26 [20120131] [svn: r97]
   - add 'fcoe' transport indicator
   - add '--wwn' option, datamine /dev/disk/by-id/wwn*
   - move lsscsi.c into src directory
 
-Version 0.25 2011/05/09 [svn: r92]
+Changelog for released lsscsi-0.25 [20110509] [svn: r92]
   - add sas_port and fc_remote_ports transport information
   - print enclosure_device entry
   - add '--size' option to show size of disks
   - add '--protmode' option to show protection information mode
 
+Changelog for released lsscsi-0.24 [20100612] [svn: r83]
 Version 0.24 2010/06/12 [svn: r83]
   - FC transport syntax changes (colon to slash)
   - add "(null)" to the currently accepted "<NULL>" as
@@ -93,6 +94,7 @@ Version 0.24 2010/06/12 [svn: r83]
   - scandir() library function has changed its signature
     in its 4th argument, use newer (non-void) variant
 
+<< Retrospectively changed "version" to "release" in this file >>
 Version 0.23 2009/12/01 [svn: r76]
   - remove /proc/mounts scan for sysfs mount point, assume
     /sys unless overridden by re-instated '--sysfsroot' option
