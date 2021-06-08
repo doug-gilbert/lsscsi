@@ -1515,7 +1515,7 @@ collect_disk_wwn_nodes(void)
 
                 cur_ent = &cur_list->nodes[cur_list->count];
                 my_strcopy(cur_ent->wwn, "0x", 3);
-                my_strcopy(cur_ent->wwn + 2, dep->d_name + 5,
+                my_strcopy(cur_ent->wwn + 2, dep->d_name + 6,
                            sizeof(cur_ent->wwn) - 2);
                 my_strcopy(cur_ent->disk_bname, basename(symlink_path),
                            sizeof(cur_ent->disk_bname));
