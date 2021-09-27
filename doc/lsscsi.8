@@ -1,4 +1,4 @@
-.TH lsscsi "8" "May 2021" "lsscsi\-0.32" LSSCSI
+.TH lsscsi "8" "September 2021" "lsscsi\-0.33" LSSCSI
 .SH NAME
 lsscsi \- list SCSI devices (or hosts), list NVMe devices
 .SH SYNOPSIS
@@ -205,6 +205,12 @@ Prior to revision 164 the first match in /dev/disk/by\-id/scsi* was
 printed. A change was added at that point to check for identifiers
 in a specific order as some are considered "stronger" than others.
 See the ORDER OF SCSI IDENTIFIERS section below.
+.br
+Note that the identifier output is prefixed by one character from this
+string: "328S10" to indicate what type of identifier is being shown. Those
+values are explained in the ORDER OF SCSI IDENTIFIERS section below.
+To show the identifier without that leading value, use \fI\-\-scsi_id\fR
+twice (or simply \fI\-ii\fR).
 .TP
 \fB\-s\fR, \fB\-\-size\fR
 Print disk capacity in human readable form. When given once, normal base
@@ -294,12 +300,12 @@ used twice outputs to stdout and shortens the date to yyyymmdd numeric
 format. The first number in the version string is the release number.
 .TP
 \fB\-w\fR, \fB\-\-wwn\fR
-outputs the WWN for disks instead of manufacturer, model and revision (or
-instead of transport information). The World Wide Name (WWN) is typically
-64 bits long (16 hex digits) but could be up to 128 bits long. To indicate
-the WWN is hexadecimal, it is prefixed by "0x". The ATA/SATA WWN is
-referred to as LU name in SCSI jargon; hence this option is more or less
-superseded by the \fI\-\-unit\fR and \fI\-\-long\-unit\fR options.
+additionally outputs the WWN for disks. The World Wide Name (WWN) is
+typically 64 bits long (16 hex digits) but could be up to 128 bits long.
+To indicate the WWN is hexadecimal, it is prefixed by "0x". Originally this
+option looked at the '/dev/disk/by-id/wwn-*' symlinks to scsi devices;
+but this was changed to '/dev/disk/by-id/scsi-*' as the latter were more
+stable (i.e. less likely to change from one boot to the next).
 .SH TRANSPORTS
 This utility lists SCSI devices which are known as logical units (LU) in
 the SCSI Architecture Model (ref: SAM\-5 at https://www.t10.org) or hosts
@@ -486,6 +492,34 @@ NAA identifier.
 .PP
 Plus there the \fI\-\-unit\fR and the \fI\-\-long\-unit\fR options that may
 be helpful in uniquely identifying storage devices.
+.SH SYSFS VPD PAGES
+Most of the numerical identifiers (and iSCSI url type strings) come from the
+SCSI INQUIRY command's Device Identification VPD (vital product data) page.
+It is one of many VPD pages. These VPD pages are essentially constant (they
+can be changed in extraordinary situations) and are read by the SCSI
+subsystem when a SCSI device is attached to the system. Modern versions of
+Linux make copies of those vpd pages available in the sysfs pseudo file
+system. They are binary files with names like "vpd_pg83" where 83 is the
+numerical identifier of the Device Identification VPD page (in hex).
+.PP
+The sg_inq and sg_vpd utilities in the sg3_utils package can decode those
+pages. Currently VPD pages 00 (list of supported VPD pages), 80 (serial
+number), 83 (device identification (DI)) and 89 (ATA Information) are
+available.  More pages may appear in the future. Root permissions are
+not required to access these pages. Using sg_vpd with dev/sg3 as an
+example, the following invocation will decode sg3's DI page:
+.PP
+  sg_vpd --raw --inhex=/sys/class/scsi_generic/sg3/device/vpd_pg83
+.PP
+which can be shortened to:
+.PP
+  sg_vpd -rI /sys/class/scsi_generic/sg3/device/vpd_pg83
+.PP
+Note that the DI VPD page contains identifiers for both a device (a
+Logical Unit (LU) in SCSI jargon) and the target device that contains
+that LU. A target may contain one or more LUs and LUs are often disks.
+A target is the (far) endpoint of the transport protocol in use, while
+the initiator is the near end of that transport.
 .SH EXAMPLES
 Information about this utility including examples can also be found at:
 https://sg.danny.cz/scsi/lsscsi.html .
@@ -524,3 +558,4 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .B lspci
 .B lsusb
 .B lsblk
+.B sg_inq, sg_vpd (both in sg3_utils package),

@@ -1,5 +1,5 @@
 %define name    lsscsi
-%define version 0.32
+%define version 0.33
 %define release 1
 
 Summary: 	List SCSI devices (or hosts) plus NVMe namespaces and ctls
@@ -54,6 +54,9 @@ fi
 
 
 %changelog
+* Sun Sep 26 2021 - dgilbert at interlog dot com
+- fixes, minor tweaks
+  * lsscsi-0.33
 * Wed May 05 2021 - dgilbert at interlog dot com
 - fixes, minor tweaks
   * lsscsi-0.32

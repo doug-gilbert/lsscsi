@@ -45,7 +45,7 @@
 #include "sg_unaligned.h"
 
 /* Package release number is first number, whole string is version */
-static const char * release_str = "0.32  2021/05/05 [svn: r167]";
+static const char * release_str = "0.33  2021/09/26 [svn: r169]";
 
 #define FT_OTHER 0
 #define FT_BLOCK 1
@@ -142,8 +142,10 @@ struct lsscsi_opts {
         bool protection;    /* -p: data integrity */
         bool protmode;      /* -P: data integrity */
         bool scsi_id;       /* -i: udev derived from /dev/disk/by-id/scsi* */
+        bool scsi_id_twice; /* -ii: scsi_id without "from whence" prefix */
         bool transport_info;  /* -t */
         bool wwn;           /* -w */
+        bool wwn_twice;     /* -ww */
         int long_opt;       /* -l: --long */
         int lunhex;         /* -x */
         int ssize;          /* show storage size, once->base 10 (e.g. 3 GB
@@ -250,18 +252,11 @@ struct dev_node_list {
 };
 static struct dev_node_list* dev_node_listhead = NULL;
 
-/* WWN here is extracted from /dev/disk/by-id/wwn-<WWN> which is
- * created by udev 60-persistent-storage.rules using ID_WWN_WITH_EXTENSION.
- * The udev ID_WWN_WITH_EXTENSION is the combination of char wwn[17] and
- * char wwn_vendor_extension[17] from struct scsi_id_device. This macro
- * defines the maximum length of char-array needed to store this wwn including
- * the null-terminator.
- */
-#define DISK_WWN_MAX_LEN 35
+/* Allow for '0x' + prefix + wwn<128-bit> + <null-terminator> */
+#define DISK_WWN_MAX_LEN 36
 
 struct disk_wwn_node_entry {
-        char wwn[DISK_WWN_MAX_LEN]; /* '0x' + wwn<128-bit> + */
-                                    /* <null-terminator> */
+        char wwn[DISK_WWN_MAX_LEN];
         char disk_bname[12];
 };
 
@@ -345,7 +340,7 @@ static const char * usage_message2 =
 "    --unit|-u         logical unit (LU) name (aka WWN for ATA/SATA)\n"
 "    --verbose|-v      output path names where data is found\n"
 "    --version|-V      output version string and exit\n"
-"    --wwn|-w          output WWN for disks (from /dev/disk/by-id/wwn*)\n"
+"    --wwn|-w          output WWN for disks (from /dev/disk/by-id/*)\n"
 "    <h:c:t:l>         filter output list (def: '*:*:*:*' (all)). Meaning:\n"
 "                      <host_num:controller:target:lun> or for NVMe:\n"
 "                      <'N':ctl_num:cntlid:namespace_id>\n\n"
@@ -1452,7 +1447,7 @@ exit:
  * number of wwn nodes collected, 0 for already collected and
  * -1 for error. */
 static int
-collect_disk_wwn_nodes(void)
+collect_disk_wwn_nodes(bool wwn_twice)
 {
         int k;
         int num = 0;
@@ -1479,6 +1474,9 @@ collect_disk_wwn_nodes(void)
         if (dirp == NULL)
                 return -1;
 
+        if (wwn_twice)
+                goto wwn_really;
+
         while (1) {
                 dep = readdir(dirp);
                 if (dep == NULL)
@@ -1487,9 +1485,10 @@ collect_disk_wwn_nodes(void)
                         continue;       /* needs to start with "scsi-" */
                 if (strstr(dep->d_name, "part"))
                         continue;       /* skip if contains "part" */
-                if (dep->d_name[5] != '3' &&
-                    dep->d_name[5] != '2' &&
-                    dep->d_name[5] != '8')
+                /* accepted device identification VPD page designator types */
+                if (dep->d_name[5] != '3' &&    /* NAA */
+                    dep->d_name[5] != '2' &&    /* EUI-64 based */
+                    dep->d_name[5] != '8')      /* SCSI name string (iSCSI) */
                         continue;       /* skip for invalid identifier */
 
                 snprintf(device_path, PATH_MAX, "%s/%s", dev_disk_byid_dir,
@@ -1515,8 +1514,50 @@ collect_disk_wwn_nodes(void)
 
                 cur_ent = &cur_list->nodes[cur_list->count];
                 my_strcopy(cur_ent->wwn, "0x", 3);
-                my_strcopy(cur_ent->wwn + 2, dep->d_name + 5,
+                /* step over designator type */
+                my_strcopy(cur_ent->wwn + 2, dep->d_name + 6,
                            sizeof(cur_ent->wwn) - 2);
+                my_strcopy(cur_ent->disk_bname, basename(symlink_path),
+                           sizeof(cur_ent->disk_bname));
+                cur_list->count++;
+                ++num;
+        }
+        closedir(dirp);
+        return num;
+wwn_really:
+        while (1) {
+                dep = readdir(dirp);
+                if (dep == NULL)
+                        break;
+                if (memcmp("wwn-", dep->d_name, 4))
+                        continue;       /* needs to start with "wwn-" */
+                if (strstr(dep->d_name, "part"))
+                        continue;       /* skip if contains "part" */
+
+                snprintf(device_path, PATH_MAX, "%s/%s", dev_disk_byid_dir,
+                         dep->d_name);
+                device_path [PATH_MAX] = '\0';
+                if (lstat(device_path, &stats))
+                        continue;
+                if (! S_ISLNK(stats.st_mode))
+                        continue;       /* Skip non-symlinks */
+                if ((k = readlink(device_path, symlink_path, PATH_MAX)) < 1)
+                        continue;
+                symlink_path[k] = '\0';
+
+                /* Add to the list. */
+                if (cur_list->count >= DISK_WWN_NODE_LIST_ENTRIES) {
+                        prev_list = cur_list;
+                        cur_list = (struct disk_wwn_node_list *)
+                                                        calloc(1, dwnl_sz);
+                        if (! cur_list)
+                                break;
+                        prev_list->next = cur_list;
+                }
+
+                cur_ent = &cur_list->nodes[cur_list->count];
+                my_strcopy(cur_ent->wwn, dep->d_name + 4,
+                           sizeof(cur_ent->wwn));
                 my_strcopy(cur_ent->disk_bname, basename(symlink_path),
                            sizeof(cur_ent->disk_bname));
                 cur_list->count++;
@@ -1547,7 +1588,8 @@ free_disk_wwn_node_list(void)
 /* Given a path to a class device, find the most recent device node with
    matching major/minor. Returns true if match found, false otherwise. */
 static bool
-get_disk_wwn(const char *wd, char * wwn_str, int max_wwn_str_len)
+get_disk_wwn(const char *wd, char * wwn_str, int max_wwn_str_len,
+             bool wwn_twice)
 {
         unsigned int k = 0;
         char * bn;
@@ -1559,7 +1601,7 @@ get_disk_wwn(const char *wd, char * wwn_str, int max_wwn_str_len)
         name[sizeof(name) - 1] = '\0';
         bn = basename(name);
         if (disk_wwn_node_listhead == NULL) {
-                collect_disk_wwn_nodes();
+                collect_disk_wwn_nodes(wwn_twice);
                 if (disk_wwn_node_listhead == NULL)
                         return false;
         }
@@ -1645,7 +1687,7 @@ out:
  * Note: The caller must free the returned buffer with free().
  */
 static char *
-get_disk_scsi_id(const char *dev_node)
+get_disk_scsi_id(const char *dev_node, bool wo_prefix)
 {
         char *scsi_id = NULL;
         DIR *dir;
@@ -1654,8 +1696,16 @@ get_disk_scsi_id(const char *dev_node)
         char sys_block[LMAX_PATH];
 
         scsi_id = lookup_dev(dev_disk_byid_dir, "scsi-", "328S10", dev_node);
-        if (scsi_id)
+        if (scsi_id) {
+                if (wo_prefix) {
+                        size_t len = strlen(scsi_id);
+                        if (len > 1) {
+                                memmove(scsi_id, scsi_id + 1, len - 1);
+                                scsi_id[len - 1] = '\0';
+                        }
+                }
                 goto out;
+        }
         scsi_id = lookup_dev(dev_disk_byid_dir, "dm-uuid-mpath-", NULL,
                              dev_node);
         if (scsi_id)
@@ -1670,7 +1720,7 @@ get_disk_scsi_id(const char *dev_node)
                 goto out;
         while ((entry = readdir(dir)) != NULL) {
                 snprintf(holder, sizeof(holder), "/dev/%s", entry->d_name);
-                scsi_id = get_disk_scsi_id(holder);     /* recurse */
+                scsi_id = get_disk_scsi_id(holder, wo_prefix); /* recurse */
                 if (scsi_id)
                         break;
         }
@@ -1824,6 +1874,17 @@ get_lu_name(const char * devname, char * b, int b_len, bool want_prefix)
         if (0 == sg_vpd_dev_id_iter(bp, len, &off, VPD_ASSOC_LU,
                                     3 /* NAA */, 1 /* binary */)) {
                 dlen = bp[off + 3];
+// pr2serr("%s: NAA dlen=%d\n", __func__, dlen);
+if (bp[off + 4] == 0x30) {
+// pr2serr("%s: locally assigned\n", __func__);
+if (0 == sg_vpd_dev_id_iter(bp, len, &off, VPD_ASSOC_LU,
+                                  3 /* NAA */, 1 /* binary */)) {
+if (bp[off + 4] != 0x30) {
+// pr2serr("%s: not locally assigned\n", __func__);
+dlen = bp[off + 3];
+}
+}
+}
                 if (! ((8 == dlen) || (16 ==dlen)))
                         return b;
                 if (want_prefix) {
@@ -1840,6 +1901,7 @@ get_lu_name(const char * devname, char * b, int b_len, bool want_prefix)
         } else if (0 == sg_vpd_dev_id_iter(bp, len, &off, VPD_ASSOC_LU,
                                            2 /* EUI */, 1 /* binary */)) {
                 dlen = bp[off + 3];
+pr2serr("%s: EUI dlen=%d\n", __func__, dlen);
                 if (! ((8 == dlen) || (12 == dlen) || (16 ==dlen)))
                         return b;
                 if (want_prefix) {
@@ -1856,6 +1918,7 @@ get_lu_name(const char * devname, char * b, int b_len, bool want_prefix)
         } else if (0 == sg_vpd_dev_id_iter(bp, len, &off, VPD_ASSOC_LU,
                                            0xa /* UUID */,  1 /* binary */)) {
                 dlen = bp[off + 3];
+pr2serr("%s: UUID dlen=%d\n", __func__, dlen);
                 if ((1 != ((bp[off + 4] >> 4) & 0xf)) || (18 != dlen)) {
                         snprintf(cp, b_len, "??");
                         /* cp += 2; */
@@ -3469,7 +3532,8 @@ one_sdev_entry(const char * dir_name, const char * devname,
                         typ = (FT_BLOCK == non_sg.ft) ? BLK_DEV : CHR_DEV;
                         if (get_wwn) {
                                 if ((BLK_DEV == typ) &&
-                                    get_disk_wwn(wd, wwn_str, sizeof(wwn_str)))
+                                    get_disk_wwn(wd, wwn_str, sizeof(wwn_str),
+                                                 op->wwn_twice))
                                         printf("%-*s  ", DISK_WWN_MAX_LEN - 1,
                                                wwn_str);
                                 else
@@ -3495,7 +3559,8 @@ one_sdev_entry(const char * dir_name, const char * devname,
                         if (op->scsi_id) {
                                 char *scsi_id;
 
-                                scsi_id = get_disk_scsi_id(dev_node);
+                                scsi_id = get_disk_scsi_id(dev_node,
+                                                           op->scsi_id_twice);
                                 printf("  %s", scsi_id ? scsi_id : "-");
                                 free(scsi_id);
                         }
@@ -4736,7 +4801,10 @@ main(int argc, char **argv)
                         do_hosts = true;
                         break;
                 case 'i':
-                        op->scsi_id = true;
+                        if (op->scsi_id)
+                                op->scsi_id_twice = true;
+                        else
+                                op->scsi_id = true;
                         break;
                 case 'k':
                         op->kname = true;
@@ -4778,7 +4846,10 @@ main(int argc, char **argv)
                         ++version_count;
                         break;
                 case 'w':
-                        op->wwn = true;
+                        if (op->wwn)
+                                op->wwn_twice = true;
+                        else
+                                op->wwn = true;
                         break;
                 case 'x':
                         ++op->lunhex;
@@ -4802,14 +4873,14 @@ main(int argc, char **argv)
                 char b[64];
 
                 if (1 == version_count) {
-                        pr2serr("release: %s\n", release_str);
+                        pr2serr("pre-release: %s\n", release_str);
                         return 0;
                 }
                 cp = strchr(release_str, '/');
                 if (cp && (3 == sscanf(cp - 4, "%d/%d/%d", &yr, &mon, &day)))
                     ;
                 else {
-                        pr2serr("version:: %s\n", release_str);
+                        pr2serr("pre-release:: %s\n", release_str);
                         return 0;
                 }
                 strncpy(b, release_str, sizeof(b) - 1);

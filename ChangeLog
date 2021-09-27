@@ -1,5 +1,14 @@
 Linux utility for listing SCSI devices.
 
+Changelog for pre-release lsscsi-0.33 [20210926] [svn: r169]
+  - change '-w' output to step over designator type prefix
+    (e.g. '3' for NAA)
+  - add '-ww' to mean really use
+    /dev/disk/by-id/wwn-* rather than .../by-id/scsi-*
+  - document that --scsi_id (-i) now is prefixed by a
+    "from whence" character from "328S10"
+  - add '-ii' to mean show identifier without that prefix
+
 Changelog for released lsscsi-0.32 [20210505] [svn: r167]
   - improve NVMe device parsing (e.g. /dev/nvme0c1n2)
   - print nr_hw_queues when available for SCSI hosts
