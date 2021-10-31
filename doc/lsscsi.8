@@ -1,4 +1,4 @@
-.TH lsscsi "8" "September 2021" "lsscsi\-0.33" LSSCSI
+.TH lsscsi "8" "October 2021" "lsscsi\-0.33" LSSCSI
 .SH NAME
 lsscsi \- list SCSI devices (or hosts), list NVMe devices
 .SH SYNOPSIS
@@ -303,9 +303,12 @@ format. The first number in the version string is the release number.
 additionally outputs the WWN for disks. The World Wide Name (WWN) is
 typically 64 bits long (16 hex digits) but could be up to 128 bits long.
 To indicate the WWN is hexadecimal, it is prefixed by "0x". Originally this
-option looked at the '/dev/disk/by-id/wwn-*' symlinks to scsi devices;
-but this was changed to '/dev/disk/by-id/scsi-*' as the latter were more
+option looked at the '/dev/disk/by\-id/wwn\-*' symlinks to scsi devices;
+but this was changed to '/dev/disk/by\-id/scsi\-*' as the latter were more
 stable (i.e. less likely to change from one boot to the next).
+.br
+If this option is used twice then the original action takes place. In other
+words the '/dev/disk/by\-id/wwn\-*' symlinks to scsi devices are used.
 .SH TRANSPORTS
 This utility lists SCSI devices which are known as logical units (LU) in
 the SCSI Architecture Model (ref: SAM\-5 at https://www.t10.org) or hosts
@@ -469,9 +472,9 @@ The SCSI identifier preference order is:
 .br
   \fB3\fR : NAA based (Network address Authority)
 .br
-  \fB2\fR : EUI-64 based
+  \fB2\fR : EUI\-64 based
 .br
-  \fB8\fR : SCSI name string (e.g. iSCSI: iqn.1998-01.com.zzware.iscsi:name1)
+  \fB8\fR : SCSI name string (e.g. iSCSI: iqn.1998\-01.com.zzware.iscsi:name1)
 .br
   \fBS\fR : serial number from SCSI VPD page 0x80
 .br
@@ -480,8 +483,8 @@ The SCSI identifier preference order is:
   \fB0\fR : Vendor Specific
 .br
 Those numbers prefixing each entry are the SCSI 'Designator Types' found
-in the definition of the Device Identification VPD page (0x83) in SPC/-3,
-SPC/-4 and SPC/-5. The 'S' of course if not a number and it refers to
+in the definition of the Device Identification VPD page (0x83) in SPC\-3,
+SPC\-4 and SPC\-5. The 'S' of course if not a number and it refers to
 a different VPD page: the Serial Number VPD page (0x80).
 .PP
 There is a more general \fI\-\-wwn\fR option that should apply to almost all
@@ -509,11 +512,11 @@ available.  More pages may appear in the future. Root permissions are
 not required to access these pages. Using sg_vpd with dev/sg3 as an
 example, the following invocation will decode sg3's DI page:
 .PP
-  sg_vpd --raw --inhex=/sys/class/scsi_generic/sg3/device/vpd_pg83
+  sg_vpd \-\-raw \-\-inhex=/sys/class/scsi_generic/sg3/device/vpd_pg83
 .PP
 which can be shortened to:
 .PP
-  sg_vpd -rI /sys/class/scsi_generic/sg3/device/vpd_pg83
+  sg_vpd \-rI /sys/class/scsi_generic/sg3/device/vpd_pg83
 .PP
 Note that the DI VPD page contains identifiers for both a device (a
 Logical Unit (LU) in SCSI jargon) and the target device that contains

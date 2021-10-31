@@ -45,7 +45,7 @@
 #include "sg_unaligned.h"
 
 /* Package release number is first number, whole string is version */
-static const char * release_str = "0.33  2021/09/26 [svn: r169]";
+static const char * release_str = "0.33  2021/20/26 [svn: r170]";
 
 #define FT_OTHER 0
 #define FT_BLOCK 1
