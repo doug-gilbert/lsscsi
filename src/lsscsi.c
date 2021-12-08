@@ -45,7 +45,7 @@
 #include "sg_unaligned.h"
 
 /* Package release number is first number, whole string is version */
-static const char * release_str = "0.33  2021/20/26 [svn: r170]";
+static const char * release_str = "0.33  2021/12/07 [svn: r171]";
 
 #define FT_OTHER 0
 #define FT_BLOCK 1
@@ -154,6 +154,8 @@ struct lsscsi_opts {
         int unit;           /* -u: logical unit (LU) name: from vpd_pg83 */
         int verbose;        /* -v */
 };
+
+static int gl_verbose;
 
 static void tag_lun(const uint8_t * lunp, int * tag_arr);
 
@@ -2201,8 +2203,12 @@ transport_init(const char * devname, /* const struct lsscsi_opts * op, */
                 off = strlen(b);
                 if (get_value(buff, "sas_address", b + off, b_len - off))
                         return true;
-                else
-                        pr2serr("_init: no sas_address, wd=%s\n", buff);
+                else {
+                        if (gl_verbose)
+                                pr2serr("%s: no sas_address, wd=%s\n",
+                                        __func__, buff);
+                        return false;
+                }
         }
 
         /* SAS class representation */
@@ -2214,8 +2220,12 @@ transport_init(const char * devname, /* const struct lsscsi_opts * op, */
                 off = strlen(b);
                 if (get_value(buff, "device_name", b + off, b_len - off))
                         return true;
-                else
-                        pr2serr("_init: no device_name, wd=%s\n", buff);
+                else {
+                        if (gl_verbose)
+                                pr2serr("%s: no device_name, wd=%s\n",
+                                        __func__, buff);
+                        return false;
+                }
         }
 
         /* SBP (FireWire) host */
@@ -4880,7 +4890,7 @@ main(int argc, char **argv)
                 if (cp && (3 == sscanf(cp - 4, "%d/%d/%d", &yr, &mon, &day)))
                     ;
                 else {
-                        pr2serr("pre-release:: %s\n", release_str);
+                        pr2serr("pre-release: %s\n", release_str);
                         return 0;
                 }
                 strncpy(b, release_str, sizeof(b) - 1);
@@ -4891,6 +4901,7 @@ main(int argc, char **argv)
                 printf("%s\n", b);
                 return 0;
         }
+        gl_verbose = op->verbose;
 
         if (optind < argc) {
                 const char * a1p = NULL;
