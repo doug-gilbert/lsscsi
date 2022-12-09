@@ -43,9 +43,10 @@
 #endif
 
 #include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 /* Package release number is first number, whole string is version */
-static const char * release_str = "0.33  2021/12/07 [svn: r171]";
+static const char * release_str = "0.33  2022/12/08 [svn: r172]";
 
 #define FT_OTHER 0
 #define FT_BLOCK 1
@@ -153,6 +154,7 @@ struct lsscsi_opts {
                              * number of logical blocks */
         int unit;           /* -u: logical unit (LU) name: from vpd_pg83 */
         int verbose;        /* -v */
+        sgj_state json_st;  /* -j[JO] or --json[=JO] */
 };
 
 static int gl_verbose;
@@ -209,6 +211,7 @@ static struct option long_options[] = {
         {"generic", no_argument, 0, 'g'},
         {"help", no_argument, 0, 'h'},
         {"hosts", no_argument, 0, 'H'},
+        {"json", optional_argument, 0, 'j'},
         {"kname", no_argument, 0, 'k'},
         {"long", no_argument, 0, 'l'},
         {"list", no_argument, 0, 'L'},
@@ -352,6 +355,7 @@ static const char * usage_message2 =
 "options can also take underscore (and vice versa).\n";
 
 
+#if 0
 #ifdef __GNUC__
 static int pr2serr(const char * fmt, ...)
         __attribute__ ((format (printf, 1, 2)));
@@ -371,6 +375,7 @@ pr2serr(const char * fmt, ...)
         va_end(args);
         return n;
 }
+#endif
 
 #ifdef __GNUC__
 static int scnpr(char * cp, int cp_max_len, const char * fmt, ...)
@@ -4767,9 +4772,12 @@ main(int argc, char **argv)
 {
         bool do_sdevices = true;
         bool do_hosts = false;  /* checked before do_sdevices */
-        int c;
+        bool as_json;
+        int c, res;
         int version_count = 0;
         const char * cp;
+        sgj_state * jsp;
+        sgj_opaque_p jop = NULL;
         struct lsscsi_opts * op;
         struct lsscsi_opts opts;
 
@@ -4780,7 +4788,7 @@ main(int argc, char **argv)
         while (1) {
                 int option_index = 0;
 
-                c = getopt_long(argc, argv, "bcCdDghHiklLNpPsStuUvVwxy:",
+                c = getopt_long(argc, argv, "bcCdDghHij::klLNpPsStuUvVwxy:",
                                 long_options, &option_index);
                 if (c == -1)
                         break;
@@ -4815,6 +4823,22 @@ main(int argc, char **argv)
                                 op->scsi_id_twice = true;
                         else
                                 op->scsi_id = true;
+                        break;
+                case 'j':
+                        if (! sgj_init_state(&op->json_st, optarg)) {
+                                int bad_char = op->json_st.first_bad_char;
+                                char e[1500];
+
+                                if (bad_char) {
+                                        pr2serr("bad argument to --json= "
+                                                "option, unrecognized "
+                                                "character '%c'\n\n",
+                                                bad_char);
+                                 }
+                                sg_json_usage(0, e, sizeof(e));
+                                pr2serr("%s", e);
+                                return 1 /* SG_LIB_SYNTAX_ERROR */;
+                        }
                         break;
                 case 'k':
                         op->kname = true;
@@ -4964,6 +4988,17 @@ main(int argc, char **argv)
         if (op->verbose > 1) {
                 printf(" sysfsroot: %s\n", sysfsroot);
         }
+        jsp = &op->json_st;
+        as_json = jsp->pr_as_json;
+        if (as_json) {
+            jop = sgj_start_r("lsscsi", release_str, argc, argv, jsp);
+{
+uint8_t h_arr[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf,
+		   0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f
+		  };
+sgj_js_nv_hex_bytes(jsp, jop, "sgj_js_nv_hex_bytes", h_arr, sizeof(h_arr));
+}
+	}
         if (do_hosts) {
                 list_shosts(op);
 #if (HAVE_NVME && (! IGNORE_NVME))
@@ -4979,6 +5014,11 @@ main(int argc, char **argv)
         }
 
         free_dev_node_list();
+	res = 0;
+	if (as_json) {
+		sgj_js2file(jsp, NULL, res, stdout);
+		sgj_finish(jsp);
+	}
 
-        return 0;
+        return res;
 }

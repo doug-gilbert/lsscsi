@@ -11,16 +11,18 @@ bin_PROGRAMS = lsscsi
 ## AM_CFLAGS = -I$(top_srcdir)/include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -Wall -W
 
 # -std=<s> can be c99, c11, gnu11, etc.
-AM_CFLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -Wall -W
+AM_CPPFLAGS = -iquote ${top_srcdir}/src -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
+### AM_CFLAGS = -Wall -W
 # AM_CFLAGS = -Wall -W -Wextra -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wshadow -Wjump-misses-init
-# AM_CFLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -Wall -W -pedantic -std=c11
-# AM_CFLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -Wall -W -pedantic -std=c11 --analyze
-# AM_CFLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -Wall -W -pedantic -std=c++11
-# AM_CFLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -Wall -W -pedantic -std=gnu++1z
-# AM_CFLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -Wall -W -pedantic -std=c++20
+AM_CFLAGS = -Wall -W -pedantic -std=c99
+# AM_CFLAGS = -Wall -W -pedantic -std=c11
+# AM_CFLAGS = -Wall -W -pedantic -std=c11 --analyze
+# AM_CFLAGS = -Wall -W -pedantic -std=c++11
+# AM_CFLAGS = -Wall -W -pedantic -std=gnu++1z
+# AM_CFLAGS = -Wall -W -pedantic -std=c++20
 
 
-lsscsi_SOURCES =	lsscsi.c
+lsscsi_SOURCES =	lsscsi.c sg_json_builder.c sg_pr2serr.c
 
 distclean-local:
 	rm -rf .deps

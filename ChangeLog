@@ -1,6 +1,6 @@
 Linux utility for listing SCSI devices.
 
-Changelog for pre-release lsscsi-0.33 [20211207] [svn: r171]
+Changelog for pre-release lsscsi-0.33 [20221208] [svn: r172]
   - change '-w' output to step over designator type prefix
     (e.g. '3' for NAA)
   - add '-ww' to mean: really use
@@ -10,6 +10,9 @@ Changelog for pre-release lsscsi-0.33 [20211207] [svn: r171]
   - add '-ii' to mean show identifier without that prefix
   - clean up '-t' output for SAS (RAID) logical disks
   - build_debian.sh: build without signatures
+  - add JSON builder code borrowed from sg3_utils
+  - autoconf: upgrade version 2.70 to 2.71; automake upgrade
+    to version 1.16.5
 
 Changelog for released lsscsi-0.32 [20210505] [svn: r167]
   - improve NVMe device parsing (e.g. /dev/nvme0c1n2)
