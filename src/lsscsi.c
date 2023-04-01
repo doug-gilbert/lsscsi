@@ -3,7 +3,7 @@
  * applicable to kernel versions 2.6.1 and greater. In lsscsi version 0.30
  * support was added to additionally list NVMe devices and controllers.
  *
- *  Copyright (C) 2003-2021 D. Gilbert
+ *  Copyright (C) 2003-2023 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -46,7 +46,7 @@
 #include "sg_pr2serr.h"
 
 /* Package release number is first number, whole string is version */
-static const char * release_str = "0.33  2022/12/08 [svn: r172]";
+static const char * release_str = "0.33  2023/04/01 [svn: r173]";
 
 #define FT_OTHER 0
 #define FT_BLOCK 1
@@ -112,7 +112,8 @@ static const char * dev_disk_byid_dir = "/dev/disk/by-id";
 static const char * class_nvme = "/class/nvme/";
 /* static const char * class_nvme_subsys = "/class/nvme-subsystem/"; */
 #endif
-
+static const char * pdt_sn = "peripheral_device_type";
+static const char * mmnbl_s = "module may not be loaded";
 
 /* For SCSI 'h' is host_num, 'c' is channel, 't' is target, 'l' is LUN is
  * uint64_t and lun_arr[8] is LUN as 8 byte array. For NVMe, h=0x7fff
@@ -137,6 +138,8 @@ struct lsscsi_opts {
         bool classic;       /* -c */
         bool dev_maj_min;   /* -d */
         bool generic;       /* -g */
+        bool do_hosts;      /* -H or -C */
+        bool do_json;       /* -j or -J */
         bool kname;         /* -k */
         bool no_nvme;       /* -N */
         bool pdt;           /* -D= peripheral device type in hex */
@@ -154,6 +157,7 @@ struct lsscsi_opts {
                              * number of logical blocks */
         int unit;           /* -u: logical unit (LU) name: from vpd_pg83 */
         int verbose;        /* -v */
+        const char * js_file; /* --js-file= argument */
         sgj_state json_st;  /* -j[JO] or --json[=JO] */
 };
 
@@ -212,6 +216,8 @@ static struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
         {"hosts", no_argument, 0, 'H'},
         {"json", optional_argument, 0, 'j'},
+        {"js-file", required_argument, 0, 'J'},
+        {"js_file", required_argument, 0, 'J'},
         {"kname", no_argument, 0, 'k'},
         {"long", no_argument, 0, 'l'},
         {"list", no_argument, 0, 'L'},
@@ -258,10 +264,10 @@ struct dev_node_list {
 static struct dev_node_list* dev_node_listhead = NULL;
 
 /* Allow for '0x' + prefix + wwn<128-bit> + <null-terminator> */
-#define DISK_WWN_MAX_LEN 36
+#define DSK_WWN_MXLEN 36
 
 struct disk_wwn_node_entry {
-        char wwn[DISK_WWN_MAX_LEN];
+        char wwn[DSK_WWN_MXLEN];
         char disk_bname[12];
 };
 
@@ -302,12 +308,14 @@ static char errpath[LMAX_PATH];
 static const char * usage_message1 =
 "Usage: lsscsi   [--brief] [--classic] [--controllers] [--device] "
             "[--generic]\n"
-            "\t\t[--help] [--hosts] [--kname] [--list] [--long] "
-            "[--long-unit]\n"
-            "\t\t[--lunhex] [--no-nvme] [--pdt] [--protection] [--prot-mode]\n"
-            "\t\t[--scsi_id] [--size] [--sz-lbs] [--sysfsroot=PATH] "
-            "[--transport]\n"
-            "\t\t[--unit] [--verbose] [--version] [--wwn]  [<h:c:t:l>]\n"
+            "\t\t[--help] [--hosts] [--json[=JO]] [--js-file=JFN] "
+            "[--kname]\n"
+            "\t\t[--list] [--long] [--long-unit] [--lunhex] [--no-nvme] "
+            "[--pdt]\n"
+            "\t\t[--protection] [--prot-mode] [--scsi_id] [--size] "
+            "[--sz-lbs]\n"
+            "\t\t[--sysfsroot=PATH] [--transport] [--unit] [--verbose]\n"
+            "\t\t[--version] [--wwn]  [<h:c:t:l>]\n"
 "  where:\n"
 "    --brief|-b        tuple and device name only\n"
 "    --classic|-c      alternate output similar to 'cat /proc/scsi/scsi'\n"
@@ -317,6 +325,10 @@ static const char * usage_message1 =
 "    --generic|-g      show scsi generic device name\n"
 "    --help|-h         this usage information\n"
 "    --hosts|-H        lists scsi hosts rather than scsi devices\n"
+"    --json[=JO]|-j[JO]    output in JSON instead of human readable\n"
+"                          test. Use --json=? for JSON help\n"
+"    --js-file=JFN|-J JFN    JFN is a filename to which JSON output is\n"
+"                            written (def: stdout); truncates then writes\n"
 "    --kname|-k        show kernel name instead of device node name\n"
 "    --list|-L         additional information output one\n"
 "                      attribute=value per line\n"
@@ -355,28 +367,6 @@ static const char * usage_message2 =
 "options can also take underscore (and vice versa).\n";
 
 
-#if 0
-#ifdef __GNUC__
-static int pr2serr(const char * fmt, ...)
-        __attribute__ ((format (printf, 1, 2)));
-#else
-static int pr2serr(const char * fmt, ...);
-#endif
-
-
-static int
-pr2serr(const char * fmt, ...)
-{
-        va_list args;
-        int n;
-
-        va_start(args, fmt);
-        n = vfprintf(stderr, fmt, args);
-        va_end(args);
-        return n;
-}
-#endif
-
 #ifdef __GNUC__
 static int scnpr(char * cp, int cp_max_len, const char * fmt, ...)
         __attribute__ ((format (printf, 3, 4)));
@@ -390,7 +380,7 @@ static int scnpr(char * cp, int cp_max_len, const char * fmt, ...);
  * < cp_max_len; for cp_max_len <= 1 the return value is 0 and no chars
  * are written to cp. Note this means that when cp_max_len = 1, this
  * function assumes that cp[0] is the null character and does nothing
- * (and returns 0).  */
+ * (and returns 0). This function is the same as sg_scnpr() in sg_lib.h  */
 static int
 scnpr(char * cp, int cp_max_len, const char * fmt, ...)
 {
@@ -404,32 +394,6 @@ scnpr(char * cp, int cp_max_len, const char * fmt, ...)
         va_end(args);
         return (n < cp_max_len) ? n : (cp_max_len - 1);
 }
-
-#if 0
-static bool
-all_zeros(const uint8_t * bp, int b_len)
-{
-        if ((NULL == bp) || (b_len <= 0))
-        return false;
-        for (--b_len; b_len >= 0; --b_len) {
-                if (0x0 != bp[b_len])
-                        return false;
-        }
-        return true;
-}
-
-static bool
-all_ffs(const uint8_t * bp, int b_len)
-{
-        if ((NULL == bp) || (b_len <= 0))
-                return false;
-        for (--b_len; b_len >= 0; --b_len) {
-                if (0xff != bp[b_len])
-                        return false;
-        }
-        return true;
-}
-#endif
 
 #if (HAVE_NVME && (! IGNORE_NVME))
 
@@ -1791,7 +1755,7 @@ get_usb_devname(const char * hname, const char * devname, char * b, int b_len)
  * descriptor; returns -1 if normal end condition and -2 for an abnormal
  * termination. Matches association, designator_type and/or code_set when
  * any of those values are greater than or equal to zero. */
-int
+static int
 sg_vpd_dev_id_iter(const uint8_t * initial_desig_desc, int page_len,
                    int * off, int m_assoc, int m_desig_type, int m_code_set)
 {
@@ -1881,6 +1845,7 @@ get_lu_name(const char * devname, char * b, int b_len, bool want_prefix)
         if (0 == sg_vpd_dev_id_iter(bp, len, &off, VPD_ASSOC_LU,
                                     3 /* NAA */, 1 /* binary */)) {
                 dlen = bp[off + 3];
+#if 0
 // pr2serr("%s: NAA dlen=%d\n", __func__, dlen);
 if (bp[off + 4] == 0x30) {
 // pr2serr("%s: locally assigned\n", __func__);
@@ -1892,6 +1857,7 @@ dlen = bp[off + 3];
 }
 }
 }
+#endif
                 if (! ((8 == dlen) || (16 ==dlen)))
                         return b;
                 if (want_prefix) {
@@ -1908,7 +1874,7 @@ dlen = bp[off + 3];
         } else if (0 == sg_vpd_dev_id_iter(bp, len, &off, VPD_ASSOC_LU,
                                            2 /* EUI */, 1 /* binary */)) {
                 dlen = bp[off + 3];
-pr2serr("%s: EUI dlen=%d\n", __func__, dlen);
+// pr2serr("%s: EUI dlen=%d\n", __func__, dlen);
                 if (! ((8 == dlen) || (12 == dlen) || (16 ==dlen)))
                         return b;
                 if (want_prefix) {
@@ -1925,7 +1891,7 @@ pr2serr("%s: EUI dlen=%d\n", __func__, dlen);
         } else if (0 == sg_vpd_dev_id_iter(bp, len, &off, VPD_ASSOC_LU,
                                            0xa /* UUID */,  1 /* binary */)) {
                 dlen = bp[off + 3];
-pr2serr("%s: UUID dlen=%d\n", __func__, dlen);
+// pr2serr("%s: UUID dlen=%d\n", __func__, dlen);
                 if ((1 != ((bp[off + 4] >> 4) & 0xf)) || (18 != dlen)) {
                         snprintf(cp, b_len, "??");
                         /* cp += 2; */
@@ -2146,9 +2112,10 @@ transport_init(const char * devname, /* const struct lsscsi_opts * op, */
         char buff[LMAX_DEVPATH];
         char wd[LMAX_PATH];
         struct stat a_stat;
+        static const int bufflen = sizeof(buff);
 
         /* SPI host */
-        snprintf(buff, sizeof(buff), "%s%s%s", sysfsroot, spi_host, devname);
+        snprintf(buff, bufflen, "%s%s%s", sysfsroot, spi_host, devname);
         if ((stat(buff, &a_stat) >= 0) && S_ISDIR(a_stat.st_mode)) {
                 transport_id = TRANSPORT_SPI;
                 snprintf(b, b_len, "spi:");
@@ -2156,7 +2123,7 @@ transport_init(const char * devname, /* const struct lsscsi_opts * op, */
         }
 
         /* FC host */
-        snprintf(buff, sizeof(buff), "%s%s%s", sysfsroot, fc_host, devname);
+        snprintf(buff, bufflen, "%s%s%s", sysfsroot, fc_host, devname);
         if ((stat(buff, &a_stat) >= 0) && S_ISDIR(a_stat.st_mode)) {
                 if (get_value(buff, "symbolic_name", wd, sizeof(wd))) {
                         if (strstr(wd, " over ")) {
@@ -2182,7 +2149,7 @@ transport_init(const char * devname, /* const struct lsscsi_opts * op, */
         }
 
         /* SRP host */
-        snprintf(buff, sizeof(buff), "%s%s%s", sysfsroot, srp_host, devname);
+        snprintf(buff, bufflen, "%s%s%s", sysfsroot, srp_host, devname);
         if (stat(buff, &a_stat) >= 0 && S_ISDIR(a_stat.st_mode)) {
                 int h;
 
@@ -2195,14 +2162,14 @@ transport_init(const char * devname, /* const struct lsscsi_opts * op, */
 
         /* SAS host */
         /* SAS transport layer representation */
-        snprintf(buff, sizeof(buff), "%s%s%s", sysfsroot, sas_host, devname);
+        snprintf(buff, bufflen, "%s%s%s", sysfsroot, sas_host, devname);
         if ((stat(buff, &a_stat) >= 0) && S_ISDIR(a_stat.st_mode)) {
                 transport_id = TRANSPORT_SAS;
                 off = strlen(buff);
-                snprintf(buff + off, sizeof(buff) - off, "/device");
+                snprintf(buff + off, bufflen - off, "/device");
                 if (sas_low_phy_scan(buff, NULL) < 1)
                         return false;
-                snprintf(buff, sizeof(buff), "%s%s%s", sysfsroot, sas_phy,
+                snprintf(buff, bufflen, "%s%s%s", sysfsroot, sas_phy,
                          sas_low_phy);
                 snprintf(b, b_len, "sas:");
                 off = strlen(b);
@@ -2217,7 +2184,7 @@ transport_init(const char * devname, /* const struct lsscsi_opts * op, */
         }
 
         /* SAS class representation */
-        snprintf(buff, sizeof(buff), "%s%s%s%s", sysfsroot, scsi_host,
+        snprintf(buff, bufflen, "%s%s%s%s", sysfsroot, scsi_host,
                  devname, "/device/sas/ha");
         if ((stat(buff, &a_stat) >= 0) && S_ISDIR(a_stat.st_mode)) {
                 transport_id = TRANSPORT_SAS_CLASS;
@@ -2238,7 +2205,7 @@ transport_init(const char * devname, /* const struct lsscsi_opts * op, */
                 char *t, buff2[LMAX_DEVPATH - 4];
 
                 /* resolve SCSI host device */
-                snprintf(buff, sizeof(buff), "%s%s%s%s", sysfsroot, scsi_host,
+                snprintf(buff, bufflen, "%s%s%s%s", sysfsroot, scsi_host,
                          devname, "/device");
                 if (readlink(buff, buff2, sizeof(buff2)) <= 0)
                         break;
@@ -2256,9 +2223,9 @@ transport_init(const char * devname, /* const struct lsscsi_opts * op, */
                 /* resolve FireWire host device */
                 buff[strlen(buff) - strlen("device")] = 0;
                 if (strlen(buff) + strlen(buff2) + strlen("host_id/guid") + 2
-                    > sizeof(buff))
+                    > bufflen)
                         break;
-                my_strcopy(buff + strlen(buff), buff2, sizeof(buff));
+                my_strcopy(buff + strlen(buff), buff2, bufflen);
 
                 /* read the FireWire host's EUI-64 */
                 if (!get_value(buff, "host_id/guid", buff2, sizeof(buff2)) ||
@@ -2269,7 +2236,7 @@ transport_init(const char * devname, /* const struct lsscsi_opts * op, */
         } while (0);
 
         /* iSCSI host */
-        snprintf(buff, sizeof(buff), "%s%s%s", sysfsroot, iscsi_host, devname);
+        snprintf(buff, bufflen, "%s%s%s", sysfsroot, iscsi_host, devname);
         if ((stat(buff, &a_stat) >= 0) && S_ISDIR(a_stat.st_mode)) {
                 transport_id = TRANSPORT_ISCSI;
                 snprintf(b, b_len, "iscsi:");
@@ -2288,7 +2255,7 @@ transport_init(const char * devname, /* const struct lsscsi_opts * op, */
         }
 
         /* ATA or SATA host, crude check: driver name */
-        snprintf(buff, sizeof(buff), "%s%s%s", sysfsroot, scsi_host, devname);
+        snprintf(buff, bufflen, "%s%s%s", sysfsroot, scsi_host, devname);
         if (get_value(buff, "proc_name", wd, sizeof(wd))) {
                 if (0 == strcmp("ahci", wd)) {
                         transport_id = TRANSPORT_SATA;
@@ -2772,7 +2739,7 @@ transport_tport(const char * devname, const struct lsscsi_opts * op,
                 if (ata_dev) {
                         off = strlen(b);
                         scnpr(b + off, b_len - off, "%s",
-                                 get_lu_name(devname, wd, wdlen, false));
+                              get_lu_name(devname, wd, wdlen, false));
                         return true;
                 }
         }
@@ -2782,9 +2749,10 @@ transport_tport(const char * devname, const struct lsscsi_opts * op,
 /* Given the transport_id of the SCSI device (LU) associated with 'devname'
  * output additional information. */
 static void
-transport_tport_longer(const char * devname, const struct lsscsi_opts * op)
+transport_tport_longer(const char * devname, struct lsscsi_opts * op,
+                       sgj_opaque_p jop)
 {
-        int n, blen, b2len, vlen, wdlen;
+        int n;
         char * cp;
         char path_name[LMAX_DEVPATH];
         char buff[LMAX_DEVPATH];
@@ -2792,13 +2760,14 @@ transport_tport_longer(const char * devname, const struct lsscsi_opts * op)
         char wd[LMAX_PATH];
         char value[LMAX_NAME];
         struct addr_hctl hctl;
+        static const int bufflen = sizeof(buff);
+        static const int b2len = sizeof(b2);
+        static const int vlen = sizeof(value);
+        static const int wdlen = sizeof(wd);
 
-        blen = sizeof(buff);
-        b2len = sizeof(b2);
-        vlen = sizeof(value);
-        wdlen = sizeof(wd);
+if (jop) { }
 #if 0
-        snprintf(buff, blen, "%s/scsi_device:%s", path_name, devname);
+        snprintf(buff, bufflen, "%s/scsi_device:%s", path_name, devname);
         if (! if_directory_chdir(buff, "device"))
                 return;
         if (NULL == getcwd(wd, wdlen))
@@ -2806,14 +2775,14 @@ transport_tport_longer(const char * devname, const struct lsscsi_opts * op)
 #else
         snprintf(path_name, sizeof(path_name), "%s%s%s", sysfsroot,
                  class_scsi_dev, devname);
-        my_strcopy(buff, path_name, blen);
+        my_strcopy(buff, path_name, bufflen);
 #endif
         switch (transport_id) {
         case TRANSPORT_SPI:
                 printf("  transport=spi\n");
                 if (! parse_colon_list(devname, &hctl))
                         break;
-                snprintf(buff, blen, "%s%starget%d:%d:%d", sysfsroot,
+                snprintf(buff, bufflen, "%s%starget%d:%d:%d", sysfsroot,
                          spi_transport, hctl.h, hctl.c, hctl.t);
                 printf("  target_id=%d\n", hctl.t);
                 if (get_value(buff, "dt", value, vlen))
@@ -2848,13 +2817,13 @@ transport_tport_longer(const char * devname, const struct lsscsi_opts * op)
                         return;
                 *cp = '\0';
                 cp = basename(wd);
-                snprintf(buff, blen, "%s%s", "fc_remote_ports/", cp);
+                snprintf(buff, bufflen, "%s%s", "fc_remote_ports/", cp);
                 if (if_directory_chdir(wd, buff)) {
-                        if (NULL == getcwd(buff, blen))
+                        if (NULL == getcwd(buff, bufflen))
                                 return;
                 } else {  /* newer transport */
                         /* /sys  /class/fc_remote_ports/  rport-x:y-z  / */
-                        snprintf(buff, blen, "%s%s%s/", sysfsroot,
+                        snprintf(buff, bufflen, "%s%s%s/", sysfsroot,
                                  fc_remote_ports, cp);
                 }
                 n = 0;
@@ -2949,8 +2918,8 @@ transport_tport_longer(const char * devname, const struct lsscsi_opts * op)
                 printf("  transport=sas\n");
                 printf("  sub_transport=sas_class\n");
                 n = 0;
-                n += scnpr(buff + n, blen - n, "%s", path_name);
-                scnpr(buff + n, blen - n, "%s", "/device/sas_device");
+                n += scnpr(buff + n, bufflen - n, "%s", path_name);
+                scnpr(buff + n, bufflen - n, "%s", "/device/sas_device");
                 if (get_value(buff, "device_name", value, vlen))
                         printf("  device_name=%s\n", value);
                 if (get_value(buff, "dev_type", value, vlen))
@@ -2987,10 +2956,10 @@ transport_tport_longer(const char * devname, const struct lsscsi_opts * op)
         case TRANSPORT_ISCSI:
                 printf("  transport=iSCSI\n");
                 n = 0;
-                n += scnpr(buff + n, blen - n, "%s", sysfsroot);
-                n += scnpr(buff + n, blen - n, "%s", iscsi_session);
-                n += scnpr(buff + n, blen - n, "%s", "session");
-                scnpr(buff + n, blen - n, "%d", iscsi_tsession_num);
+                n += scnpr(buff + n, bufflen - n, "%s", sysfsroot);
+                n += scnpr(buff + n, bufflen - n, "%s", iscsi_session);
+                n += scnpr(buff + n, bufflen - n, "%s", "session");
+                scnpr(buff + n, bufflen - n, "%d", iscsi_tsession_num);
                 if (get_value(buff, "targetname", value, vlen))
                         printf("  targetname=%s\n", value);
                 if (get_value(buff, "tpgt", value, vlen))
@@ -3055,25 +3024,30 @@ transport_tport_longer(const char * devname, const struct lsscsi_opts * op)
 
 static void
 longer_d_entry(const char * path_name, const char * devname,
-               const struct lsscsi_opts * op)
+               struct lsscsi_opts * op, sgj_opaque_p jop)
 {
+        sgj_state * jsp = &op->json_st;
         char value[LMAX_NAME];
+        static const int vlen = sizeof(value);
+        static const char * db_s = "device_blocked";
+        static const char * iocb_s = "iocounterbits";
 
         if (op->transport_info) {
-                transport_tport_longer(devname, op);
+                transport_tport_longer(devname, op, jop);
                 return;
         }
         if (op->long_opt >= 3) {
-                if (get_value(path_name, "device_blocked", value,
-                              sizeof(value)))
-                        printf("  device_blocked=%s\n", value);
-                else if (op->verbose > 0)
-                        printf("  device_blocked=?\n");
-                if (get_value(path_name, "iocounterbits", value,
-                              sizeof(value)))
-                        printf("  iocounterbits=%s\n", value);
-                else if (op->verbose > 0)
-                        printf("  iocounterbits=?\n");
+                if (get_value(path_name, db_s, value, vlen)) {
+                        sgj_pr_hr(jsp, "  %s=%s\n", db_s, value);
+                        sgj_js_nv_s(jsp, jop, db_s, value);
+                } else if (op->verbose > 0)
+                        sgj_pr_hr(jsp, "  %s=?\n", db_s);
+                if (get_value(path_name, iocb_s, value, vlen)) {
+                        sgj_pr_hr(jsp, "  %s=%s\n", iocb_s, value);
+                        sgj_js_nv_s(jsp, jop, iocb_s, value);
+                } else if (op->verbose > 0)
+                        sgj_pr_hr(jsp,  "  %s=?\n", iocb_s);
+// xxxxxxxxxxxxxxxxxxxx
                 if (get_value(path_name, "iodone_cnt", value, sizeof(value)))
                         printf("  iodone_cnt=%s\n", value);
                 else if (op->verbose > 0)
@@ -3184,7 +3158,7 @@ longer_nd_entry(const char * path_name, const char * devname,
                 const struct lsscsi_opts * op)
 {
         char value[LMAX_NAME];
-        const int vlen = sizeof(value);
+        static const int vlen = sizeof(value);
 
         if (devname) { ; }      /* suppress warning */
         if (op->long_opt) {
@@ -3257,7 +3231,7 @@ longer_nd_entry(const char * path_name, const char * devname,
 
 static void
 one_classic_sdev_entry(const char * dir_name, const char * devname,
-                       const struct lsscsi_opts * op)
+                       struct lsscsi_opts * op)
 {
         int type, scsi_level;
         char buff[LMAX_DEVPATH];
@@ -3322,7 +3296,7 @@ one_classic_sdev_entry(const char * dir_name, const char * devname,
                         printf("-\n");
         }
         if (op->long_opt > 0)
-                longer_d_entry(buff, devname, op);
+                longer_d_entry(buff, devname, op, NULL);
         if (op->verbose)
                 printf("  dir: %s\n", buff);
 }
@@ -3418,105 +3392,132 @@ is_direct_access_dev(int pdt)
 /* List one SCSI device (LU) on a line. */
 static void
 one_sdev_entry(const char * dir_name, const char * devname,
-               const struct lsscsi_opts * op)
+               struct lsscsi_opts * op, sgj_opaque_p jop)
 {
         bool get_wwn = false;
-        int n, vlen;
+        int n;
         int dec_pdt = 0;        /* decoded PDT; called 'type' in sysfs */
+        int q = 0;
         int devname_len = 13;
+        sgj_state * jsp = &op->json_st;
+        const char * cp;
         char buff[LMAX_DEVPATH];
         char extra[LMAX_DEVPATH];
         char value[LMAX_NAME];
         char wd[LMAX_PATH];
+        char b[512];
+        char e[256];
         struct addr_hctl hctl;
+        static const int blen = sizeof(b);
+        static const int elen = sizeof(e);
+        static const int vlen = sizeof(value);
 
         if (op->classic) {
                 one_classic_sdev_entry(dir_name, devname, op);
                 return;
         }
-        vlen = sizeof(value);
         snprintf(buff, sizeof(buff), "%s/%s", dir_name, devname);
         if (op->lunhex && parse_colon_list(devname, &hctl)) {
                 int sel_mask = 0xf;
-                char b[80];
 
                 sel_mask |= (1 == op->lunhex) ? 0x10 : 0x20;
-                snprintf(value, vlen, "[%s]",
-                         tuple2string(&hctl, sel_mask, sizeof(b), b));
+                cp = tuple2string(&hctl, sel_mask, elen, e);
+                snprintf(value, vlen, "[%s]", cp);
+                if (jsp->pr_as_json) {
+                        sgj_js_nv_i(jsp, jop, "host_index", hctl.h);
+                        sgj_js_nv_i(jsp, jop, "controller_index", hctl.c);
+                        sgj_js_nv_i(jsp, jop, "target_index", hctl.t);
+
+                        sgj_js_nv_s(jsp, jop, "hctl_string", cp);
+// yyyyyyyy
+                }
                 devname_len = 28;
-        } else
+        } else {
                 snprintf(value, vlen, "[%s]", devname);
+                if (jsp->pr_as_json) {
+                        if (parse_colon_list(devname, &hctl)) {
+                                sgj_js_nv_i(jsp, jop, "host_index", hctl.h);
+                                sgj_js_nv_i(jsp, jop, "controller_index",
+                                            hctl.c);
+                                sgj_js_nv_i(jsp, jop, "target_index", hctl.t);
+                        }
+                        sgj_js_nv_s(jsp, jop, "hctl_string", devname);
+                }
+        }
 
-        if ((int)strlen(value) >= devname_len)
-                 printf("%s ", value);  /* if very long, append a space */
+        if ((int)strlen(value) >= devname_len) /* if long, append a space */
+                 q += scnpr(b + q, blen - q, "%s ", value);
         else /* left justified with field length of devname_len */
-                printf("%-*s", devname_len, value);
+                q += scnpr(b + q, blen - q, "%-*s", devname_len, value);
         if (op->pdt) {
-                char b[16];
-
                 if (get_value(buff, "type", value, vlen) &&
                     (1 == sscanf(value, "%d", &dec_pdt)) &&
                     (dec_pdt >= 0) && (dec_pdt < 32))
-                        snprintf(b, sizeof(b), "0x%x", dec_pdt);
+                        snprintf(e, elen, "0x%x", dec_pdt);
                 else
-                        snprintf(b, sizeof(b), "-1");
-                printf("%-8s", b);
+                        snprintf(e, elen, "-1");
+                q += scnpr(b + q, blen - q, "%-8s", e);
         } else if (op->brief)
                 ;
         else if (! get_value(buff, "type", value, vlen)) {
-                printf("type?   ");
+                q += scnpr(b + q, blen - q, "type?   ");
         } else if (1 != sscanf(value, "%d", &dec_pdt)) {
-                printf("type??  ");
+                q += scnpr(b + q, blen - q, "type??  ");
         } else if ((dec_pdt < 0) || (dec_pdt > 31)) {
-                printf("type??? ");
-        } else
-                printf("%s ", scsi_short_device_types[dec_pdt]);
+                q += scnpr(b + q, blen - q, "type??? ");
+        } else {
+                cp = scsi_short_device_types[dec_pdt];
+                q += scnpr(b + q, blen - q, "%s ", cp);
+                sgj_js_nv_ihexstr(jsp, jop, pdt_sn, dec_pdt, NULL, cp);
+        }
 
         if (op->wwn)
                 get_wwn = true;
         if (op->transport_info) {
                 if (transport_tport(devname, op, vlen, value))
-                        printf("%-30s  ", value);
+                        q += scnpr(b + q, blen - q, "%-30s  ", value);
                 else
-                        printf("                                ");
+                        q += scnpr(b + q, blen - q,
+                                   "                                ");
         } else if (op->unit) {
                 get_lu_name(devname, value, vlen, op->unit > 3);
                 n = strlen(value);
                 if (n < 1)      /* left justified "none" means no lu name */
-                        printf("%-32s  ", "none");
+                        q += scnpr(b + q, blen - q, "%-32s  ", "none");
                 else if (1 == op->unit) {
                         if (n < 33)
-                                printf("%-32s  ", value);
+                                q += scnpr(b + q, blen - q, "%-32s  ", value);
                         else {
                                 value[32] = '_';
                                 value[33] = ' ';
                                 value[34] = '\0';
-                                printf("%-34s", value);
+                                q += scnpr(b + q, blen - q, "%-34s", value);
                         }
                 } else if (2 == op->unit) {
                         if (n < 33)
-                                printf("%-32s  ", value);
+                                q += scnpr(b + q, blen - q, "%-32s  ", value);
                         else {
                                 value[n - 32] = '_';
-                                printf("%-32s  ", value + n - 32);
+                                q += scnpr(b + q, blen - q, "%-32s  ",
+                                           value + n - 32);
                         }
                 } else     /* -uuu, output in full, append rest of line */
-                        printf("%-s  ", value);
+                        q += scnpr(b + q, blen - q, "%-s  ", value);
         } else if (! op->brief) {
                 if (get_value(buff, "vendor", value, vlen))
-                        printf("%-8s ", value);
+                        q += scnpr(b + q, blen - q, "%-8s ", value);
                 else
-                        printf("vendor?  ");
+                        q += scnpr(b + q, blen - q, "vendor?  ");
 
                 if (get_value(buff, "model", value, vlen))
-                        printf("%-16s ", value);
+                        q += scnpr(b + q, blen - q, "%-16s ", value);
                 else
-                        printf("model?           ");
+                        q += scnpr(b + q, blen - q, "model?           ");
 
                 if (get_value(buff, "rev", value, vlen))
-                        printf("%-4s  ", value);
+                        q += scnpr(b + q, blen - q, "%-4s  ", value);
                 else
-                        printf("rev?  ");
+                        q += scnpr(b + q, blen - q, "rev?  ");
         }
 
         if (1 == non_sg_scan(buff, op)) {
@@ -3526,7 +3527,8 @@ one_sdev_entry(const char * dir_name, const char * devname,
                                 my_strcopy(extra, aa_first.name,
                                            sizeof(extra));
                         else {
-                                printf("unexpected scan_for_first error");
+                                q += scnpr(b + q, blen - q, "unexpected "
+                                           "scan_for_first error");
                                 wd[0] = '\0';
                         }
                 } else {
@@ -3535,13 +3537,13 @@ one_sdev_entry(const char * dir_name, const char * devname,
                 }
                 if (wd[0] && (if_directory_chdir(wd, extra))) {
                         if (NULL == getcwd(wd, sizeof(wd))) {
-                                printf("getcwd error");
+                                q += scnpr(b + q, blen - q, "getcwd error");
                                 wd[0] = '\0';
                         }
                 }
                 if (wd[0]) {
                         char dev_node[LMAX_NAME] = "";
-                        char wwn_str[DISK_WWN_MAX_LEN];
+                        char wwn_str[DSK_WWN_MXLEN];
                         enum dev_type typ;
 
                         typ = (FT_BLOCK == non_sg.ft) ? BLK_DEV : CHR_DEV;
@@ -3549,12 +3551,13 @@ one_sdev_entry(const char * dir_name, const char * devname,
                                 if ((BLK_DEV == typ) &&
                                     get_disk_wwn(wd, wwn_str, sizeof(wwn_str),
                                                  op->wwn_twice))
-                                        printf("%-*s  ", DISK_WWN_MAX_LEN - 1,
-                                               wwn_str);
+                                        q += scnpr(b + q, blen - q, "%-*s  ",
+                                                   DSK_WWN_MXLEN - 1,
+                                                   wwn_str);
                                 else
-                                        printf("                          "
-                                               "      ");
-
+                                        q += scnpr(b + q, blen - q, "        "
+                                                   "                        "
+                                                  );
                         }
                         if (op->kname)
                                 snprintf(dev_node, sizeof(dev_node), "%s/%s",
@@ -3563,12 +3566,13 @@ one_sdev_entry(const char * dir_name, const char * devname,
                                 snprintf(dev_node, sizeof(dev_node),
                                          "-       ");
 
-                        printf("%-9s", dev_node);
+                        q += scnpr(b + q, blen - q, "%-9s", dev_node);
                         if (op->dev_maj_min) {
                                 if (get_value(wd, "dev", value, vlen))
-                                        printf("[%s]", value);
+                                        q += scnpr(b + q, blen - q, "[%s]",
+                                                   value);
                                 else
-                                        printf("[dev?]");
+                                        q += scnpr(b + q, blen - q, "[dev?]");
                         }
 
                         if (op->scsi_id) {
@@ -3576,23 +3580,26 @@ one_sdev_entry(const char * dir_name, const char * devname,
 
                                 scsi_id = get_disk_scsi_id(dev_node,
                                                            op->scsi_id_twice);
-                                printf("  %s", scsi_id ? scsi_id : "-");
+                                q += scnpr(b + q, blen - q, "  %s",
+                                           scsi_id ? scsi_id : "-");
                                 free(scsi_id);
                         }
                 }
         } else {
                 if (get_wwn)
-                        printf("                                ");
+                        q += scnpr(b + q, blen - q, "                       "
+                                   "         ");
                 if (op->scsi_id)
-                        printf("%-9s  -", "-");
+                        q += scnpr(b + q, blen - q, "%-9s  -", "-");
                 else
-                        printf("%-9s", "-");
+                        q += scnpr(b + q, blen - q, "%-9s", "-");
         }
 
         if (op->generic) {
                 if (if_directory_ch2generic(buff)) {
                         if (NULL == getcwd(wd, sizeof(wd)))
-                                printf("  generic_dev error");
+                                q += scnpr(b + q, blen - q,
+                                           "  generic_dev error");
                         else {
                                 char dev_node[LMAX_NAME] = "";
 
@@ -3604,18 +3611,20 @@ one_sdev_entry(const char * dir_name, const char * devname,
                                                         CHR_DEV))
                                         snprintf(dev_node, sizeof(dev_node),
                                                  "-");
-                                printf("  %-9s", dev_node);
+                                q += scnpr(b + q, blen - q, "  %-9s",
+                                           dev_node);
                                 if (op->dev_maj_min) {
-                                        if (get_value(wd, "dev", value,
-                                                      sizeof(value)))
-                                                printf("[%s]", value);
+                                        if (get_value(wd, "dev", value, vlen))
+                                                q += scnpr(b + q, blen - q,
+                                                           "[%s]", value);
                                         else
-                                                printf("[dev?]");
+                                                q += scnpr(b + q, blen - q,
+                                                           "[dev?]");
                                 }
                         }
                 }
                 else
-                        printf("  %-9s", "-");
+                        q += scnpr(b + q, blen - q, "  %-9s", "-");
         }
 
         if (op->protection) {
@@ -3627,22 +3636,23 @@ one_sdev_entry(const char * dir_name, const char * devname,
 
                 if (sd_scan(sddir) &&
                     if_directory_chdir(sddir, ".") &&
-                    get_value(".", "protection_type", value, sizeof(value))) {
+                    get_value(".", "protection_type", value, vlen)) {
 
                         if (!strncmp(value, "0", 1))
-                                printf("  %-9s", "-");
+                                q += scnpr(b + q, blen - q, "  %-9s", "-");
                         else
-                                printf("  DIF/Type%1s", value);
+                                q += scnpr(b + q, blen - q, "  DIF/Type%1s",
+                                           value);
 
                 } else
-                        printf("  %-9s", "-");
+                        q += scnpr(b + q, blen - q, "  %-9s", "-");
 
                 if (block_scan(blkdir) &&
                     if_directory_chdir(blkdir, "integrity") &&
-                    get_value(".", "format", value, sizeof(value)))
-                        printf("  %-16s", value);
+                    get_value(".", "format", value, vlen))
+                        q += scnpr(b + q, blen - q, "  %-16s", value);
                 else
-                        printf("  %-16s", "-");
+                        q += scnpr(b + q, blen - q, "  %-16s", "-");
         }
 
         if (op->protmode) {
@@ -3652,15 +3662,14 @@ one_sdev_entry(const char * dir_name, const char * devname,
 
                 if (sd_scan(sddir) &&
                     if_directory_chdir(sddir, ".") &&
-                    get_value(sddir, "protection_mode", value,
-                              sizeof(value))) {
+                    get_value(sddir, "protection_mode", value, vlen)) {
 
                         if (!strcmp(value, "none"))
-                                printf("  %-4s", "-");
+                                q += scnpr(b + q, blen - q, "  %-4s", "-");
                         else
-                                printf("  %-4s", value);
+                                q += scnpr(b + q, blen - q, "  %-4s", value);
                 } else
-                        printf("  %-4s", "-");
+                        q += scnpr(b + q, blen - q, "  %-4s", "-");
         }
 
         if (op->ssize) {
@@ -3673,7 +3682,7 @@ one_sdev_entry(const char * dir_name, const char * devname,
                        block_scan(blkdir) &&
                        if_directory_chdir(blkdir, ".") &&
                        get_value(".", "size", value, vlen)) ) {
-                        printf("  %6s", "-");
+                        /* q += */ scnpr(b + q, blen - q, "  %6s", "-");
                         goto fini_line;
                 }
                 blk512s = atoll(value);
@@ -3686,9 +3695,11 @@ one_sdev_entry(const char * dir_name, const char * devname,
                                       sizeof(bb))) {
                                 lbs = atoi(bb);
                                 if (lbs < 1)
-                                        printf("  %12s,[lbs<1 ?]", value);
+                                        q += scnpr(b + q, blen - q,
+                                                   "  %12s,[lbs<1 ?]", value);
                                 else if (512 == lbs)
-                                        printf("  %12s%s", value,
+                                        q += scnpr(b + q, blen - q,
+                                                   "  %12s%s", value,
                                                (op->ssize > 3) ? ",512" : "");
                                 else {
                                         int64_t byts = 512 * blk512s;
@@ -3696,13 +3707,16 @@ one_sdev_entry(const char * dir_name, const char * devname,
                                         snprintf(value, vlen, "%" PRId64,
                                                  (byts / lbs));
                                         if (op->ssize > 3)
-                                                printf("  %12s,%d", value,
-                                                       lbs);
+                                                q += scnpr(b + q, blen - q,
+                                                           "  %12s,%d", value,
+                                                           lbs);
                                         else
-                                                printf("  %12s", value);
+                                                q += scnpr(b + q, blen - q,
+                                                           "  %12s", value);
                                 }
                         } else
-                                printf("  %12s,512", value);
+                                q += scnpr(b + q, blen - q, "  %12s,512",
+                                           value);
                 } else {
                         enum string_size_units unit_val = (0x1 & op->ssize) ?
                                          STRING_UNITS_10 : STRING_UNITS_2;
@@ -3710,25 +3724,27 @@ one_sdev_entry(const char * dir_name, const char * devname,
                         blk512s <<= 9;
                         if (blk512s > 0 &&
                             size2string(blk512s, unit_val, value, vlen))
-                                printf("  %6s", value);
+                                q += scnpr(b + q, blen - q, "  %6s", value);
                         else
-                                printf("  %6s", "-");
+                                q += scnpr(b + q, blen - q, "  %6s", "-");
                 }
+                if (op->verbose > 6)    /* stop 'unused' compiler noise */
+                        pr2serr("%s: actual blen=%d\n", __func__, q);
         }
 
 fini_line:
-        printf("\n");
+        sgj_pr_hr(jsp, "%s\n", b);
         if (op->long_opt > 0)
-                longer_d_entry(buff, devname, op);
+                longer_d_entry(buff, devname, op, jop);
         if (op->verbose > 0) {
-                printf("  dir: %s  [", buff);
+                q = scnpr(b, blen, "  dir: %s  [", buff);
                 if (if_directory_chdir(buff, "")) {
                         if (NULL == getcwd(wd, sizeof(wd)))
-                                printf("?");
+                                scnpr(b + q, blen - q, "?");
                         else
-                                printf("%s", wd);
+                                scnpr(b + q, blen - q, "%s", wd);
                 }
-                printf("]\n");
+                sgj_pr_hr(jsp, "%s]\n", b);
         }
 }
 
@@ -3775,9 +3791,10 @@ sdev_dir_scan_select(const struct dirent * s)
 /* List one NVMe namespace (NS) on a line. */
 static void
 one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
-               const struct lsscsi_opts * op)
+               struct lsscsi_opts * op, sgj_opaque_p jop)
 {
         int n, m;
+        int q = 0;
         int cdev_minor = 0;
         int cntlid = 0;
         int vb = op->verbose;
@@ -3785,19 +3802,24 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
         int sel_mask = 0xf;
         uint32_t nsid = 0;
         char * cp;
+        sgj_state * jsp = &op->json_st;
         char buff[LMAX_DEVPATH];
         char value[LMAX_NAME];
         char dev_node[LMAX_NAME + 16] = "";
         char wd[LMAX_PATH];
         char devname[64];
         char ctl_model[48];
-        char b[80];
-        const int blen = sizeof(b);
+        char b[256];
+        char d[80];
         const int bufflen = sizeof(buff);
         const int vlen = sizeof(value);
         struct addr_hctl hctl;
+        static const int blen = sizeof(b);
+        static const int dlen = sizeof(d);
 
+if (jop) { }
         n = 0;
+        b[0] = '\0';
         n += scnpr(buff + n, bufflen - n, "%s/", nvme_ctl_abs);
         scnpr(buff + n, bufflen - n, "%s", nvme_ns_rel);
         if ((0 == strncmp(nvme_ns_rel, "nvme", 4)) &&
@@ -3839,19 +3861,19 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
         snprintf(value, vlen, "[%s]",
                  tuple2string(&hctl, sel_mask, sizeof(devname), devname));
 
-        if ((int)strlen(value) >= devname_len)
-                printf("%s ", value);  /* if very long, append a space */
+        if ((int)strlen(value) >= devname_len) /* if long, append a space */
+                q += scnpr(b + q, blen - q, "%s ", value);
         else /* left justified with field length of devname_len */
-                printf("%-*s", devname_len, value);
+                q += scnpr(b + q, blen - q, "%-*s", devname_len, value);
 
         if (op->pdt)
-                printf("%-8s", "0x0");
+                q += scnpr(b + q, blen - q, "%-8s", "0x0");
         else if (op->brief)
                 ;
         else if (vb) /* NVMe namespace can only be NVM device */
-                printf("dsk/nvm ");
+                q += scnpr(b + q, blen - q, "dsk/nvm ");
         else
-                printf("disk    ");
+                q += scnpr(b + q, blen - q, "disk    ");
 
         if (op->transport_info) {
                 if (get_value(buff, "device/transport", value, vlen)) {
@@ -3861,45 +3883,49 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
 
                         if (0 == strcmp("pcie" , value)) {
 
-                                if (get_value(buff, svp, b, blen) &&
+                                if (get_value(buff, svp, d, dlen) &&
                                     get_value(buff, sdp, bb, sizeof(bb))) {
                                         snprintf(value , vlen, "pcie %s:%s",
-                                                 b, bb);
-                                        printf("%-41s  ", value);
+                                                 d, bb);
+                                        q += scnpr(b + q, blen - q, "%-41s  ",
+                                                   value);
                                 } else
-                                        printf("%-41s  ", "transport?");
+                                        q += scnpr(b + q, blen - q, "%-41s  ",
+                                                   "transport?");
                         } else
-                                printf("%-41s  ", value);
+                                q += scnpr(b + q, blen - q, "%-41s  ", value);
                 } else
-                        printf("%-41s  ", "transport?");
+                        q += scnpr(b + q, blen - q, "%-41s  ", "transport?");
         } else if (op->unit) {
                 if (get_value(buff, "wwid", value, vlen)) {
                         if ((op->unit < 4) &&
                             (0 == strncmp("eui.", value, 4)))
-                                printf("%-41s  ", value + 4);
+                                q += scnpr(b + q, blen - q, "%-41s  ",
+                                           value + 4);
                         else
-                                printf("%-41s  ", value);
+                                q += scnpr(b + q, blen - q, "%-41s  ",
+                                           value);
                 } else
-                        printf("%-41s  ", "wwid?");
+                        q += scnpr(b + q, blen - q, "%-41s  ", "wwid?");
         } else if (! op->brief) {
                 if (! get_value(nvme_ctl_abs, "model", ctl_model,
                                 sizeof(ctl_model)))
                         snprintf(ctl_model, sizeof(ctl_model), "-    ");
                 n = trim_lead_trail(ctl_model, true, true);
-                snprintf(b, blen, "__%u", nsid);
-                m = strlen(b);
+                snprintf(d, dlen, "__%u", nsid);
+                m = strlen(d);
                 if (n > (41 - m))
-                        memcpy(ctl_model + 41 - m, b, m + 1);
+                        memcpy(ctl_model + 41 - m, d, m + 1);
                 else
-                        strcat(ctl_model, b);
-                printf("%-41s  ", ctl_model);
+                        strcat(ctl_model, d);
+                q += scnpr(b + q, blen - q, "%-41s  ", ctl_model);
         }
 
         if (op->wwn) {
                 if (get_value(buff, "wwid", value, vlen))
-                        printf("%-41s  ", value);
+                        q += scnpr(b + q, blen - q, "%-41s  ", value);
                 else
-                        printf("%-41s  ", "wwid?");
+                        q += scnpr(b + q, blen - q, "%-41s  ", "wwid?");
         }
 
         if (op->kname)
@@ -3908,21 +3934,21 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
         else if (! get_dev_node(buff, dev_node, BLK_DEV))
                 snprintf(dev_node, sizeof(dev_node), "-       ");
 
-        printf("%-9s", dev_node);
+        q += scnpr(b + q, blen - q, "%-9s", dev_node);
         if (op->dev_maj_min) {
                 if (get_value(buff, "dev", value, vlen))
-                        printf(" [%s]", value);
+                        q += scnpr(b + q, blen - q, " [%s]", value);
                 else
-                        printf(" [dev?]");
+                        q += scnpr(b + q, blen - q, " [dev?]");
         }
-        if (op->generic)
-                printf("  %-9s", "-");  /* no NVMe generic devices (yet) */
+        if (op->generic) /* no NVMe generic devices (yet) */
+                q += scnpr(b + q, blen - q, "  %-9s", "-");
 
         if (op->ssize) {
                 uint64_t blk512s;
 
                 if (! get_value(buff, "size", value, vlen)) {
-                        printf("  %6s", "-");
+                        q += scnpr(b + q, blen - q, "  %6s", "-");
                         goto fini_line;
                 }
                 blk512s = atoll(value);
@@ -3935,9 +3961,11 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
                                       sizeof(bb))) {
                                 lbs = atoi(bb);
                                 if (lbs < 1)
-                                        printf("  %12s,[lbs<1 ?]", value);
+                                        q += scnpr(b + q, blen - q,
+                                                   "  %12s,[lbs<1 ?]", value);
                                 else if (512 == lbs)
-                                        printf("  %12s%s", value,
+                                        q += scnpr(b + q, blen - q,
+                                                   "  %12s%s", value,
                                                (op->ssize > 3) ? ",512" : "");
                                 else {
                                         int64_t byts = 512 * blk512s;
@@ -3945,13 +3973,16 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
                                         snprintf(value, vlen, "%" PRId64,
                                                  (byts / lbs));
                                         if (op->ssize > 3)
-                                                printf("  %12s,%d", value,
-                                                       lbs);
+                                                q += scnpr(b + q, blen - q,
+                                                           "  %12s,%d", value,
+                                                           lbs);
                                         else
-                                                printf("  %12s", value);
+                                                q += scnpr(b + q, blen - q,
+                                                           "  %12s", value);
                                 }
                         } else
-                                printf("  %12s,512", value);
+                                q += scnpr(b + q, blen - q, "  %12s,512",
+                                           value);
                 } else {
                         enum string_size_units unit_val = (0x1 & op->ssize) ?
                                          STRING_UNITS_10 : STRING_UNITS_2;
@@ -3959,14 +3990,14 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
                         blk512s <<= 9;
                         if (blk512s > 0 &&
                             size2string(blk512s, unit_val, value, vlen))
-                                printf("  %6s", value);
+                                q += scnpr(b + q, blen - q, "  %6s", value);
                         else
-                                printf("  %6s", "-");
+                                q += scnpr(b + q, blen - q, "  %6s", "-");
                 }
         }
 
 fini_line:
-        printf("\n");
+        sgj_pr_hr(jsp, "%s\n", b);
         if (op->long_opt > 0)
                 longer_nd_entry(buff, devname, op);
         if (vb > 0) {
@@ -4272,10 +4303,13 @@ nhost_scandir_sort(const struct dirent ** a, const struct dirent ** b)
 
 /* List SCSI devices (LUs). */
 static void
-list_sdevices(const struct lsscsi_opts * op)
+list_sdevices(struct lsscsi_opts * op, sgj_opaque_p jop)
 {
         int num, k, n, blen, nlen;
         struct dirent ** namelist;
+        sgj_state * jsp = &op->json_st;
+        sgj_opaque_p jap = NULL;
+        sgj_opaque_p jo2p = NULL;
         char buff[LMAX_DEVPATH];
         char name[LMAX_NAME];
 
@@ -4292,19 +4326,28 @@ list_sdevices(const struct lsscsi_opts * op)
                                    __func__);
                         scnpr(name + n, nlen - n, "%s", buff);
                         perror(name);
-                        printf("SCSI mid level module may not be loaded\n");
+                        sgj_pr_hr(jsp, "SCSI mid level %s\n", mmnbl_s);
                 }
                 if (op->classic)
-                        printf("Attached devices: none\n");
+                        sgj_pr_hr(jsp, "Attached devices: none\n");
                 return;
         }
         if (op->classic)
-                printf("Attached devices: %s\n", (num ? "" : "none"));
+                sgj_pr_hr(jsp, "Attached devices: %s\n", (num ? "" : "none"));
+
+        if (jsp->pr_as_json) {
+                sgj_js_nv_i(jsp, jsp->basep,
+                            "number_of_attached_scsi_devices", num);
+                jap = sgj_named_subarray_r(jsp, jop,
+                                           "attached_scsi_device_list");
+        }
 
         for (k = 0; k < num; ++k) {
                 my_strcopy(name, namelist[k]->d_name, nlen);
                 transport_id = TRANSPORT_UNKNOWN;
-                one_sdev_entry(buff, name, op);
+                jo2p = sgj_new_unattached_object_r(jsp);
+                one_sdev_entry(buff, name, op, jo2p);
+                sgj_js_nv_o(jsp, jap, NULL /* implies an array add */, jo2p);
                 free(namelist[k]);
         }
         free(namelist);
@@ -4316,11 +4359,14 @@ list_sdevices(const struct lsscsi_opts * op)
 
 /* List NVME devices (namespaces). */
 static void
-list_ndevices(const struct lsscsi_opts * op)
+list_ndevices(struct lsscsi_opts * op, sgj_opaque_p jop)
 {
         int num, num2, k, j, n, blen, b2len, elen;
         struct dirent ** name_list;
         struct dirent ** namelist2;
+        sgj_state * jsp = &op->json_st;
+        sgj_opaque_p jap = NULL;
+        sgj_opaque_p jo2p = NULL;
         char buff[LMAX_DEVPATH];
         char buff2[LMAX_DEVPATH];
         char ebuf[120];
@@ -4341,10 +4387,17 @@ list_ndevices(const struct lsscsi_opts * op)
                                    __func__);
                         scnpr(ebuf + n, elen - n, "%s", buff);
                         perror(ebuf);
-                        printf("NVMe module may not be loaded\n");
+                        sgj_pr_hr(jsp, "NVMe %s\n", mmnbl_s);
                 }
                 return;
         }
+        if (jsp->pr_as_json) {
+                sgj_js_nv_i(jsp, jsp->basep,
+                            "number_of_attached_nvme_devices", num);
+                jap = sgj_named_subarray_r(jsp, jop,
+                                           "attached_nvme_device_list");
+        }
+
         for (k = 0; k < num; ++k) {
                 n = 0;
                 n += scnpr(buff2 + n, b2len - n, "%s", buff);
@@ -4366,7 +4419,10 @@ list_ndevices(const struct lsscsi_opts * op)
                 }
                 for (j = 0; j < num2; ++j) {
                         transport_id = TRANSPORT_UNKNOWN;
-                        one_ndev_entry(buff2, namelist2[j]->d_name, op);
+                        jo2p = sgj_new_unattached_object_r(jsp);
+                        one_ndev_entry(buff2, namelist2[j]->d_name, op, jo2p);
+                        sgj_js_nv_o(jsp, jap, NULL /* implies an array add */,
+                                    jo2p);
                         free(namelist2[j]);
                 }
                 free(namelist2);
@@ -4386,7 +4442,7 @@ static void
 longer_h_entry(const char * path_name, const struct lsscsi_opts * op)
 {
         char value[LMAX_NAME];
-        const int vlen = sizeof(value);
+        static const int vlen = sizeof(value);
 
         if (op->transport_info) {
                 transport_init_longer(path_name, op);
@@ -4417,10 +4473,6 @@ longer_h_entry(const char * path_name, const struct lsscsi_opts * op)
                         printf("  state=%s\n", value);
                 else if (op->verbose)
                         printf("  state=?\n");
-                if (get_value(path_name, "unchecked_isa_dma", value, vlen))
-                        printf("  unchecked_isa_dma=%s\n", value);
-                else if (op->verbose)
-                        printf("  unchecked_isa_dma=?\n");
                 if (get_value(path_name, "unique_id", value, vlen))
                         printf("  unique_id=%s\n", value);
                 else if (op->verbose)
@@ -4440,11 +4492,6 @@ longer_h_entry(const char * path_name, const struct lsscsi_opts * op)
                         printf("sg_tablesize=%-4s ", value);
                 else
                         printf("sg_tablesize=???? ");
-
-                if (get_value(path_name, "unchecked_isa_dma", value, vlen))
-                        printf("unchecked_isa_dma=%-2s ", value);
-                else
-                        printf("unchecked_isa_dma=?? ");
                 printf("\n");
                 if (2 == op->long_opt) {
                         if (get_value(path_name, "can_queue", value, vlen))
@@ -4469,8 +4516,8 @@ one_host_entry(const char * dir_name, const char * devname,
         char buff[LMAX_DEVPATH];
         char value[LMAX_NAME];
         char wd[LMAX_PATH];
-        const int blen = sizeof(buff);
-        const int vlen = sizeof(value);
+        static const int blen = sizeof(buff);
+        static const int vlen = sizeof(value);
 
         if (op->classic) {
                 // one_classic_host_entry(dir_name, devname, op);
@@ -4561,13 +4608,15 @@ shost_scandir_sort(const struct dirent ** a, const struct dirent ** b)
 }
 
 static void
-list_shosts(const struct lsscsi_opts * op)
+list_shosts(struct lsscsi_opts * op, sgj_opaque_p jop)
 {
         int num, k;
         struct dirent ** namelist;
+        // sgj_state * jsp = &op->json_st;
         char buff[LMAX_DEVPATH];
         char name[LMAX_NAME];
 
+if (jop) { }
         snprintf(buff, sizeof(buff), "%s%s", sysfsroot, scsi_host);
 
         num = scandir(buff, &namelist, host_dir_scan_select,
@@ -4598,15 +4647,17 @@ list_shosts(const struct lsscsi_opts * op)
 
 /* List NVME hosts (controllers). */
 static void
-list_nhosts(const struct lsscsi_opts * op)
+list_nhosts(struct lsscsi_opts * op, sgj_opaque_p jop)
 {
         int num, k, n;
         struct dirent ** namelist;
+        sgj_state * jsp = &op->json_st;
         char buff[LMAX_DEVPATH];
         char ebuf[120];
-        const int blen = sizeof(buff);
-        const int elen = sizeof(ebuf);
+        static const int blen = sizeof(buff);
+        static const int elen = sizeof(ebuf);
 
+if (jop) { }
         n = 0;
         n += scnpr(buff + n, blen - 1, "%s", sysfsroot);
         scnpr(buff + n, blen - 1, "%s", class_nvme);
@@ -4620,7 +4671,7 @@ list_nhosts(const struct lsscsi_opts * op)
                                    __func__);
                         scnpr(ebuf + n, elen - n, "%s", buff);
                         perror(ebuf);
-                        printf("NVMe module may not be loaded\n");
+                        sgj_pr_hr(jsp, "NVMe %s\n", mmnbl_s);
                 }
                 return;
         }
@@ -4770,10 +4821,9 @@ err_out:
 int
 main(int argc, char **argv)
 {
-        bool do_sdevices = true;
-        bool do_hosts = false;  /* checked before do_sdevices */
-        bool as_json;
-        int c, res;
+        bool do_sdevices = true;  /* op->do_hosts checked before this */
+        int c;
+        int res = 0;
         int version_count = 0;
         const char * cp;
         sgj_state * jsp;
@@ -4788,7 +4838,7 @@ main(int argc, char **argv)
         while (1) {
                 int option_index = 0;
 
-                c = getopt_long(argc, argv, "bcCdDghHij::klLNpPsStuUvVwxy:",
+                c = getopt_long(argc, argv, "bcCdDghHij::J:klLNpPsStuUvVwxy:",
                                 long_options, &option_index);
                 if (c == -1)
                         break;
@@ -4801,7 +4851,7 @@ main(int argc, char **argv)
                         op->classic = true;
                         break;
                 case 'C':       /* synonym for --hosts, NVMe perspective */
-                        do_hosts = true;
+                        op->do_hosts = true;
                         break;
                 case 'd':
                         op->dev_maj_min = true;
@@ -4816,7 +4866,7 @@ main(int argc, char **argv)
                         usage();
                         return 0;
                 case 'H':
-                        do_hosts = true;
+                        op->do_hosts = true;
                         break;
                 case 'i':
                         if (op->scsi_id)
@@ -4839,6 +4889,11 @@ main(int argc, char **argv)
                                 pr2serr("%s", e);
                                 return 1 /* SG_LIB_SYNTAX_ERROR */;
                         }
+                        op->do_json = true;
+                        break;
+                case 'J':
+                        op->do_json = true;
+                        op->js_file = optarg;
                         break;
                 case 'k':
                         op->kname = true;
@@ -4977,7 +5032,7 @@ main(int argc, char **argv)
                 return 1;
         }
         if (op->unit) {
-                if (do_hosts)
+                if (op->do_hosts)
                         pr2serr("--unit ignored when --hosts given\n");
                 if ((1 == op->long_opt) || (2 == op->long_opt)) {
                         pr2serr("please use '--list' (rather than '--long') "
@@ -4989,36 +5044,55 @@ main(int argc, char **argv)
                 printf(" sysfsroot: %s\n", sysfsroot);
         }
         jsp = &op->json_st;
-        as_json = jsp->pr_as_json;
-        if (as_json) {
+        if (op->do_json) {
             jop = sgj_start_r("lsscsi", release_str, argc, argv, jsp);
+#if 0
 {
 uint8_t h_arr[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf,
-		   0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f
-		  };
+                   0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19,
+                   0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f
+                  };
 sgj_js_nv_hex_bytes(jsp, jop, "sgj_js_nv_hex_bytes", h_arr, sizeof(h_arr));
 }
-	}
-        if (do_hosts) {
-                list_shosts(op);
-#if (HAVE_NVME && (! IGNORE_NVME))
-                if ((! op->no_nvme) && (! op->classic))
-                        list_nhosts(op);
-#endif
-        } else if (do_sdevices) {
-                list_sdevices(op);
-#if (HAVE_NVME && (! IGNORE_NVME))
-                if ((! op->no_nvme) && (! op->classic))
-                        list_ndevices(op);
 #endif
         }
+        if (op->do_hosts) {
+                list_shosts(op, jop);
+#if (HAVE_NVME && (! IGNORE_NVME))
+                if ((! op->no_nvme) && (! op->classic))
+                        list_nhosts(op, jop);
+#endif
+        } else if (do_sdevices) {
+                list_sdevices(op, jop);
+#if (HAVE_NVME && (! IGNORE_NVME))
+                if ((! op->no_nvme) && (! op->classic))
+                        list_ndevices(op, jop);
+#endif
+        }
+        res = (res >= 0) ? res : 1 /* SG_LIB_CAT_OTHER */;
+        if (op->do_json) {
+                FILE * fp = stdout;
 
+                /* '--js-file=-' will send JSON output to stdout */
+                if (op->js_file) {
+                        if ((1 != strlen(op->js_file)) ||
+                            ('-' != op->js_file[0])) {
+                                /* "w" truncate if exists */
+                                fp = fopen(op->js_file, "w");
+                                if (NULL == fp) {
+                                        pr2serr("unable to open file: %s\n",
+                                                op->js_file);
+                                        res = 1 /* SG_LIB_FILE_ERROR */;
+                                }
+                        }
+                }
+                if (fp)
+                        sgj_js2file(jsp, NULL, res, fp);
+                if (op->js_file && fp && (stdout != fp))
+                        fclose(fp);
+                sgj_finish(jsp);
+        }
         free_dev_node_list();
-	res = 0;
-	if (as_json) {
-		sgj_js2file(jsp, NULL, res, stdout);
-		sgj_finish(jsp);
-	}
 
         return res;
 }

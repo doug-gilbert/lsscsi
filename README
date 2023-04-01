@@ -16,5 +16,10 @@ Revisiting this in lk 5.9.6; configuring:
   CONFIG_SYSFS_DEPRECATED_V2=y
 alone causes blocks device names (e.g. /dev/sda) not to be found.
 
+The build sequence is now:
+  ./autogen.sh ; ./configure ; make ; make install
+or
+  ./bootstrap ; ./configure ; make ; make install
+
 Douglas Gilbert
-25th April 2021
+1st April 2023

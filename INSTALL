@@ -1,4 +1,5 @@
 To build:
+ $ ./autogen.sh
  $ ./configure
  $ make
 
@@ -42,4 +43,4 @@ There is a build_debian.sh script in the tarball's top level directory
 that does the above.
 
 Douglas Gilbert
-8th November 2011
+1st April 2023
