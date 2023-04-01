@@ -1845,19 +1845,6 @@ get_lu_name(const char * devname, char * b, int b_len, bool want_prefix)
         if (0 == sg_vpd_dev_id_iter(bp, len, &off, VPD_ASSOC_LU,
                                     3 /* NAA */, 1 /* binary */)) {
                 dlen = bp[off + 3];
-#if 0
-// pr2serr("%s: NAA dlen=%d\n", __func__, dlen);
-if (bp[off + 4] == 0x30) {
-// pr2serr("%s: locally assigned\n", __func__);
-if (0 == sg_vpd_dev_id_iter(bp, len, &off, VPD_ASSOC_LU,
-                                  3 /* NAA */, 1 /* binary */)) {
-if (bp[off + 4] != 0x30) {
-// pr2serr("%s: not locally assigned\n", __func__);
-dlen = bp[off + 3];
-}
-}
-}
-#endif
                 if (! ((8 == dlen) || (16 ==dlen)))
                         return b;
                 if (want_prefix) {
@@ -1874,7 +1861,6 @@ dlen = bp[off + 3];
         } else if (0 == sg_vpd_dev_id_iter(bp, len, &off, VPD_ASSOC_LU,
                                            2 /* EUI */, 1 /* binary */)) {
                 dlen = bp[off + 3];
-// pr2serr("%s: EUI dlen=%d\n", __func__, dlen);
                 if (! ((8 == dlen) || (12 == dlen) || (16 ==dlen)))
                         return b;
                 if (want_prefix) {
@@ -1891,7 +1877,6 @@ dlen = bp[off + 3];
         } else if (0 == sg_vpd_dev_id_iter(bp, len, &off, VPD_ASSOC_LU,
                                            0xa /* UUID */,  1 /* binary */)) {
                 dlen = bp[off + 3];
-// pr2serr("%s: UUID dlen=%d\n", __func__, dlen);
                 if ((1 != ((bp[off + 4] >> 4) & 0xf)) || (18 != dlen)) {
                         snprintf(cp, b_len, "??");
                         /* cp += 2; */
@@ -3005,13 +2990,13 @@ if (jop) { }
                 break;
         case TRANSPORT_ATA:
                 printf("  transport=ata\n");
-                cp = get_lu_name(devname, b2, sizeof(b2), false);
+                cp = get_lu_name(devname, b2, b2len, false);
                 if (strlen(cp) > 0)
                         printf("  wwn=%s\n", cp);
                 break;
         case TRANSPORT_SATA:
                 printf("  transport=sata\n");
-                cp = get_lu_name(devname, b2, sizeof(b2), false);
+                cp = get_lu_name(devname, b2, b2len, false);
                 if (strlen(cp) > 0)
                         printf("  wwn=%s\n", cp);
                 break;
@@ -3026,11 +3011,23 @@ static void
 longer_d_entry(const char * path_name, const char * devname,
                struct lsscsi_opts * op, sgj_opaque_p jop)
 {
+        int q = 0;
         sgj_state * jsp = &op->json_st;
         char value[LMAX_NAME];
+        char b[256];
         static const int vlen = sizeof(value);
+        static const int blen = sizeof(b);
         static const char * db_s = "device_blocked";
         static const char * iocb_s = "iocounterbits";
+        static const char * iodc_s = "iodone_cnt";
+        static const char * ioec_s = "ioerr_cnt";
+        static const char * iorc_s = "iorequest_cnt";
+        static const char * qd_s = "queue_depth";
+        static const char * qt_s = "queue_type";
+        static const char * sl_s = "scsi_level";
+        static const char * st_s = "state";
+        static const char * tm_s = "timeout";
+        static const char * ty_s = "type";
 
         if (op->transport_info) {
                 transport_tport_longer(devname, op, jop);
@@ -3046,107 +3043,118 @@ longer_d_entry(const char * path_name, const char * devname,
                         sgj_pr_hr(jsp, "  %s=%s\n", iocb_s, value);
                         sgj_js_nv_s(jsp, jop, iocb_s, value);
                 } else if (op->verbose > 0)
-                        sgj_pr_hr(jsp,  "  %s=?\n", iocb_s);
-// xxxxxxxxxxxxxxxxxxxx
-                if (get_value(path_name, "iodone_cnt", value, sizeof(value)))
-                        printf("  iodone_cnt=%s\n", value);
-                else if (op->verbose > 0)
-                        printf("  iodone_cnt=?\n");
-                if (get_value(path_name, "ioerr_cnt", value, sizeof(value)))
-                        printf("  ioerr_cnt=%s\n", value);
-                else if (op->verbose > 0)
-                        printf("  ioerr_cnt=?\n");
-                if (get_value(path_name, "iorequest_cnt", value,
-                              sizeof(value)))
-                        printf("  iorequest_cnt=%s\n", value);
-                else if (op->verbose > 0)
-                        printf("  iorequest_cnt=?\n");
-                if (get_value(path_name, "queue_depth", value,
-                              sizeof(value)))
-                        printf("  queue_depth=%s\n", value);
-                else if (op->verbose > 0)
-                        printf("  queue_depth=?\n");
-                if (get_value(path_name, "queue_type", value,
-                              sizeof(value)))
-                        printf("  queue_type=%s\n", value);
-                else if (op->verbose > 0)
-                        printf("  queue_type=?\n");
-                if (get_value(path_name, "scsi_level", value,
-                              sizeof(value)))
-                        printf("  scsi_level=%s\n", value);
-                else if (op->verbose > 0)
-                        printf("  scsi_level=?\n");
-                if (get_value(path_name, "state", value,
-                              sizeof(value)))
-                        printf("  state=%s\n", value);
-                else if (op->verbose > 0)
-                        printf("  state=?\n");
-                if (get_value(path_name, "timeout", value,
-                              sizeof(value)))
-                        printf("  timeout=%s\n", value);
-                else if (op->verbose > 0)
-                        printf("  timeout=?\n");
-                if (get_value(path_name, "type", value,
-                              sizeof(value)))
-                        printf("  type=%s\n", value);
-                else if (op->verbose > 0)
-                        printf("  type=?\n");
+                        sgj_pr_hr(jsp, "  %s=?\n", iocb_s);
+                if (get_value(path_name, iodc_s, value, vlen)) {
+                        sgj_pr_hr(jsp, "  %s=%s\n", iodc_s, value);
+                        sgj_js_nv_s(jsp, jop, iodc_s, value);
+                } else if (op->verbose > 0)
+                        sgj_pr_hr(jsp, "  %s=?\n", iodc_s);
+                if (get_value(path_name, ioec_s, value, vlen)) {
+                        sgj_pr_hr(jsp, "  %s=%s\n", ioec_s, value);
+                        sgj_js_nv_s(jsp, jop, ioec_s, value);
+                } else if (op->verbose > 0)
+                        sgj_pr_hr(jsp, "  %s=?\n", ioec_s);
+                if (get_value(path_name, iorc_s, value, vlen)) {
+                        sgj_pr_hr(jsp, "  %s=%s\n", iorc_s, value);
+                        sgj_js_nv_s(jsp, jop, iorc_s, value);
+                } else if (op->verbose > 0)
+                        sgj_pr_hr(jsp, "  %s=?\n", iorc_s);
+                if (get_value(path_name, qd_s, value, vlen)) {
+                        sgj_pr_hr(jsp, "  %s=%s\n", qd_s, value);
+                        sgj_js_nv_s(jsp, jop, qd_s, value);
+                } else if (op->verbose > 0)
+                        sgj_pr_hr(jsp, "  %s=?\n", qd_s);
+                if (get_value(path_name, qt_s, value, vlen)) {
+                        sgj_pr_hr(jsp, "  %s=%s\n", qt_s, value);
+                        sgj_js_nv_s(jsp, jop, qt_s, value);
+                } else if (op->verbose > 0)
+                        sgj_pr_hr(jsp, "  %s=?\n", qt_s);
+                if (get_value(path_name, sl_s, value, vlen)) {
+                        sgj_pr_hr(jsp, "  %s=%s\n", sl_s, value);
+                        sgj_js_nv_s(jsp, jop, sl_s, value);
+                } else if (op->verbose > 0)
+                        sgj_pr_hr(jsp, "  %s=?\n", sl_s);
+                if (get_value(path_name, st_s, value, vlen)) {
+                        sgj_pr_hr(jsp, "  %s=%s\n", st_s, value);
+                        sgj_js_nv_s(jsp, jop, st_s, value);
+                } else if (op->verbose > 0)
+                        sgj_pr_hr(jsp, "  %s=?\n", st_s);
+                if (get_value(path_name, tm_s, value, vlen)) {
+                        sgj_pr_hr(jsp, "  %s=%s\n", tm_s, value);
+                        sgj_js_nv_s(jsp, jop, tm_s, value);
+                } else if (op->verbose > 0)
+                        sgj_pr_hr(jsp, "  %s=?\n", tm_s);
+                if (get_value(path_name, ty_s, value, vlen)) {
+                        sgj_pr_hr(jsp, "  %s=%s\n", ty_s, value);
+                        sgj_js_nv_s(jsp, jop, ty_s, value);
+                } else if (op->verbose > 0)
+                        sgj_pr_hr(jsp, "  %s=?\n", ty_s);
                 return;
         }
 
-        if (get_value(path_name, "state", value, sizeof(value)))
-                printf("  state=%s", value);
-        else
-                printf("  state=?");
-        if (get_value(path_name, "queue_depth", value, sizeof(value)))
-                printf(" queue_depth=%s", value);
-        else
-                printf(" queue_depth=?");
-        if (get_value(path_name, "scsi_level", value, sizeof(value)))
-                printf(" scsi_level=%s", value);
-        else
-                printf(" scsi_level=?");
-        if (get_value(path_name, "type", value, sizeof(value)))
-                printf(" type=%s", value);
-        else
-                printf(" type=?");
-        if (get_value(path_name, "device_blocked", value, sizeof(value)))
-                printf(" device_blocked=%s", value);
-        else
-                printf(" device_blocked=?");
-        if (get_value(path_name, "timeout", value, sizeof(value)))
-                printf(" timeout=%s", value);
-        else
-                printf(" timeout=?");
-        printf("\n");
+        if (get_value(path_name, st_s, value, vlen)) {
+                q += scnpr(b + q, blen - q, "  %s=%s", st_s, value);
+                sgj_js_nv_s(jsp, jop, st_s, value);
+        } else
+                q += scnpr(b + q, blen - q, "  %s=?", st_s);
+        if (get_value(path_name, qd_s, value, vlen)) {
+                q += scnpr(b + q, blen - q, " %s=%s", qd_s, value);
+                sgj_js_nv_s(jsp, jop, qd_s, value);
+        } else
+                q += scnpr(b + q, blen - q, " %s=?", qd_s);
+        if (get_value(path_name, sl_s, value, vlen)) {
+                q += scnpr(b + q, blen - q, " %s=%s", sl_s, value);
+                sgj_js_nv_s(jsp, jop, sl_s, value);
+        } else
+                q += scnpr(b + q, blen - q, " %s=?", sl_s);
+        if (get_value(path_name, ty_s, value, vlen)) {
+                q += scnpr(b + q, blen - q, " %s=%s", ty_s, value);
+                sgj_js_nv_s(jsp, jop, ty_s, value);
+        } else
+                q += scnpr(b + q, blen - q, " %s=?", ty_s);
+        if (get_value(path_name, db_s, value, vlen)) {
+                q += scnpr(b + q, blen - q, " %s=%s", db_s, value);
+                sgj_js_nv_s(jsp, jop, db_s, value);
+        } else
+                q += scnpr(b + q, blen - q, " %s=?", db_s);
+        if (get_value(path_name, tm_s, value, vlen)) {
+                /* q += */ scnpr(b + q, blen - q, " %s=%s", tm_s, value);
+                sgj_js_nv_s(jsp, jop, tm_s, value);
+        } else
+                /* q += */ scnpr(b + q, blen - q, " %s=?", tm_s);
+        sgj_pr_hr(jsp, "%s\n", b);
+        q = 0;
         if (op->long_opt == 2) {
-                if (get_value(path_name, "iocounterbits", value,
-                              sizeof(value)))
-                        printf("  iocounterbits=%s", value);
-                else
-                        printf("  iocounterbits=?");
-                if (get_value(path_name, "iodone_cnt", value,
-                               sizeof(value)))
-                        printf(" iodone_cnt=%s", value);
-                else
-                        printf(" iodone_cnt=?");
-                if (get_value(path_name, "ioerr_cnt", value,
-                               sizeof(value)))
-                        printf(" ioerr_cnt=%s", value);
-                else
-                        printf(" ioerr_cnt=?");
-                if (get_value(path_name, "iorequest_cnt", value,
-                               sizeof(value)))
-                        printf(" iorequest_cnt=%s", value);
-                else
-                        printf(" iorequest_cnt=?");
-                printf("\n");
-                if (get_value(path_name, "queue_type", value,
-                               sizeof(value)))
-                        printf("  queue_type=%s", value);
-                else
-                        printf("  queue_type=?");
-                printf("\n");
+                if (get_value(path_name, iocb_s, value, vlen)) {
+                        q += scnpr(b + q, blen - q, "  %s=%s\n", iocb_s,
+                                   value);
+                        sgj_js_nv_s(jsp, jop, iocb_s, value);
+                } else if (op->verbose > 0)
+                        q += scnpr(b + q, blen - q, "  %s=?\n", iocb_s);
+                if (get_value(path_name, iodc_s, value, vlen)) {
+                        q += scnpr(b + q, blen - q, " %s=%s", iodc_s, value);
+                        sgj_js_nv_s(jsp, jop, iodc_s, value);
+                } else
+                        q += scnpr(b + q, blen - q, " %s=?", iodc_s);
+                if (get_value(path_name, ioec_s, value, vlen)) {
+                        q += scnpr(b + q, blen - q, " %s=%s", ioec_s, value);
+                        sgj_js_nv_s(jsp, jop, ioec_s, value);
+                } else
+                        q += scnpr(b + q, blen - q, " %s=%s", ioec_s, value);
+                if (get_value(path_name, iorc_s, value, vlen)) {
+                        q += scnpr(b + q, blen - q, " %s=%s", iorc_s, value);
+                        sgj_js_nv_s(jsp, jop, iorc_s, value);
+                } else
+                        q += scnpr(b + q, blen - q, " %s=%s", iorc_s, value);
+                sgj_pr_hr(jsp, "%s\n", b);
+                q = 0;
+                if (get_value(path_name, qt_s, value, vlen)) {
+                        q += scnpr(b + q, blen - q, " %s=%s", qt_s, value);
+                        sgj_js_nv_s(jsp, jop, qt_s, value);
+                } else
+                        q += scnpr(b + q, blen - q, " %s=%s", qt_s, value);
+                sgj_pr_hr(jsp, "%s\n", b);
+                sgj_pr_hr(jsp, "%s\n", b);
         }
 }
 
