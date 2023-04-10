@@ -31,6 +31,7 @@ Author:
 %setup -q
 
 %build
+./autogen.sh
 %configure
 
 %install
@@ -54,7 +55,7 @@ fi
 
 
 %changelog
-* Tue Dec 07 2021 - dgilbert at interlog dot com
+* Mon Apr 10 2023 - dgilbert at interlog dot com
 - fixes, minor tweaks
   * lsscsi-0.33
 * Wed May 05 2021 - dgilbert at interlog dot com

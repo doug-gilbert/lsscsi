@@ -1,6 +1,6 @@
 Linux utility for listing SCSI devices.
 
-Changelog for pre-release lsscsi-0.33 [20230401] [svn: r174]
+Changelog for pre-release lsscsi-0.33 [20230410] [svn: r175]
   - experimental: add --json[=JO] and --js-file=JFN for
     JSON output
   - change '-w' output to step over designator type prefix
