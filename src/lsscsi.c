@@ -46,7 +46,7 @@
 #include "sg_pr2serr.h"
 
 /* Package release number is first number, whole string is version */
-static const char * release_str = "0.33  2023/04/10 [svn: r175]";
+static const char * release_str = "0.33  2023/04/24 [svn: r175]";
 
 #define FT_OTHER 0
 #define FT_BLOCK 1
@@ -90,7 +90,7 @@ static int transport_id = TRANSPORT_UNKNOWN;
 static const char * sysfsroot = "/sys";
 static const char * bus_scsi_devs = "/bus/scsi/devices";
 static const char * class_scsi_dev = "/class/scsi_device/";
-static const char * scsi_host = "/class/scsi_host/";
+static const char * scsi_host_s = "/class/scsi_host/";
 static const char * spi_host = "/class/spi_host/";
 static const char * spi_transport = "/class/spi_transport/";
 static const char * sas_host = "/class/sas_host/";
@@ -568,6 +568,12 @@ dir_or_link(const struct dirent * s, const char * starting_with)
                 }
                 return true;
         }
+}
+
+static bool
+stat_is_dir_or_symlink(struct stat * statp)
+{
+        return S_ISDIR(statp->st_mode) || S_ISLNK(statp->st_mode);
 }
 
 static void
@@ -1735,7 +1741,7 @@ get_usb_devname(const char * hname, const char * devname, char * b, int b_len)
         char buff[LMAX_DEVPATH];
 
         if (hname) {
-                snprintf(buff, sizeof(buff), "%s%s", sysfsroot, scsi_host);
+                snprintf(buff, sizeof(buff), "%s%s", sysfsroot, scsi_host_s);
                 np = hname;
         } else if (devname) {
                 snprintf(buff, sizeof(buff), "%s%s", sysfsroot,
@@ -2049,7 +2055,7 @@ get_local_srp_gid(const int h, char *b, int b_len)
         char buff[LMAX_DEVPATH];
         char value[LMAX_NAME];
 
-        snprintf(buff, sizeof(buff), "%s%shost%d", sysfsroot, scsi_host, h);
+        snprintf(buff, sizeof(buff), "%s%shost%d", sysfsroot, scsi_host_s, h);
         if (!get_value(buff, "local_ib_port", value, sizeof(value)))
                 return;
         if (sscanf(value, "%d", &port) != 1)
@@ -2075,7 +2081,7 @@ get_srp_orig_dgid(const int h, char *b, int b_len)
         char buff[LMAX_DEVPATH];
         char value[LMAX_NAME];
 
-        snprintf(buff, sizeof(buff), "%s%shost%d", sysfsroot, scsi_host, h);
+        snprintf(buff, sizeof(buff), "%s%shost%d", sysfsroot, scsi_host_s, h);
         if (get_value(buff, "orig_dgid", value, sizeof(value)) &&
             strlen(value) > 20) {
                 snprintf(b, b_len, "%s", value + 20);
@@ -2095,7 +2101,7 @@ get_srp_dgid(const int h, char *b, int b_len)
         char buff[LMAX_DEVPATH];
         char value[LMAX_NAME];
 
-        snprintf(buff, sizeof(buff), "%s%shost%d", sysfsroot, scsi_host, h);
+        snprintf(buff, sizeof(buff), "%s%shost%d", sysfsroot, scsi_host_s, h);
         if (get_value(buff, "dgid", value, sizeof(value)) &&
             strlen(value) > 20) {
                 snprintf(b, b_len, "%s", value + 20);
@@ -2108,8 +2114,7 @@ get_srp_dgid(const int h, char *b, int b_len)
  * transport_id, place a string in 'b' and return true. Otherwise return
  * false. */
 static bool
-transport_init(const char * devname, /* const struct lsscsi_opts * op, */
-               int b_len, char * b)
+transport_init(const char * devname, int b_len, char * b)
 {
         int off;
         char * cp;
@@ -2167,15 +2172,15 @@ transport_init(const char * devname, /* const struct lsscsi_opts * op, */
         /* SAS host */
         /* SAS transport layer representation */
         snprintf(buff, bufflen, "%s%s%s", sysfsroot, sas_host, devname);
-        if ((stat(buff, &a_stat) >= 0) && S_ISDIR(a_stat.st_mode)) {
+        if ((stat(buff, &a_stat) >= 0) && stat_is_dir_or_symlink(&a_stat)) {
                 transport_id = TRANSPORT_SAS;
+                snprintf(b, b_len, "sas:");
                 off = strlen(buff);
                 snprintf(buff + off, bufflen - off, "/device");
                 if (sas_low_phy_scan(buff, NULL) < 1)
                         return false;
                 snprintf(buff, bufflen, "%s%s%s", sysfsroot, sas_phy,
                          sas_low_phy);
-                snprintf(b, b_len, "sas:");
                 off = strlen(b);
                 if (get_value(buff, "sas_address", b + off, b_len - off))
                         return true;
@@ -2188,7 +2193,7 @@ transport_init(const char * devname, /* const struct lsscsi_opts * op, */
         }
 
         /* SAS class representation */
-        snprintf(buff, bufflen, "%s%s%s%s", sysfsroot, scsi_host,
+        snprintf(buff, bufflen, "%s%s%s%s", sysfsroot, scsi_host_s,
                  devname, "/device/sas/ha");
         if ((stat(buff, &a_stat) >= 0) && S_ISDIR(a_stat.st_mode)) {
                 transport_id = TRANSPORT_SAS_CLASS;
@@ -2209,7 +2214,7 @@ transport_init(const char * devname, /* const struct lsscsi_opts * op, */
                 char *t, buff2[LMAX_DEVPATH - 4];
 
                 /* resolve SCSI host device */
-                snprintf(buff, bufflen, "%s%s%s%s", sysfsroot, scsi_host,
+                snprintf(buff, bufflen, "%s%s%s%s", sysfsroot, scsi_host_s,
                          devname, "/device");
                 if (readlink(buff, buff2, sizeof(buff2)) <= 0)
                         break;
@@ -2235,7 +2240,7 @@ transport_init(const char * devname, /* const struct lsscsi_opts * op, */
                 if (!get_value(buff, "host_id/guid", buff2, sizeof(buff2)) ||
                     strlen(buff2) != 18)
                         break;
-                snprintf(b, b_len, "sbp:%s", buff2 + 2);
+                snprintf(b, b_len, "sbp:%.120s", buff2 + 2);
                 return true;
         } while (0);
 
@@ -2259,7 +2264,7 @@ transport_init(const char * devname, /* const struct lsscsi_opts * op, */
         }
 
         /* ATA or SATA host, crude check: driver name */
-        snprintf(buff, bufflen, "%s%s%s", sysfsroot, scsi_host, devname);
+        snprintf(buff, bufflen, "%s%s%s", sysfsroot, scsi_host_s, devname);
         if (get_value(buff, "proc_name", wd, sizeof(wd))) {
                 if (0 == strcmp("ahci", wd)) {
                         transport_id = TRANSPORT_SATA;
@@ -2283,75 +2288,83 @@ transport_init(const char * devname, /* const struct lsscsi_opts * op, */
  * 'path_name' output additional information.
  */
 static void
-transport_init_longer(const char * path_name, const struct lsscsi_opts * op)
+transport_init_longer(const char * path_name, struct lsscsi_opts * op,
+                      sgj_opaque_p jop)
 {
         int k, j, len;
         int phynum;
         int portnum;
         char * cp;
-        struct stat a_stat;
+        sgj_state * jsp = &op->json_st;
         struct dirent ** phylist;
         struct dirent ** portlist;
-        char buff[LMAX_PATH];
+        struct stat a_stat;
+        char b[LMAX_PATH];
         char bname[LMAX_NAME];
         char value[LMAX_NAME];
+        static const int blen = sizeof(b);
+        static const int vlen = sizeof(value);
+        static const char * trans_s = "transport";
+        static const char * sig_s = "signalling";
 
-        my_strcopy(buff, path_name, sizeof(buff));
-        cp = basename(buff);
+        my_strcopy(b, path_name, blen);
+        cp = basename(b);
         my_strcopy(bname, cp, sizeof(bname));
         bname[sizeof(bname) - 1] = '\0';
         cp = bname;
         switch (transport_id) {
         case TRANSPORT_SPI:
-                printf("  transport=spi\n");
-                snprintf(buff, sizeof(buff), "%s%s%s", sysfsroot, spi_host,
+                sgj_haj_vs(jsp, jop, 2, trans_s, SGJ_SEP_EQUAL_NO_SPACE,
+                           "spi");
+                snprintf(b, blen, "%s%s%s", sysfsroot, spi_host,
                          cp);
-                if (get_value(buff, "signalling", value, sizeof(value)))
-                        printf("  signalling=%s\n", value);
+                if (get_value(b, sig_s, value, vlen))
+                        sgj_haj_vs(jsp, jop, 2, sig_s, SGJ_SEP_EQUAL_NO_SPACE,
+                                   value);
                 break;
         case TRANSPORT_FC:
         case TRANSPORT_FCOE:
-                printf("  transport=%s\n",
-                       transport_id == TRANSPORT_FC ? "fc:" : "fcoe:");
-                snprintf(buff, sizeof(buff), "%s%s%s", path_name,
-                         "/device/fc_host/", cp);
-                if (stat(buff, &a_stat) < 0) {
+                sgj_haj_vs(jsp, jop, 2, trans_s, SGJ_SEP_EQUAL_NO_SPACE,
+                           (transport_id == TRANSPORT_FC) ? "fc:" : "fcoe:");
+                snprintf(b, blen, "%s%s%s", path_name, "/device/fc_host/",
+                         cp);
+                if (stat(b, &a_stat) < 0) {
                         if (op->verbose > 2)
                                 printf("no fc_host directory\n");
                         break;
                 }
-                if (get_value(buff, "active_fc4s", value, sizeof(value)))
+                if (get_value(b, "active_fc4s", value, vlen))
                         printf("  active_fc4s=%s\n", value);
-                if (get_value(buff, "supported_fc4s", value, sizeof(value)))
+                if (get_value(b, "supported_fc4s", value, vlen))
                         printf("  supported_fc4s=%s\n", value);
-                if (get_value(buff, "fabric_name", value, sizeof(value)))
+                if (get_value(b, "fabric_name", value, vlen))
                         printf("  fabric_name=%s\n", value);
-                if (get_value(buff, "maxframe_size", value, sizeof(value)))
+                if (get_value(b, "maxframe_size", value, vlen))
                         printf("  maxframe_size=%s\n", value);
-                if (get_value(buff, "max_npiv_vports", value, sizeof(value)))
+                if (get_value(b, "max_npiv_vports", value, vlen))
                         printf("  max_npiv_vports=%s\n", value);
-                if (get_value(buff, "npiv_vports_inuse", value, sizeof(value)))
+                if (get_value(b, "npiv_vports_inuse", value, vlen))
                         printf("  npiv_vports_inuse=%s\n", value);
-                if (get_value(buff, "node_name", value, sizeof(value)))
+                if (get_value(b, "node_name", value, vlen))
                         printf("  node_name=%s\n", value);
-                if (get_value(buff, "port_name", value, sizeof(value)))
+                if (get_value(b, "port_name", value, vlen))
                         printf("  port_name=%s\n", value);
-                if (get_value(buff, "port_id", value, sizeof(value)))
+                if (get_value(b, "port_id", value, vlen))
                         printf("  port_id=%s\n", value);
-                if (get_value(buff, "port_state", value, sizeof(value)))
+                if (get_value(b, "port_state", value, vlen))
                         printf("  port_state=%s\n", value);
-                if (get_value(buff, "port_type", value, sizeof(value)))
+                if (get_value(b, "port_type", value, vlen))
                         printf("  port_type=%s\n", value);
-                if (get_value(buff, "speed", value, sizeof(value)))
+                if (get_value(b, "speed", value, vlen))
                         printf("  speed=%s\n", value);
-                if (get_value(buff, "supported_speeds", value, sizeof(value)))
+                if (get_value(b, "supported_speeds", value, vlen))
                         printf("  supported_speeds=%s\n", value);
-                if (get_value(buff, "supported_classes", value, sizeof(value)))
+                if (get_value(b, "supported_classes", value, vlen))
                         printf("  supported_classes=%s\n", value);
-                if (get_value(buff, "tgtid_bind_type", value, sizeof(value)))
+                if (get_value(b, "tgtid_bind_type", value, vlen))
                         printf("  tgtid_bind_type=%s\n", value);
                 if (op->verbose > 2)
-                        printf("fetched from directory: %s\n", buff);
+                        printf("fetched from directory: %s\n", b);
                 break;
         case TRANSPORT_SRP:
                 printf("  transport=srp\n");
@@ -2360,73 +2373,69 @@ transport_init_longer(const char * path_name, const struct lsscsi_opts * op)
 
                         if (sscanf(path_name, "host%d", &h) != 1)
                                 break;
-                        if (get_srp_orig_dgid(h, value, sizeof(value)))
+                        if (get_srp_orig_dgid(h, value, vlen))
                                 printf("  orig_dgid=%s\n", value);
-                        if (get_srp_dgid(h, value, sizeof(value)))
+                        if (get_srp_dgid(h, value, vlen))
                                 printf("  dgid=%s\n", value);
                 }
                 break;
         case TRANSPORT_SAS:
                 printf("  transport=sas\n");
-                snprintf(buff, sizeof(buff), "%s%s", path_name,
-                         "" /* was: "/device" */);
-                if ((portnum = sas_port_scan(buff, &portlist)) < 1) {
+                snprintf(b, blen, "%s%s", path_name, "" /* was: "/device" */);
+                if ((portnum = sas_port_scan(b, &portlist)) < 1) {
                         /* no configured ports */
                         printf("  no configured ports\n");
-                        if ((phynum = sas_low_phy_scan(buff, &phylist)) < 1) {
+                        if ((phynum = sas_low_phy_scan(b, &phylist)) < 1) {
                                 printf("  no configured phys\n");
                                 return;
                         }
                         for (k = 0; k < phynum; ++k) {
                                 /* emit something potentially useful */
-                                snprintf(buff, sizeof(buff), "%s%s%s",
-                                         sysfsroot, sas_phy,
-                                         phylist[k]->d_name);
+                                snprintf(b, blen, "%s%s%s", sysfsroot,
+                                         sas_phy, phylist[k]->d_name);
                                 printf("  %s\n",phylist[k]->d_name);
-                                if (get_value(buff, "sas_address", value,
-                                              sizeof(value)))
+                                if (get_value(b, "sas_address", value, vlen))
                                         printf("    sas_address=%s\n", value);
-                                if (get_value(buff, "phy_identifier", value,
-                                              sizeof(value)))
+                                if (get_value(b, "phy_identifier", value,
+                                              vlen))
                                         printf("    phy_identifier=%s\n",
                                                value);
-                                if (get_value(buff, "minimum_linkrate", value,
-                                              sizeof(value)))
+                                if (get_value(b, "minimum_linkrate", value,
+                                              vlen))
                                         printf("    minimum_linkrate=%s\n",
                                                value);
-                                if (get_value(buff, "minimum_linkrate_hw",
-                                              value, sizeof(value)))
+                                if (get_value(b, "minimum_linkrate_hw",
+                                              value, vlen))
                                         printf("    minimum_linkrate_hw=%s\n",
                                                value);
-                                if (get_value(buff, "maximum_linkrate", value,
-                                              sizeof(value)))
+                                if (get_value(b, "maximum_linkrate", value,
+                                              vlen))
                                         printf("    maximum_linkrate=%s\n",
                                                value);
-                                if (get_value(buff, "maximum_linkrate_hw",
-                                              value, sizeof(value)))
+                                if (get_value(b, "maximum_linkrate_hw",
+                                              value, vlen))
                                         printf("    maximum_linkrate_hw=%s\n",
                                                value);
-                                if (get_value(buff, "negotiated_linkrate",
-                                              value, sizeof(value)))
+                                if (get_value(b, "negotiated_linkrate",
+                                              value, vlen))
                                         printf("    negotiated_linkrate=%s\n",
                                                value);
                         }
                         return;
                 }
                 for (k = 0; k < portnum; ++k) {     /* for each host port */
-                        snprintf(buff, sizeof(buff), "%s%s%s", path_name,
+                        snprintf(b, blen, "%s%s%s", path_name,
                                  "/device/", portlist[k]->d_name);
-                        if ((phynum = sas_low_phy_scan(buff, &phylist)) < 1) {
+                        if ((phynum = sas_low_phy_scan(b, &phylist)) < 1) {
                                 printf("  %s: phy list not available\n",
                                        portlist[k]->d_name);
                                 free(portlist[k]);
                                 continue;
                         }
 
-                        snprintf(buff, sizeof(buff), "%s%s%s", sysfsroot,
-                                 sas_port, portlist[k]->d_name);
-                        if (get_value(buff, "num_phys", value,
-                                      sizeof(value))) {
+                        snprintf(b, blen, "%s%s%s", sysfsroot, sas_port,
+                                 portlist[k]->d_name);
+                        if (get_value(b, "num_phys", value, vlen)) {
                                 printf("  %s: num_phys=%s,",
                                        portlist[k]->d_name, value);
                                 for (j = 0; j < phynum; ++j) {
@@ -2436,60 +2445,51 @@ transport_init_longer(const char * path_name, const struct lsscsi_opts * op)
                                 printf("\n");
                                 if (op->verbose > 2)
                                         printf("  fetched from directory: "
-                                               "%s\n", buff);
+                                               "%s\n", b);
                                 free(phylist);
                         }
-                        snprintf(buff, sizeof(buff), "%s%s%s", sysfsroot,
-                                 sas_phy, sas_low_phy);
-                        if (get_value(buff, "device_type", value,
-                                      sizeof(value)))
+                        snprintf(b, blen, "%s%s%s", sysfsroot, sas_phy,
+                                 sas_low_phy);
+                        if (get_value(b, "device_type", value, vlen))
                                 printf("    device_type=%s\n", value);
-                        if (get_value(buff, "initiator_port_protocols", value,
-                                      sizeof(value)))
+                        if (get_value(b, "initiator_port_protocols", value,
+                                      vlen))
                                 printf("    initiator_port_protocols=%s\n",
                                        value);
-                        if (get_value(buff, "invalid_dword_count", value,
-                                      sizeof(value)))
+                        if (get_value(b, "invalid_dword_count", value, vlen))
                                 printf("    invalid_dword_count=%s\n", value);
-                        if (get_value(buff, "loss_of_dword_sync_count", value,
-                                      sizeof(value)))
+                        if (get_value(b, "loss_of_dword_sync_count", value,
+                                      vlen))
                                 printf("    loss_of_dword_sync_count=%s\n",
                                        value);
-                        if (get_value(buff, "minimum_linkrate", value,
-                                      sizeof(value)))
+                        if (get_value(b, "minimum_linkrate", value, vlen))
                                 printf("    minimum_linkrate=%s\n", value);
-                        if (get_value(buff, "minimum_linkrate_hw", value,
-                                      sizeof(value)))
+                        if (get_value(b, "minimum_linkrate_hw", value, vlen))
                                 printf("    minimum_linkrate_hw=%s\n", value);
-                        if (get_value(buff, "maximum_linkrate", value,
-                                      sizeof(value)))
+                        if (get_value(b, "maximum_linkrate", value, vlen))
                                 printf("    maximum_linkrate=%s\n", value);
-                        if (get_value(buff, "maximum_linkrate_hw", value,
-                                      sizeof(value)))
+                        if (get_value(b, "maximum_linkrate_hw", value, vlen))
                                 printf("    maximum_linkrate_hw=%s\n", value);
-                        if (get_value(buff, "negotiated_linkrate", value,
-                                      sizeof(value)))
+                        if (get_value(b, "negotiated_linkrate", value, vlen))
                                 printf("    negotiated_linkrate=%s\n", value);
-                        if (get_value(buff, "phy_identifier", value,
-                                      sizeof(value)))
+                        if (get_value(b, "phy_identifier", value, vlen))
                                 printf("    phy_identifier=%s\n", value);
-                        if (get_value(buff, "phy_reset_problem_count", value,
-                                      sizeof(value)))
+                        if (get_value(b, "phy_reset_problem_count", value,
+                                      vlen))
                                 printf("    phy_reset_problem_count=%s\n",
                                        value);
-                        if (get_value(buff, "running_disparity_error_count",
-                                      value, sizeof(value)))
+                        if (get_value(b, "running_disparity_error_count",
+                                      value, vlen))
                                 printf("    running_disparity_error_count="
                                        "%s\n", value);
-                        if (get_value(buff, "sas_address", value,
-                                      sizeof(value)))
+                        if (get_value(b, "sas_address", value, vlen))
                                 printf("    sas_address=%s\n", value);
-                        if (get_value(buff, "target_port_protocols", value,
-                                      sizeof(value)))
+                        if (get_value(b, "target_port_protocols", value,
+                                      vlen))
                                 printf("    target_port_protocols=%s\n",
                                        value);
                         if (op->verbose > 2)
-                                printf("  fetched from directory: %s\n", buff);
+                                printf("  fetched from directory: %s\n", b);
 
                         free(portlist[k]);
 
@@ -2501,40 +2501,38 @@ transport_init_longer(const char * path_name, const struct lsscsi_opts * op)
 /* this case looks like dead code */
                 printf("  transport=sas\n");
                 printf("  sub_transport=sas_class\n");
-                snprintf(buff, sizeof(buff), "%s%s", path_name,
-                         "/device/sas/ha");
-                if (get_value(buff, "device_name", value, sizeof(value)))
+                snprintf(b, blen, "%s%s", path_name, "/device/sas/ha");
+                if (get_value(b, "device_name", value, vlen))
                         printf("  device_name=%s\n", value);
-                if (get_value(buff, "ha_name", value, sizeof(value)))
+                if (get_value(b, "ha_name", value, vlen))
                         printf("  ha_name=%s\n", value);
-                if (get_value(buff, "version_descriptor", value,
-                              sizeof(value)))
+                if (get_value(b, "version_descriptor", value, vlen))
                         printf("  version_descriptor=%s\n", value);
                 printf("  phy0:\n");
-                len = strlen(buff);
-                snprintf(buff + len, sizeof(buff) - len, "%s", "/phys/0");
-                if (get_value(buff, "class", value, sizeof(value)))
+                len = strlen(b);
+                snprintf(b + len, blen - len, "%s", "/phys/0");
+                if (get_value(b, "class", value, vlen))
                         printf("    class=%s\n", value);
-                if (get_value(buff, "enabled", value, sizeof(value)))
+                if (get_value(b, "enabled", value, vlen))
                         printf("    enabled=%s\n", value);
-                if (get_value(buff, "id", value, sizeof(value)))
+                if (get_value(b, "id", value, vlen))
                         printf("    id=%s\n", value);
-                if (get_value(buff, "iproto", value, sizeof(value)))
+                if (get_value(b, "iproto", value, vlen))
                         printf("    iproto=%s\n", value);
-                if (get_value(buff, "linkrate", value, sizeof(value)))
+                if (get_value(b, "linkrate", value, vlen))
                         printf("    linkrate=%s\n", value);
-                if (get_value(buff, "oob_mode", value, sizeof(value)))
+                if (get_value(b, "oob_mode", value, vlen))
                         printf("    oob_mode=%s\n", value);
-                if (get_value(buff, "role", value, sizeof(value)))
+                if (get_value(b, "role", value, vlen))
                         printf("    role=%s\n", value);
-                if (get_value(buff, "sas_addr", value, sizeof(value)))
+                if (get_value(b, "sas_addr", value, vlen))
                         printf("    sas_addr=%s\n", value);
-                if (get_value(buff, "tproto", value, sizeof(value)))
+                if (get_value(b, "tproto", value, vlen))
                         printf("    tproto=%s\n", value);
-                if (get_value(buff, "type", value, sizeof(value)))
+                if (get_value(b, "type", value, vlen))
                         printf("    type=%s\n", value);
                 if (op->verbose > 2)
-                        printf("fetched from directory: %s\n", buff);
+                        printf("fetched from directory: %s\n", b);
                 break;
         case TRANSPORT_ISCSI:
                 printf("  transport=iSCSI\n");
@@ -2548,7 +2546,7 @@ transport_init_longer(const char * path_name, const struct lsscsi_opts * op)
         case TRANSPORT_USB:
                 printf("  transport=usb\n");
                 printf("  device_name=%s\n", get_usb_devname(cp, NULL,
-                       value, sizeof(value)));
+                       value, vlen));
                 break;
         case TRANSPORT_ATA:
                 printf("  transport=ata\n");
@@ -2590,7 +2588,7 @@ transport_tport(const char * devname, const struct lsscsi_opts * op,
         wdlen = sizeof(wd);
         /* check for SAS host */
         snprintf(buff, bufflen, "%s%shost%d", sysfsroot, sas_host, hctl.h);
-        if ((stat(buff, &a_stat) >= 0) && S_ISDIR(a_stat.st_mode)) {
+        if ((stat(buff, &a_stat) >= 0) && stat_is_dir_or_symlink(&a_stat)) {
                 /* SAS transport layer representation */
                 transport_id = TRANSPORT_SAS;
                 snprintf(buff, bufflen, "%s%s%s", sysfsroot, class_scsi_dev,
@@ -2726,7 +2724,7 @@ transport_tport(const char * devname, const struct lsscsi_opts * op,
         }
 
         /* ATA or SATA device, crude check: driver name */
-        snprintf(buff, bufflen, "%s%shost%d", sysfsroot, scsi_host, hctl.h);
+        snprintf(buff, bufflen, "%s%shost%d", sysfsroot, scsi_host_s, hctl.h);
         if (get_value(buff, "proc_name", wd, wdlen)) {
                 ata_dev = false;
                 if (0 == strcmp("ahci", wd)) {
@@ -4550,149 +4548,218 @@ list_ndevices(struct lsscsi_opts * op, sgj_opaque_p jop)
 
 #endif          /* (HAVE_NVME && (! IGNORE_NVME)) */
 
-/* List host (initiator) attributes when --long given (one or more times). */
+/* List SCSI host (initiator) attributes when --long given (one or more
+ * times). */
 static void
-longer_h_entry(const char * path_name, const struct lsscsi_opts * op)
+longer_sh_entry(const char * path_name, struct lsscsi_opts * op,
+                sgj_opaque_p jop)
 {
+        int n;
+        sgj_state * jsp = &op->json_st;
         char value[LMAX_NAME];
+        char b[168];
         static const int vlen = sizeof(value);
+        static const int blen = sizeof(b);
+        static const char * am_s = "active_mode";
+        static const char * cq_s = "can_queue";
+        static const char * cpl_s = "cmd_per_lun";
+        static const char * hb_s = "host_busy";
+        static const char * nhq_s = "nr_hw_queues";
+        static const char * st_s = "sg_tablesize";
+        static const char * state_s = "state";
+        static const char * ui_s = "unique_id";
+        static const char * ubm_s = "use_blk_mq";
 
         if (op->transport_info) {
-                transport_init_longer(path_name, op);
+                transport_init_longer(path_name, op, jop);
                 return;
         }
         if (op->long_opt >= 3) {
-                if (get_value(path_name, "active_mode", value, vlen))
-                        printf("  active_mode=%s\n", value);
-                if (get_value(path_name, "can_queue", value, vlen))
-                        printf("  can_queue=%s\n", value);
+                if (get_value(path_name, am_s, value, vlen))
+                        sgj_haj_vs(jsp, jop, 2, am_s, SGJ_SEP_EQUAL_NO_SPACE,
+                                   value);
+                if (get_value(path_name, cq_s, value, vlen))
+                        sgj_haj_vs(jsp, jop, 2, cq_s, SGJ_SEP_EQUAL_NO_SPACE,
+                                   value);
                 else if (op->verbose)
-                        printf("  can_queue=?\n");
-                if (get_value(path_name, "cmd_per_lun", value, vlen))
-                        printf("  cmd_per_lun=%s\n", value);
+                        sgj_pr_hr(jsp, "  %s=?\n", cq_s);
+                if (get_value(path_name, cpl_s, value, vlen))
+                        sgj_haj_vs(jsp, jop, 2, cpl_s, SGJ_SEP_EQUAL_NO_SPACE,
+                                   value);
                 else if (op->verbose)
-                        printf("  cmd_per_lun=?\n");
-                if (get_value(path_name, "host_busy", value, vlen))
-                        printf("  host_busy=%s\n", value);
+                        sgj_pr_hr(jsp, "  %s=?\n", cpl_s);
+                if (get_value(path_name, hb_s, value, vlen))
+                        sgj_haj_vs(jsp, jop, 2, hb_s, SGJ_SEP_EQUAL_NO_SPACE,
+                                   value);
                 else if (op->verbose)
-                        printf("  host_busy=?\n");
-                if (get_value(path_name, "nr_hw_queues", value, vlen))
-                        printf("  nr_hw_queues=%s\n", value);
+                        sgj_pr_hr(jsp, "  %s=?\n", hb_s);
+                if (get_value(path_name, nhq_s, value, vlen))
+                        sgj_haj_vs(jsp, jop, 2, nhq_s, SGJ_SEP_EQUAL_NO_SPACE,
+                                   value);
                 else if (op->verbose)
-                        printf("  nr_hw_queues=?\n");
-                if (get_value(path_name, "sg_tablesize", value, vlen))
-                        printf("  sg_tablesize=%s\n", value);
+                        sgj_pr_hr(jsp, "  %s=?\n", nhq_s);
+                if (get_value(path_name, st_s, value, vlen))
+                        sgj_haj_vs(jsp, jop, 2, st_s, SGJ_SEP_EQUAL_NO_SPACE,
+                                   value);
                 else if (op->verbose)
-                        printf("  sg_tablesize=?\n");
-                if (get_value(path_name, "state", value, vlen))
-                        printf("  state=%s\n", value);
+                        sgj_pr_hr(jsp, "  %s=?\n", st_s);
+                if (get_value(path_name, state_s, value, vlen))
+                        sgj_haj_vs(jsp, jop, 2, state_s,
+                                   SGJ_SEP_EQUAL_NO_SPACE, value);
                 else if (op->verbose)
-                        printf("  state=?\n");
-                if (get_value(path_name, "unique_id", value, vlen))
-                        printf("  unique_id=%s\n", value);
+                        sgj_pr_hr(jsp, "  %s=?\n", state_s);
+                if (get_value(path_name, ui_s, value, vlen))
+                        sgj_haj_vs(jsp, jop, 2, ui_s, SGJ_SEP_EQUAL_NO_SPACE,
+                                   value);
                 else if (op->verbose)
-                        printf("  unique_id=?\n");
-                if (get_value(path_name, "use_blk_mq", value, vlen))
-                        printf("  use_blk_mq=%s\n", value);
+                        sgj_pr_hr(jsp, "  %s=?\n", ui_s);
+                if (get_value(path_name, ubm_s, value, vlen))
+                        sgj_haj_vs(jsp, jop, 2, ubm_s, SGJ_SEP_EQUAL_NO_SPACE,
+                                   value);
         } else if (op->long_opt > 0) {
-                if (get_value(path_name, "cmd_per_lun", value, vlen))
-                        printf("  cmd_per_lun=%-4s ", value);
-                else
-                        printf("  cmd_per_lun=???? ");
+                n = 0;
+                if (get_value(path_name, cpl_s, value, vlen)) {
+                        n += sg_scnpr(b + n, blen - n, "  %s=%-4s ", cpl_s,
+                                     value);
+                        if (jsp->pr_as_json)
+                                sgj_js_nv_s(jsp, jop, cpl_s, value);
+                } else if (op->verbose)
+                        n += sg_scnpr(b + n, blen - n, "  %s=???? \n", cpl_s);
 
-                if (get_value(path_name, "host_busy", value, vlen))
-                        printf("host_busy=%-4s ", value);
-                else
-                        printf("host_busy=???? ");
+                if (get_value(path_name, hb_s, value, vlen)) {
+                        n += sg_scnpr(b + n, blen - n, "%s=%-4s ", hb_s,
+                                     value);
+                        if (jsp->pr_as_json)
+                                sgj_js_nv_s(jsp, jop, hb_s, value);
+                } else if (op->verbose)
+                        n += sg_scnpr(b + n, blen - n, "%s=???? \n", hb_s);
 
-                if (get_value(path_name, "sg_tablesize", value, vlen))
-                        printf("sg_tablesize=%-4s ", value);
-                else
-                        printf("sg_tablesize=???? ");
+                if (get_value(path_name, st_s, value, vlen)) {
+                        n += sg_scnpr(b + n, blen - n, "%s=%-4s ", st_s,
+                                     value);
+                        if (jsp->pr_as_json)
+                                sgj_js_nv_s(jsp, jop, st_s, value);
+                } else if (op->verbose)
+                        n += sg_scnpr(b + n, blen - n, "%s=???? \n", st_s);
 
-                if (get_value(path_name, "active_mode", value, vlen))
-                        printf("active_mode=%-4s ", value);
-                printf("\n");
+                if (get_value(path_name, am_s, value, vlen)) {
+                        sg_scnpr(b + n, blen - n, "%s=%-4s ", am_s, value);
+                        if (jsp->pr_as_json)
+                                sgj_js_nv_s(jsp, jop, am_s, value);
+                }
+                sgj_pr_hr(jsp, "%s\n", b);
+
                 if (2 == op->long_opt) {
-                        if (get_value(path_name, "can_queue", value, vlen))
-                                printf("  can_queue=%-4s ", value);
-                        if (get_value(path_name, "state", value, vlen))
-                                printf("  state=%-8s ", value);
-                        if (get_value(path_name, "unique_id", value, vlen))
-                                printf("  unique_id=%-2s ", value);
-                        if (get_value(path_name, "use_blk_mq", value, vlen))
-                                printf("  use_blk_mq=%-2s ", value);
-                        printf("\n");
+                        n = 0;
+                        if (get_value(path_name, cq_s, value, vlen)) {
+                                n += sg_scnpr(b + n, blen - n, "  %s=%-4s ",
+                                              cq_s, value);
+                                if (jsp->pr_as_json)
+                                        sgj_js_nv_s(jsp, jop, cq_s, value);
+                        }
+                        if (get_value(path_name, state_s, value, vlen)) {
+                                n += sg_scnpr(b + n, blen - n,"  %s=%-8s ",
+                                              state_s, value);
+                                if (jsp->pr_as_json)
+                                        sgj_js_nv_s(jsp, jop, state_s, value);
+                        }
+                        if (get_value(path_name, ui_s, value, vlen)) {
+                                n += sg_scnpr(b + n, blen - n,"  %s=%-8s ",
+                                              ui_s, value);
+                                if (jsp->pr_as_json)
+                                        sgj_js_nv_s(jsp, jop, ui_s, value);
+                        }
+                        if (get_value(path_name, ubm_s, value, vlen)) {
+                                sg_scnpr(b + n, blen - n,"  %s=%-8s ",
+                                         ubm_s, value);
+                                if (jsp->pr_as_json)
+                                        sgj_js_nv_s(jsp, jop, ubm_s, value);
+                        }
+                        sgj_pr_hr(jsp, "%s\n", b);
                 }
         }
 }
 
 static void
-one_host_entry(const char * dir_name, const char * devname,
-               const struct lsscsi_opts * op)
+one_shost_entry(const char * dir_name, const char * devname,
+                struct lsscsi_opts * op, sgj_opaque_p jop)
 {
-        int n;
+        int n, q;
         unsigned int host_id;
-        const char * nullname1 = "<NULL>";
-        const char * nullname2 = "(null)";
+        sgj_state * jsp = &op->json_st;
         char b[LMAX_DEVPATH];
         char value[LMAX_NAME];
         char wd[LMAX_PATH];
+        char o[144];
         static const int blen = sizeof(b);
         static const int vlen = sizeof(value);
+        static const int olen = sizeof(o);
+        static const char * nullname1 = "<NULL>";
+        static const char * nullname2 = "(null)";
+        static const char * host_id_s = "host_id";
 
         if (op->classic) {
                 // one_classic_host_entry(dir_name, devname, op);
-                printf("  <'--classic' not supported for hosts>\n");
+                sgj_pr_hr(jsp, "  <'--classic' not supported for hosts>\n");
                 return;
         }
-        if (1 == sscanf(devname, "host%u", &host_id))
-                printf("[%u]  ", host_id);
-        else
-                printf("[?]  ");
         n = 0;
+        q = 0;
+        if (1 == sscanf(devname, "host%u", &host_id)) {
+                q += scnpr(o + q, olen - q, "[%u]  ", host_id);
+                if (jsp->pr_as_json)
+                        sgj_js_nv_i(jsp, jop, host_id_s, host_id);
+        } else
+                q += scnpr(o + q, olen - q, "[?]  ");
         n += scnpr(b + n, blen - n, "%s", dir_name);
-        n += scnpr(b + n, blen - n, "%s", "/");
-        scnpr(b + n, blen - n, "%s", devname);
+        // n += scnpr(b + n, blen - n, "%s", "/");
+        n += scnpr(b + n, blen - n, "%s", devname);
         if ((get_value(b, "proc_name", value, vlen)) &&
-            (strncmp(value, nullname1, 6)) && (strncmp(value, nullname2, 6)))
-                printf("  %-12s  ", value);
-        else if (if_directory_chdir(b, "device/../driver")) {
+            (strncmp(value, nullname1, 6)) && (strncmp(value, nullname2, 6))) {
+                q += scnpr(o + q, olen - q, "  %-12s  ", value);
+                if (jsp->pr_as_json)
+                        sgj_js_nv_s(jsp, jop, "driver_name", value);
+        } else if (if_directory_chdir(b, "device/../driver")) {
                 if (NULL == getcwd(wd, sizeof(wd)))
-                        printf("  %-12s  ", nullname2);
+                        q += scnpr(o + q, olen - q, "  %-12s  ", nullname2);
                 else
-                        printf("  %-12s  ", basename(wd));
+                        q += scnpr(o + q, olen - q, "  %-12s  ",
+                                   basename(wd));
 
         } else
-                printf("  proc_name=????  ");
+                q += scnpr(o + q, olen - q, "  proc_name=????  ");
         if (op->transport_info) {
+                if (! transport_init(devname, olen - q, o + q)) {
+                        if (op->verbose > 3)
+                                pr2serr("%s: transport_init() failed\n",
+                                        __func__);
+                }
+                if (jsp->pr_as_json && (strlen(o + q) > 1))
+                        sgj_js_nv_s(jsp, jop, "transport_summary", o + q);
+        }
+        sgj_pr_hr(jsp, "%s\n", o);
+
+        if (op->long_opt > 0)
+                longer_sh_entry(b, op, jop);
+
+        if (op->verbose > 0) {
                 char b2[LMAX_DEVPATH];
                 static const int b2len = sizeof(b2);
 
-                if (transport_init(devname, /* op, */ b2len, b2))
-                        printf("%s\n", b2);
-                else
-                        printf("\n");
-        } else
-                printf("\n");
-
-        if (op->long_opt > 0)
-                longer_h_entry(b, op);
-
-        if (op->verbose > 0) {
-                printf("  dir: %s\n  device dir: ", b);
+                n = 0;
+                n += scnpr(b2 + n, b2len - n, "  dir: %s\n  device dir: ", b);
                 if (if_directory_chdir(b, "device")) {
-                        if (NULL == getcwd(wd, sizeof(wd)))
-                                printf("?");
+                        if (getcwd(wd, sizeof(wd)))
+                                n += scnpr(b2 + n, b2len - n, "%s", wd);
                         else
-                                printf("%s", wd);
+                                n += scnpr(b2 + n, b2len - n, "?");
                 }
-                printf("\n");
+                sgj_pr_hr(jsp, "%s\n", b2);
         }
 }
 
 static int
-host_dir_scan_select(const struct dirent * s)
+shost_dir_scan_select(const struct dirent * s)
 {
         int h;
 
@@ -4737,32 +4804,40 @@ list_shosts(struct lsscsi_opts * op, sgj_opaque_p jop)
 {
         int num, k;
         struct dirent ** namelist;
-        // sgj_state * jsp = &op->json_st;
+        sgj_state * jsp = &op->json_st;
+        sgj_opaque_p jo2p = NULL;
+        sgj_opaque_p jap = NULL;
         char buff[LMAX_DEVPATH];
         char name[LMAX_NAME];
+        static const int namelen = sizeof(name);
 
-if (jop) { }
-        snprintf(buff, sizeof(buff), "%s%s", sysfsroot, scsi_host);
+        snprintf(buff, sizeof(buff), "%s%s", sysfsroot, scsi_host_s);
 
-        num = scandir(buff, &namelist, host_dir_scan_select,
+        num = scandir(buff, &namelist, shost_dir_scan_select,
                       shost_scandir_sort);
         if (num < 0) {
-                int n, nlen;
+                int n = 0;
 
-                n = 0;
-                nlen = sizeof(name);
-                n += scnpr(name + n, nlen - n, "%s: scandir: ", __func__);
-                scnpr(name + n, nlen - n, "%s", name);
+                n += scnpr(name + n, namelen - n, "%s: scandir: ", __func__);
+                scnpr(name + n, namelen - n, "%s", buff);
                 perror(name);
                 return;
         }
         if (op->classic)
-                printf("Attached hosts: %s\n", (num ? "" : "none"));
+                sgj_pr_hr(jsp, "Attached hosts: %s\n", (num ? "" : "none"));
 
+        if (jsp->pr_as_json) {
+                sgj_js_nv_i(jsp, jsp->basep,
+                            "number_of_attached_scsi_hosts", num);
+                jap = sgj_named_subarray_r(jsp, jop,
+                                           "attached_scsi_host_list");
+        }
         for (k = 0; k < num; ++k) {
-                my_strcopy(name, namelist[k]->d_name, sizeof(name));
+                my_strcopy(name, namelist[k]->d_name, namelen);
                 transport_id = TRANSPORT_UNKNOWN;
-                one_host_entry(buff, name, op);
+                jo2p = sgj_new_unattached_object_r(jsp);
+                one_shost_entry(buff, name, op, jo2p);
+                sgj_js_nv_o(jsp, jap, NULL /* implies an array add */, jo2p);
                 free(namelist[k]);
         }
         free(namelist);
