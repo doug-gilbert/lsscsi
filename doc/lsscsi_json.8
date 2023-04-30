@@ -8,7 +8,7 @@ lsscsi_json \- JSON output options for the lsscsi utility
 Uses information in sysfs (Linux kernel series 2.6 and later) to list SCSI
 devices (or hosts) currently attached to the system. Many non\-SCSI storage
 devices (but not all) used the SCSI subsystem in Linux. In lsscsi version
-0.30 support was added to list NVMe devices.
+0.30 support was added to list NVMe devices and controllers.
 .PP
 JavaScript Object Notation (JSON) is an open standard file format that can be
 used for data exchange between programs including across a network. See
@@ -16,12 +16,7 @@ https://en.wikipedia.org/wiki/JSON . JSON comes in many flavours and this one
 uses the json-builder C implementation found at
 https://github.com/json-parser/json-builder which implements four simple JSON
 data types: string, integer, boolean and null. Its other data types are JSON
-object and JSON array.
-.PP
-This utility uses the 'snake_case' convention for JSON object names: all in
-lower case letters or numerals with individual words joined with a single
-underscore (e.g. "starting_lba"). There should be no leading or trailing
-underscore characters. The json-builder library uses the
+object and JSON array. The json-builder library uses the
 SPDX\-License\-Identifier: BSD\-2\-Clause which is the same license as lsscsi.
 .PP
 The json-builder library is relatively lightweight (700 lines of C code) and
@@ -31,10 +26,18 @@ include what is needed from the json-parser header so that only the builder
 and not the parser are built. The parser could be added later, but currently
 there seems to be no need for it.
 .PP
+This utility uses the 'snake_case' convention for JSON property/object names:
+all in lower case letters or numerals with individual words joined with a
+single underscore (e.g. "starting_lba"). There should be no leading or
+trailing underscore characters. The lsscsi utility is essentially
+data\-mining in Linux's sysfs pseudo file system. Conveniently the naming
+convention used in the sysfs pseudo file system is also the 'snake_case'
+convention.
+.PP
 The user interface to JSON functionality in this utility is heavily based on
 what has been done by Christian Franke and others in smartctl, a utility in
-the smartmontools package for getting S.M.A.R.T. information from disks (and
-other storage devices).
+the smartmontools package for getting S.M.A.R.T. information from disks and
+other storage devices.
 .PP
 This manpage discusses the \fI\-\-json\fR and \fI\-\-js\-file=JFN\fR options.
 The \fI\-\-json\fR option may itself take an optional argument hence the

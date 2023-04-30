@@ -118,7 +118,7 @@ sgj_parse_opts(sgj_state * jsp, const char * j_optarg)
     int k, c;
 
     for (k = 0; j_optarg[k]; ++k) {     /* step over leading whitespace */
-        if (! isspace(j_optarg[k]))
+        if (! isspace((uint8_t)j_optarg[k]))
             break;
     }
     for ( ; j_optarg[k]; ++k) {

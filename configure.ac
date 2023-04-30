@@ -25,4 +25,13 @@ AC_ARG_ENABLE([fast-lebe],
   AC_HELP_STRING([--disable-fast-lebe], [use generic little-endian/big-endian code instead]),
   [AC_DEFINE_UNQUOTED(IGNORE_FAST_LEBE, 1, [use generic little-endian/big-endian instead], )], [])
 
+AC_ARG_ENABLE([debug],
+              [  --enable-debug          Turn on debugging],
+              [case "${enableval}" in
+                  yes) debug=true ;;
+                  no)  debug=false ;;
+                  *) AC_MSG_ERROR([bad value ${enableval} for --enable-debug]) ;;
+               esac],[debug=false])
+AM_CONDITIONAL([DEBUG], [test x$debug = xtrue])
+
 AC_OUTPUT(Makefile src/Makefile doc/Makefile)
