@@ -46,7 +46,7 @@
 #include "sg_pr2serr.h"
 
 /* Package release number is first number, whole string is version */
-static const char * release_str = "0.33  2023/04/29 [svn: r177]";
+static const char * release_str = "0.33  2023/04/30 [svn: r178]";
 
 #define FT_OTHER 0
 #define FT_BLOCK 1
@@ -160,6 +160,7 @@ static const char * stat_s = "state";
 static const char * mbs_s = "megabytes";
 static const char * gbs_s = "gigabytes";
 static const char * uniqi_s = "unique_id";
+static const char * pcie_s = "pcie";
 
 #if (HAVE_NVME && (! IGNORE_NVME))
 static const char * class_nvme = "/class/nvme/";
@@ -227,8 +228,7 @@ struct lsscsi_opts {
 static int gl_verbose;
 
 
-static const char * scsi_device_types[] =
-{
+static const char * const scsi_device_types[] = {
         "Direct-Access",
         "Sequential-Access",
         "Printer",
@@ -257,8 +257,7 @@ static const char * scsi_device_types[] =
         "No device",
 };
 
-static const char * scsi_short_device_types[] =
-{
+static const char * const scsi_short_device_types[] = {
         "disk   ", "tape   ", "printer", "process", "worm   ", "cd/dvd ",
         "scanner", "optical", "mediumx", "comms  ", "(0xa)  ", "(0xb)  ",
         "storage", "enclosu", "sim dsk", "opti rd", "bridge ", "osd    ",
@@ -468,7 +467,8 @@ scnpr(char * cp, int cp_max_len, const char * fmt, ...)
  * or empty (or both bools are false) it does nothing. Returns length of
  * processed string (or 0 if s is NULL). */
 static int
-trim_lead_trail(char * s, bool trim_leading, bool trim_trailing) {
+trim_lead_trail(char * s, bool trim_leading, bool trim_trailing)
+{
         int n;
         char * p = s;
 
@@ -551,9 +551,9 @@ name_eq2value(const char * dirp, const char * fname, const char * name,
                 snprintf(full_name, len - 2, "%s", fname);
 
         fp = fopen(full_name, "r");
-        if (NULL == fp) {
-            goto clean_up;
-        }
+        if (NULL == fp)
+                goto clean_up;
+
         if (strlen(name) >= (len - 2)) {
                 snprintf(b, b_len, "%s", bad_arg);
                 goto clean_up;
@@ -690,7 +690,7 @@ tuple2string(const struct addr_hctl * tp, int sel_mask, int blen, char * b)
                 n += scnpr(b + n, blen - n, "%s%d", got1 ? ":" : "", tp->t);
                 got1 = true;
         }
-        if ((! is_nvme ) && (0x1 & sel_mask)) {
+        if ((! is_nvme) && (0x1 & sel_mask)) {
                 int lunhex = (sel_mask >> 4) & 0x3;
 
                 if (1 == lunhex) {  /* -x (--lunhex) format */
@@ -794,10 +794,11 @@ size2string(uint64_t size, const enum string_size_units units, char *buf,
         uint64_t sf_cap;
         uint64_t remainder = 0;
         char tmp[8];
-        static const char *units_10[] = {"B", "kB", "MB", "GB", "TB", "PB",
-                                         "EB", "ZB", "YB", NULL};
-        static const char *units_2[] = {"B", "KiB", "MiB", "GiB", "TiB",
-                                        "PiB", "EiB", "ZiB", "YiB", NULL };
+        static const char * units_10[] = {
+                "B", "kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB", NULL};
+        static const char * units_2[] = {
+                "B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB",
+                NULL};
         /* designated initializer are C99 but not yet C++; g++ and clang++
          * accept them (with noise) */
 #ifdef __cplusplus
@@ -1233,7 +1234,7 @@ static int
 sas_low_phy_scan(const char * dir_name, struct dirent ***phy_list)
 {
         int num, k;
-        struct dirent ** namelist=NULL;
+        struct dirent ** namelist = NULL;
 
         memset(sas_low_phy, 0, sizeof(sas_low_phy));
         num = scandir(dir_name, &namelist, sas_low_phy_dir_scan_select, NULL);
@@ -1243,8 +1244,7 @@ sas_low_phy_scan(const char * dir_name, struct dirent ***phy_list)
                 for (k = 0; k < num; ++k)
                         free(namelist[k]);
                 free(namelist);
-        }
-        else
+        } else
                 *phy_list = namelist;
         return num;
 }
@@ -1436,14 +1436,15 @@ collect_dev_nodes(void)
                         continue;
 
                 /* Skip non-block/char files. */
-                if ( (!S_ISBLK(stats.st_mode)) && (!S_ISCHR(stats.st_mode)) )
+                if ((! S_ISBLK(stats.st_mode)) && (! S_ISCHR(stats.st_mode)))
                         continue;
 
                 /* Add to the list. */
                 if (cur_list->count >= DEV_NODE_LIST_ENTRIES) {
                         prev_list = cur_list;
                         cur_list = (struct dev_node_list *)calloc(1, dnl_sz);
-                        if (! cur_list) break;
+                        if (! cur_list)
+                                break;
                         prev_list->next = cur_list;
                         cur_list->next = NULL;
                         cur_list->count = 0;
@@ -1502,13 +1503,14 @@ get_dev_node(const char * wd, char * node, enum dev_type d_typ)
         if (dev_node_listhead == NULL) {
                 collect_dev_nodes();
                 if (dev_node_listhead == NULL)
-                        goto exit;
+                        goto fini;
         }
 
         /* Get the major/minor for this device. */
         if (!get_value(wd, dv_s, value, LMAX_NAME))
-                goto exit;
-        sscanf(value, "%u:%u", &maj, &min);
+                goto fini;
+        if (2 != sscanf(value, "%u:%u", &maj, &min))
+                goto fini;
 
         /* Search the node list for the newest match on this major/minor. */
         cur_list = dev_node_listhead;
@@ -1528,7 +1530,7 @@ get_dev_node(const char * wd, char * node, enum dev_type d_typ)
                     (min == cur_ent->min) &&
                     (d_typ == cur_ent->d_typ)) {
                         if ((! match_found) ||
-                            (difftime(cur_ent->mtime,newest_mtime) > 0)) {
+                            (difftime(cur_ent->mtime, newest_mtime) > 0)) {
                                 newest_mtime = cur_ent->mtime;
                                 my_strcopy(node, cur_ent->name, LMAX_NAME);
                         }
@@ -1536,7 +1538,7 @@ get_dev_node(const char * wd, char * node, enum dev_type d_typ)
                 }
         }
 
-exit:
+fini:
         return match_found;
 }
 
@@ -1591,7 +1593,7 @@ collect_disk_wwn_nodes(bool wwn_twice)
 
                 snprintf(device_path, PATH_MAX, "%s/%s", dev_disk_byid_dir,
                          dep->d_name);
-                device_path [PATH_MAX] = '\0';
+                device_path[PATH_MAX] = '\0';
                 if (lstat(device_path, &stats))
                         continue;
                 if (! S_ISLNK(stats.st_mode))
@@ -1634,7 +1636,7 @@ wwn_really:
 
                 snprintf(device_path, PATH_MAX, "%s/%s", dev_disk_byid_dir,
                          dep->d_name);
-                device_path [PATH_MAX] = '\0';
+                device_path[PATH_MAX] = '\0';
                 if (lstat(device_path, &stats))
                         continue;
                 if (! S_ISLNK(stats.st_mode))
@@ -1739,7 +1741,7 @@ static char *
 lookup_dev(const char *dir, const char *pfx, const char *priority,
            const char *dev)
 {
-        unsigned st_rdev;
+        unsigned int st_rdev;
         DIR *dirp;
         struct dirent *entry;
         char *result = NULL;
@@ -1758,6 +1760,7 @@ lookup_dev(const char *dir, const char *pfx, const char *priority,
                     stats.st_rdev == st_rdev &&
                     strncmp(entry->d_name, pfx, strlen(pfx)) == 0) {
                         char *nm = entry->d_name + strlen(pfx);
+
                         if (!priority || *nm == *priority) {
                                 free(result);
                                 result = strdup(nm);
@@ -1797,6 +1800,7 @@ get_disk_scsi_id(const char *dev_node, bool wo_prefix)
         if (scsi_id) {
                 if (wo_prefix) {
                         size_t len = strlen(scsi_id);
+
                         if (len > 1) {
                                 memmove(scsi_id, scsi_id + 1, len - 1);
                                 scsi_id[len - 1] = '\0';
@@ -1972,11 +1976,11 @@ get_lu_name(const char * devname, char * b, int b_len, bool want_prefix)
         if (0 == sg_vpd_dev_id_iter(bp, len, &off, VPD_ASSOC_LU,
                                     3 /* NAA */, 1 /* binary */)) {
                 dlen = bp[off + 3];
-                if (! ((8 == dlen) || (16 ==dlen)))
+                if (! ((8 == dlen) || (16 == dlen)))
                         return b;
                 if (want_prefix) {
                         if ((n = snprintf(cp, b_len, "naa.")) >= b_len)
-                            n = b_len - 1;
+                                n = b_len - 1;
                         cp += n;
                         b_len -= n;
                 }
@@ -1988,11 +1992,11 @@ get_lu_name(const char * devname, char * b, int b_len, bool want_prefix)
         } else if (0 == sg_vpd_dev_id_iter(bp, len, &off, VPD_ASSOC_LU,
                                            2 /* EUI */, 1 /* binary */)) {
                 dlen = bp[off + 3];
-                if (! ((8 == dlen) || (12 == dlen) || (16 ==dlen)))
+                if (! ((8 == dlen) || (12 == dlen) || (16 == dlen)))
                         return b;
                 if (want_prefix) {
                         if ((n = snprintf(cp, b_len, "eui.")) >= b_len)
-                            n = b_len - 1;
+                                n = b_len - 1;
                         cp += n;
                         b_len -= n;
                 }
@@ -2012,7 +2016,7 @@ get_lu_name(const char * devname, char * b, int b_len, bool want_prefix)
                         if (want_prefix) {
                                 if ((n = snprintf(cp, b_len, "uuid.")) >=
                                     b_len)
-                                    n = b_len - 1;
+                                        n = b_len - 1;
                                 cp += n;
                                 b_len -= n;
                         }
@@ -2039,7 +2043,7 @@ get_lu_name(const char * devname, char * b, int b_len, bool want_prefix)
                         return b;       /* must have 8 byte T10 vendor id */
                 if (want_prefix) {
                         if ((n = snprintf(cp, b_len, "t10.")) >= b_len)
-                            n = b_len - 1;
+                                n = b_len - 1;
                         cp += n;
                         b_len -= n;
                 }
@@ -2101,11 +2105,12 @@ parse_colon_list(const char * colon_list, struct addr_hctl * outp)
                 }
 
                 return true;
-        }
-        else
-#endif
+        } else if (1 != sscanf(colon_list, "%d", &outp->h))
+                return false;
+#else
         if (1 != sscanf(colon_list, "%d", &outp->h))
                 return false;
+#endif
         if (NULL == (elem_end = strchr(colon_list, ':')))
                 return false;
         colon_list = elem_end + 1;
@@ -2695,7 +2700,7 @@ transport_init_longer(const char * path_name, struct lsscsi_opts * op,
                 sgj_haj_vs(jsp, jop, 2, trans_s, SEP_EQ_NO_SP, "sata");
                 break;
         case TRANSPORT_PCIE:
-                sgj_haj_vs(jsp, jop, 2, trans_s, SEP_EQ_NO_SP, "pcie");
+                sgj_haj_vs(jsp, jop, 2, trans_s, SEP_EQ_NO_SP, pcie_s);
                 break;
         default:
                 if (op->verbose > 1)
@@ -3422,10 +3427,10 @@ longer_nd_entry(const char * path_name, const char * devname,
                 if (get_value(path_name, rem_s, value, vlen)) {
                         if (as_json)
                                 sgj_js_nv_s(jsp, jop, rem_s, value);
-                        n += scnpr(b + n, blen - n, "  %s=%s%s", rem_s,
-                                   value, sep);
+                        scnpr(b + n, blen - n, "  %s=%s%s", rem_s, value,
+                              sep);
                 } else
-                        n += scnpr(b + n, blen - n, "  %s=?%s", rem_s, sep);
+                        scnpr(b + n, blen - n, "  %s=?%s", rem_s, sep);
                 sgj_pr_hr(jsp, "%s%s", b, sing ? "" : "\n");
                 n = 0;
                 if (op->long_opt > 1) {
@@ -3449,11 +3454,10 @@ longer_nd_entry(const char * path_name, const char * devname,
                         if (get2_value(path_name, qu_s, wc_s, value, vlen)) {
                                 if (as_json)
                                         sgj_js_nv_s(jsp, jop, wc_s, value);
-                                n += scnpr(b + n, blen - n, "  %s=%s%s",
-                                           wc_s, value, sep);
+                                scnpr(b + n, blen - n, "  %s=%s%s", wc_s,
+                                      value, sep);
                         } else
-                                n += scnpr(b + n, blen - n, "  %s=?%s",
-                                           wc_s, sep);
+                                scnpr(b + n, blen - n, "  %s=?%s", wc_s, sep);
                         sgj_pr_hr(jsp, "%s%s", b, sing ? "" : "\n");
                         n = 0;
                         if (get2_value(path_name, qu_s, lbs_s, value, vlen)) {
@@ -3467,11 +3471,12 @@ longer_nd_entry(const char * path_name, const char * devname,
                         if (get2_value(path_name, qu_s, pbs_s, value, vlen)) {
                                 if (as_json)
                                         sgj_js_nv_s(jsp, jop, pbs_s, value);
-                                n += scnpr(b + n, blen - n, "  %s=%s%s",
-                                           pbs_s, value, sep);
+                                scnpr(b + n, blen - n, "  %s=%s%s", pbs_s,
+                                      value, sep);
                         } else
-                                n += scnpr(b + n, blen - n, "  %s=?%s",
-                                           pbs_s, sep);
+                                scnpr(b + n, blen - n, "  %s=?%s", pbs_s,
+                                      sep);
+                        sgj_pr_hr(jsp, "%s%s", b, sing ? "" : "\n");
                 }
                 // if (! sing)
                         // printf("\n");
@@ -3592,7 +3597,7 @@ tag_lun(const uint8_t * lunp, int * tag_arr)
                 case 0:         /* peripheral device addressing method */
                         bus_id = lunp[0] & 0x3f;
                         if (bus_id)
-                            next_level = true;
+                                next_level = true;
                         tag_lun_helper(tag_arr, k, 2);
                         break;
                 case 1:         /* flat space addressing method */
@@ -3675,6 +3680,9 @@ one_sdev_entry(const char * dir_name, const char * devname,
         static const char * llun_s = "linux_lun";
         static const char * t10_lun_s = "t10_lun_array";
         static const char * hctl_s = "hctl_string";
+        static const char * prott_s = "protection_type";
+        static const char * form_s = "format";
+        static const char * protm_s = "protection_mode";
 
         as_json = jsp->pr_as_json;
         if (op->classic) {
@@ -3725,7 +3733,7 @@ one_sdev_entry(const char * dir_name, const char * devname,
         }
 
         if ((int)strlen(value) >= devname_len) /* if long, append a space */
-                 q += scnpr(b + q, blen - q, "%s ", value);
+                q += scnpr(b + q, blen - q, "%s ", value);
         else /* left justified with field length of devname_len */
                 q += scnpr(b + q, blen - q, "%-*s", devname_len, value);
         if (op->pdt) {
@@ -3855,8 +3863,8 @@ one_sdev_entry(const char * dir_name, const char * devname,
                                 if (get_dev_node(wd, dev_node, d_typ))
                                         cp = "primary_device_node";
                                 else
-                                    snprintf(dev_node, dev_node_sz,
-                                             "-       ");
+                                        snprintf(dev_node, dev_node_sz,
+                                                 "-       ");
                         }
                         q += scnpr(b + q, blen - q, "%-9s", dev_node);
                         if (cp && as_json)
@@ -3889,8 +3897,8 @@ one_sdev_entry(const char * dir_name, const char * devname,
                 }
         } else {        /* non_sg_scan() didn't return 1, probably 0 */
                 if (get_wwn)
-                        q += scnpr(b + q, blen - q, "                       "
-                                   "         ");
+                        q += scnpr(b + q, blen - q, "%s",
+                                   "                                ");
                 if (op->scsi_id)
                         q += scnpr(b + q, blen - q, "%-9s  -", "-");
                 else
@@ -3913,10 +3921,10 @@ one_sdev_entry(const char * dir_name, const char * devname,
                                 } else {
                                         if (get_dev_node(wd, dev_node,
                                                          CHR_DEV))
-                                            cp = "sg_node";
+                                                cp = "sg_node";
                                         else
-                                            snprintf(dev_node, dev_node_sz,
-                                                     "-");
+                                                snprintf(dev_node,
+                                                         dev_node_sz, "-");
                                 }
                                 q += scnpr(b + q, blen - q, "  %-9s",
                                            dev_node);
@@ -3947,24 +3955,29 @@ one_sdev_entry(const char * dir_name, const char * devname,
                 my_strcopy(sddir,  buff, sizeof(sddir));
                 my_strcopy(blkdir, buff, sizeof(blkdir));
 
+                jo2p = sgj_named_subobject_r(jsp, jop, "protection");
                 if (sd_scan(sddir) &&
                     if_directory_chdir(sddir, ".") &&
-                    get_value(".", "protection_type", value, vlen)) {
+                    get_value(".", prott_s, value, vlen)) {
 
                         if (!strncmp(value, "0", 1))
                                 q += scnpr(b + q, blen - q, "  %-9s", "-");
                         else
                                 q += scnpr(b + q, blen - q, "  DIF/Type%1s",
                                            value);
+                        if (as_json)
+                                sgj_js_nv_s(jsp, jo2p, prott_s, value);
 
                 } else
                         q += scnpr(b + q, blen - q, "  %-9s", "-");
 
                 if (block_scan(blkdir) &&
                     if_directory_chdir(blkdir, "integrity") &&
-                    get_value(".", "format", value, vlen))
+                    get_value(".", form_s, value, vlen)) {
                         q += scnpr(b + q, blen - q, "  %-16s", value);
-                else
+                        if (as_json)
+                                sgj_js_nv_s(jsp, jo2p, form_s, value);
+                } else
                         q += scnpr(b + q, blen - q, "  %-16s", "-");
         }
 
@@ -3975,12 +3988,14 @@ one_sdev_entry(const char * dir_name, const char * devname,
 
                 if (sd_scan(sddir) &&
                     if_directory_chdir(sddir, ".") &&
-                    get_value(sddir, "protection_mode", value, vlen)) {
+                    get_value(sddir, protm_s, value, vlen)) {
 
                         if (!strcmp(value, "none"))
                                 q += scnpr(b + q, blen - q, "  %-4s", "-");
                         else
                                 q += scnpr(b + q, blen - q, "  %-4s", value);
+                        if (as_json)
+                                sgj_js_nv_s(jsp, jop, protm_s, value);
                 } else
                         q += scnpr(b + q, blen - q, "  %-4s", "-");
         }
@@ -3996,7 +4011,7 @@ one_sdev_entry(const char * dir_name, const char * devname,
                 if (! (is_direct_access_dev(dec_pdt) &&
                        block_scan(blkdir) &&
                        if_directory_chdir(blkdir, ".") &&
-                       get_value(".", "size", vp, vlen)) ) {
+                       get_value(".", "size", vp, vlen))) {
                         /* q += */ scnpr(b + q, blen - q, "  %6s", "-");
                         goto fini_line;
                 }
@@ -4238,12 +4253,12 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
                         const char * bp = buff;
                         static const char * dev2_s = "device/device";
 
-                        if (0 == strcmp("pcie" , value)) {
+                        if (0 == strcmp(pcie_s, value)) {
 
                                 if (get2_value(bp, dev2_s, svp_s, d, dlen) &&
                                     get2_value(bp, dev2_s, sdp_s, e, elen)) {
-                                        snprintf(value , vlen, "pcie %s:%s",
-                                                 d, e);
+                                        snprintf(value , vlen, "%s %s:%s",
+                                                 pcie_s, d, e);
                                         q += scnpr(b + q, blen - q, "%-*s  ",
                                                    model_len, value);
                                 } else
@@ -4345,7 +4360,7 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
                 int64_t num_by = 0;
 
                 if (! get_value(buff, "size", value, vlen)) {
-                        q += scnpr(b + q, blen - q, "  %6s", "-");
+                        scnpr(b + q, blen - q, "  %6s", "-");
                         goto fini_line;
                 }
                 blk512s = atoll(value);
@@ -4554,19 +4569,19 @@ one_nhost_entry(const char * dir_name, const char * nvme_ctl_rel,
         if (op->transport_info) {
                 n += scnpr(a + n, alen - n, "    ");
                 if (get_value(buff, trans_s, value, vlen)) {
-                        if (0 == strcmp("pcie" , value)) {
+                        if (0 == strcmp(pcie_s, value)) {
                                 if (get2_value(buff, dvc_s, svp_s, b, blen) &&
                                     get2_value(buff, dvc_s, sdp_s, bb, bblen))
-                                        n += scnpr(a + n, alen - n,
-                                                   "pcie %s:%s", b, bb);
+                                        scnpr(a + n, alen - n, "%s %s:%s",
+                                              pcie_s, b, bb);
                                 else
-                                        n += scnpr(a + n, alen - n,
-                                                   "pcie ?:?");
+                                        scnpr(a + n, alen - n, "%s ?:?",
+                                              pcie_s);
                         } else
-                                n += scnpr(a + n, alen - n, "%s%s",
-                                           (vb ? "transport=" : ""), value);
+                                scnpr(a + n, alen - n, "%s%s",
+                                      (vb ? "transport=" : ""), value);
                 } else if (vb)
-                        n += scnpr(a + n, alen - n, "%s=?", trans_s);
+                        scnpr(a + n, alen - n, "%s=?", trans_s);
                 sgj_pr_hr(jsp, "%s\n", a);
                 n = 0;
         } else if (op->wwn) {
@@ -4580,8 +4595,8 @@ one_nhost_entry(const char * dir_name, const char * nvme_ctl_rel,
                 n = 0;
         } else if (op->unit) {
                 if (get2_value(buff, dvc_s, svp_s, value, vlen)) {
-                        n += scnpr(a + n, alen - n, "   %s%s:",
-                                   (vb ? "vin=" : ""), value);
+                        scnpr(a + n, alen - n, "   %s%s:",
+                              (vb ? "vin=" : ""), value);
                         if (as_json)
                                 sgj_js_nv_s(jsp, jop, svp_s, value);
                         if (get2_value(buff, dvc_s, sdp_s, value, vlen)) {
@@ -4689,17 +4704,15 @@ one_nhost_entry(const char * dir_name, const char * nvme_ctl_rel,
                 sgj_pr_hr(jsp, "%s\n", a);
                 n = 0;
         }
-        if (n > 0) {
+        if (n > 0)
                 sgj_pr_hr(jsp, "%s\n", a);
-                n = 0;
-        }
         if (vb > 0) {
                 n = scnpr(a, alen, "  dir: %s\n  device dir: ", buff);
                 if (if_directory_chdir(buff, dvc_s)) {
                         if (NULL == getcwd(wd, sizeof(wd)))
-                                n += scnpr(a + n, alen - n, "?");
+                                scnpr(a + n, alen - n, "?");
                         else
-                                n += scnpr(a + n, alen - n, "%s", wd);
+                                scnpr(a + n, alen - n, "%s", wd);
                 }
                 sgj_pr_hr(jsp, "%s\n", a);
         }
@@ -4986,7 +4999,7 @@ longer_sh_entry(const char * path_name, struct lsscsi_opts * op,
                         if (jsp->pr_as_json)
                                 sgj_js_nv_s(jsp, jop, cpl_s, value);
                 } else if (op->verbose)
-                        n += sg_scnpr(b + n, blen - n, "  %s=???? \n", cpl_s);
+                        n += sg_scnpr(b + n, blen - n, "  %s=????\n", cpl_s);
 
                 if (get_value(path_name, hb_s, value, vlen)) {
                         n += sg_scnpr(b + n, blen - n, "%s=%-4s ", hb_s,
@@ -4994,7 +5007,7 @@ longer_sh_entry(const char * path_name, struct lsscsi_opts * op,
                         if (jsp->pr_as_json)
                                 sgj_js_nv_s(jsp, jop, hb_s, value);
                 } else if (op->verbose)
-                        n += sg_scnpr(b + n, blen - n, "%s=???? \n", hb_s);
+                        n += sg_scnpr(b + n, blen - n, "%s=????\n", hb_s);
 
                 if (get_value(path_name, sgt_s, value, vlen)) {
                         n += sg_scnpr(b + n, blen - n, "%s=%-4s ", sgt_s,
@@ -5002,7 +5015,7 @@ longer_sh_entry(const char * path_name, struct lsscsi_opts * op,
                         if (jsp->pr_as_json)
                                 sgj_js_nv_s(jsp, jop, sgt_s, value);
                 } else if (op->verbose)
-                        n += sg_scnpr(b + n, blen - n, "%s=???? \n", sgt_s);
+                        n += sg_scnpr(b + n, blen - n, "%s=????\n", sgt_s);
 
                 if (get_value(path_name, am_s, value, vlen)) {
                         sg_scnpr(b + n, blen - n, "%s=%-4s ", am_s, value);
@@ -5020,19 +5033,19 @@ longer_sh_entry(const char * path_name, struct lsscsi_opts * op,
                                         sgj_js_nv_s(jsp, jop, cq_s, value);
                         }
                         if (get_value(path_name, state_s, value, vlen)) {
-                                n += sg_scnpr(b + n, blen - n,"  %s=%-8s ",
+                                n += sg_scnpr(b + n, blen - n, "  %s=%-8s ",
                                               state_s, value);
                                 if (jsp->pr_as_json)
                                         sgj_js_nv_s(jsp, jop, state_s, value);
                         }
                         if (get_value(path_name, uniqi_s, value, vlen)) {
-                                n += sg_scnpr(b + n, blen - n,"  %s=%-8s ",
+                                n += sg_scnpr(b + n, blen - n, "  %s=%-8s ",
                                               uniqi_s, value);
                                 if (jsp->pr_as_json)
                                         sgj_js_nv_s(jsp, jop, uniqi_s, value);
                         }
                         if (get_value(path_name, ubm_s, value, vlen)) {
-                                sg_scnpr(b + n, blen - n,"  %s=%-8s ",
+                                sg_scnpr(b + n, blen - n, "  %s=%-8s ",
                                          ubm_s, value);
                                 if (jsp->pr_as_json)
                                         sgj_js_nv_s(jsp, jop, ubm_s, value);
@@ -5076,7 +5089,7 @@ one_shost_entry(const char * dir_name, const char * devname,
                 q += scnpr(o + q, olen - q, "[?]  ");
         n += scnpr(b + n, blen - n, "%s", dir_name);
         // n += scnpr(b + n, blen - n, "%s", "/");
-        n += scnpr(b + n, blen - n, "%s", devname);
+        scnpr(b + n, blen - n, "%s", devname);
         if ((get_value(b, "proc_name", value, vlen)) &&
             (strncmp(value, nulln1_s, 6)) && (strncmp(value, nulln2_s, 6))) {
                 q += scnpr(o + q, olen - q, "  %-12s  ", value);
@@ -5113,9 +5126,9 @@ one_shost_entry(const char * dir_name, const char * devname,
                 n += scnpr(b2 + n, b2len - n, "  dir: %s\n  device dir: ", b);
                 if (if_directory_chdir(b, dvc_s)) {
                         if (getcwd(wd, sizeof(wd)))
-                                n += scnpr(b2 + n, b2len - n, "%s", wd);
+                                scnpr(b2 + n, b2len - n, "%s", wd);
                         else
-                                n += scnpr(b2 + n, b2len - n, "?");
+                                scnpr(b2 + n, b2len - n, "?");
                 }
                 sgj_pr_hr(jsp, "%s\n", b2);
         }
@@ -5222,7 +5235,6 @@ list_nhosts(struct lsscsi_opts * op, sgj_opaque_p jop)
         static const int blen = sizeof(buff);
         static const int elen = sizeof(ebuf);
 
-if (jop) { }
         n = 0;
         n += scnpr(buff + n, blen - 1, "%s", sysfsroot);
         scnpr(buff + n, blen - 1, "%s", class_nvme);
@@ -5310,17 +5322,20 @@ one_filter_arg(const char * arg, struct addr_hctl * filtp)
                                 }
                         }
                         if ((1 != res) && (NULL == strchr(buff, ']'))) {
-                                        ;
                                 pr2serr("cannot decode %s as an integer\n",
                                         buff);
                                 return false;
                         }
                 }
                 switch (k) {
-                case 0: filtp->h = val; break;
-                case 1: filtp->c = val; break;
-                case 2: filtp->t = val; break;
-                case 3: filtp->l = val64; break;
+                case 0: filtp->h = val;
+                        break;
+                case 1: filtp->c = val;
+                        break;
+                case 2: filtp->t = val;
+                        break;
+                case 3: filtp->l = val64;
+                        break;
                 default:
                         pr2serr("expect three colons at most in %s\n", arg);
                         return false;
@@ -5347,7 +5362,7 @@ decode_filter_arg(const char * a1p, const char * a2p, const char * a3p,
         filtp->t = -1;
         filtp->l = UINT64_LAST;
         if ((0 == strncmp("host", a1p, 4)) &&
-            (1 == sscanf(a1p, "host%d", &n)) && ( n >= 0)) {
+            (1 == sscanf(a1p, "host%d", &n)) && (n >= 0)) {
                 filtp->h = n;
                 return true;
         }
@@ -5526,7 +5541,7 @@ main(int argc, char **argv)
                 }
                 cp = strchr(release_str, '/');
                 if (cp && (3 == sscanf(cp - 4, "%d/%d/%d", &yr, &mon, &day)))
-                    ;
+                        ;
                 else {
                         pr2serr("pre-release: %s\n", release_str);
                         return 0;
@@ -5618,7 +5633,7 @@ main(int argc, char **argv)
                         pr2serr("--unit ignored when --hosts given\n");
                 if ((1 == op->long_opt) || (2 == op->long_opt)) {
                         pr2serr("please use '--list' (rather than '--long') "
-                                "with " "--unit\n");
+                                "with --unit\n");
                         return 1;
                 }
         }
@@ -5626,9 +5641,8 @@ main(int argc, char **argv)
                 printf(" sysfsroot: %s\n", sysfsroot);
         }
         jsp = &op->json_st;
-        if (op->do_json) {
-            jop = sgj_start_r("lsscsi", release_str, argc, argv, jsp);
-        }
+        if (op->do_json)
+                jop = sgj_start_r("lsscsi", release_str, argc, argv, jsp);
         if (op->do_hosts) {
                 list_shosts(op, jop);
 #if (HAVE_NVME && (! IGNORE_NVME))

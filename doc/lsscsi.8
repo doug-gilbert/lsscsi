@@ -19,11 +19,19 @@ devices (or hosts) currently attached to the system. Many non\-SCSI storage
 devices (but not all) used the SCSI subsystem in Linux. In lsscsi version
 0.30 support was added to list NVMe devices and controllers.
 .PP
-In single line per device (LU or NVMe namespace) mode, the default, each
-line starts with a 4 element tuple surrounded by square brackets. For SCSI
-devices the first element 'H' is the host number, the second element 'C' is
-the controller number, the third element 'T' is the target number and the
-final element is the Logical Unit Number (LUN). All four are integers.
+The term "device" is wonderfully vague with one possible definition being
+the "thing" at the other end of the wire (from the CPU or host computer).
+In SCSI the "thing" at the other end of the wire is called the target
+which contains one or more "logical units" (LUs). A LU is a sequence of
+equally sized blocks addressed by a "logical block address" (LBA) starting
+at 0. In NVMe the "thing" at the other end of the wire is a "NVMe device"
+which contains one or more namespaces.
+.PP
+By default, this utility is in single_line_per_LU/namespace mode, each line
+starts with a 4 element tuple surrounded by square brackets. For SCSI devices
+the first element ('H') is the host number, the second element ('C') is the
+controller number, the third element ('T') is the target number and the final
+element is the Logical Unit Number ('L' or LUN). All four are integers.
 For NVMe namespaces see two paragraphs down. When the \fI\-\-hosts\fR option
 is given for SCSI devices the tuple is reduced to one element: the host
 number.
@@ -32,11 +40,12 @@ If a \fIH:C:T:L\fR tuple is given as an argument on the command line then
 it acts as a filter and only devices that match it are listed. The colons
 don't have to be present, and '\-', '*', '?' or missing components at the
 end are interpreted as wildcards. The default is '*:*:*:*' which means to
-match devices (i.e.  Logical Units). Any filter string using '*' of '?'
+match devices (i.e.  LU or namespaces). Any filter string using '*' of '?'
 should be surrounded by single or double quotes to stop shell expansions.
 If '\-' is used as a wildcard then the whole filter tuple should be prefixed
 by '\-\- ' to tell this utility there are no more options on the command
-line to be interpreted.  A leading '[' and trailing ']' are permitted (
+line to be interpreted. The use of '\-\- ' like that is standard Unix
+command line practice. A leading '[' and trailing ']' are permitted (
 e.g. '[1:0:0]' matches all LUNs on 1:0:0). May also be used to filter
 \fI\-\-hosts\fR in which case only the \fIH\fR is active and may be either
 a number or in the form "host<n>" where <n> is a host number.
@@ -51,7 +60,7 @@ is the NVMe namespace identifier which is typically a sequential value
 starting at 1. The leading explicit "N" for NVMe devices is converted
 internally into a large value (32,767) that should not interfere with any
 Linux generated SCSI host number; it also means that the numeric sort
-used to show hosts (controllers) and devices (LUs or logical units) will
+used to show hosts (controllers) and devices (LUs or namespaces) will
 always place NVMe devices and controllers after those that use the SCSI
 subsystem. To filter using a \fIH:C:T:L\fR argument for NVMe controllers,
 "hostN", "hostN:<num>", "N" or "N:<num>" may be used; when no "<num>" is
@@ -74,7 +83,7 @@ report disk error messages using the disk's default kernel name.
 Arguments to long options are mandatory for short options as well. The options
 are arranged in alphabetical order based on the long option name. Hyphenated
 long options can also take underscore, and vice versa (e.g. \fI\-\-scsi_id\fR
-or \fI\-\-scsi\-id\fR are acceptable).
+or \fI\-\-scsi\-id\fR are acceptable) instead.
 .TP
 \fB\-b\fR, \fB\-\-brief\fR
 reduces one line per device output to the tuple and the primary device name.
@@ -146,7 +155,7 @@ program called udev has the ability to
 .B change
 those special change file names which is what the user will see henceforth
 apart from sysfs which still uses the original name (i.e. the name soon
-after bootup). 
+after bootup).
 .br
 This option should be seldom needed.
 .TP

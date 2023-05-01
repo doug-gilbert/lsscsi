@@ -8,7 +8,7 @@ Version: 	%{version}
 Release: 	%{release}
 License:	GPL
 Group:		Utilities/System
-Source0:	https://sg.danny.cz/scsi/%{name}-%{version}.tgz
+Source0:	https://sg.danny.cz/scsi/%{name}-%{version}.tar.gz
 Url:		https://sg.danny.cz/scsi/lsscsi.html
 BuildRoot:	%{_tmppath}/%{name}-%{version}-root/
 Packager:	dgilbert at interlog dot com
@@ -55,7 +55,7 @@ fi
 
 
 %changelog
-* Sat Apr 29 2023 - dgilbert at interlog dot com
+* Sun Apr 30 2023 - dgilbert at interlog dot com
 - fixes, minor tweaks
   * lsscsi-0.33
 * Wed May 05 2021 - dgilbert at interlog dot com

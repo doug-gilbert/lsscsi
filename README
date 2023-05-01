@@ -1,25 +1,49 @@
 Installation instructions are in the INSTALL file.
 
 For a description of this utility see:
-https://sg.danny.cz/scsi/lsscsi.html
+  https://sg.danny.cz/scsi/lsscsi.html
+or
+  https://doug-gilbert.github.io/scsi/lsscsi.html
 
-The "man" page (lsscsi.8) in this directory may also be useful.
+The "man" page (lsscsi.8) in this package may also be useful.
 
-In Linux kernel versions 2.6.37 and 2.6.38 (and perhaps later)
-configuring:
-  CONFIG_SYSFS_DEPRECATED=y
-  CONFIG_SYSFS_DEPRECATED_V2=y 
+Various options can be given to the ./configure script. Those
+specific to this package are:
 
-causes blocks device names (e.g. /dev/sda) not to be found.
+  --disable-nvme-supp     remove all or most NVMe code
+  --disable-fast-lebe     use generic little-endian/big-endian code instead
+  --enable-debug          Turn on debugging
 
-Revisiting this in lk 5.9.6; configuring:
-  CONFIG_SYSFS_DEPRECATED_V2=y
-alone causes blocks device names (e.g. /dev/sda) not to be found.
+The first option may be required for old Linux systems that pre-date
+NVMe support in the kernel.
+
+In almost all cases "fast-lebe" should be okay. The problem is that there
+are two (major) ways of representing integers that require greater than 8
+bits to represent. The most logical (for humans) is called "big endian"
+where the high(er/est) byte appears before (i.e. at a lower address) the
+low(er-est) byte. Networking and SCSI use the "big endian" representation.
+Intel have always maintained that the "little endian" representation is
+more computationally efficient and judging from most modern CPU designs,
+the industry seems to agree with them. Some CPUs, such as those from ARM,
+can run in either big or little endian mode.  That said, there are few
+examples of Linux or Unix using big endian ARM: Gentoo (Linux) and NetBSD
+have support for big endian ARM. NVMe, a project started by Intel, uses
+little endian (but not exclusively as some unique identifiers specify big
+endian (e.g. IEEE NAA)). So its a mess, that won't be sorted any time soon.
+There is another, more subtle issue, associated with the alignment of the
+integer representation in memory that is best addressed at the same time
+as "endian-ness". Along the "wire" (transport medium) it is often best to
+pack integers so there are no fill characters (bytes) between them. If
+the --disable-fast-lebe is needed, then probably there will be other
+serious issues.
 
 The build sequence is now:
   ./autogen.sh ; ./configure ; make ; make install
 or
   ./bootstrap ; ./configure ; make ; make install
 
+Note that the final 'make install' will usually require root permissions
+and will place binaries in the /usr/local/bin directory.
+
 Douglas Gilbert
-1st April 2023
+30th April 2023
