@@ -46,7 +46,7 @@
 #include "sg_pr2serr.h"
 
 /* Package release number is first number, whole string is version */
-static const char * release_str = "0.33  2023/04/30 [svn: r178]";
+static const char * release_str = "0.33  2023/05/05 [svn: r179]";
 
 #define FT_OTHER 0
 #define FT_BLOCK 1
@@ -161,6 +161,7 @@ static const char * mbs_s = "megabytes";
 static const char * gbs_s = "gigabytes";
 static const char * uniqi_s = "unique_id";
 static const char * pcie_s = "pcie";
+static const char * none_s = "none";
 
 #if (HAVE_NVME && (! IGNORE_NVME))
 static const char * class_nvme = "/class/nvme/";
@@ -220,6 +221,7 @@ struct lsscsi_opts {
                              * number of logical blocks */
         int unit;           /* -u: logical unit (LU) name: from vpd_pg83 */
         int verbose;        /* -v */
+        int version_count;  /* -V */
         const char * json_arg;  /* carries [JO] if any */
         const char * js_file; /* --js-file= argument */
         sgj_state json_st;  /* -j[JO] or --json[=JO] */
@@ -390,8 +392,9 @@ static const char * usage_message1 =
 "    --generic|-g      show scsi generic device name\n"
 "    --help|-h         this usage information\n"
 "    --hosts|-H        lists scsi hosts rather than scsi devices\n"
-"    --json[=JO]|-j[JO]    output in JSON instead of human readable\n"
-"                          test. Use --json=? for JSON help\n"
+"    --json[=JO]|-j[=JO]    output in JSON instead of plain text. "
+"use\n"
+"                           --json=? or '-j=?' for JSON help\n"
 "    --js-file=JFN|-J JFN    JFN is a filename to which JSON output is\n"
 "                            written (def: stdout); truncates then writes\n"
 "    --kname|-k        show kernel name instead of device node name\n"
@@ -3216,6 +3219,114 @@ transport_tport_longer(const char * devname, struct lsscsi_opts * op,
         }
 }
 
+static int
+rend_prot_protmode(const char * rb, char * o, int omlen, bool one_ln,
+                   struct lsscsi_opts * op, sgj_opaque_p jop)
+{
+        bool as_json;
+        bool sing = (op->long_opt > 2);
+        int q = 0;
+        const char * sep = NULL;
+        sgj_state * jsp = &op->json_st;
+        sgj_opaque_p jo2p = NULL;
+        char value[LMAX_NAME];
+        char sddir[LMAX_DEVPATH];
+                char blkdir[LMAX_DEVPATH];
+        static const int vlen = sizeof(value);
+        static const char * ato_s = "app_tag_own";
+        static const char * prott_s = "protection_type";
+        static const char * form_s = "format";
+        static const char * tgsz_s = "tag_size";
+        static const char * protm_s = "protection_mode";
+
+        as_json = jsp->pr_as_json;
+        if (! one_ln)
+                sep = sing ? "\n" : "";
+
+// pr2serr("%s: one_ln=%d, rb: %s\n", __func__, one_ln, rb);
+        if (op->protection) {
+                my_strcopy(sddir,  rb, sizeof(sddir));
+                my_strcopy(blkdir, rb, sizeof(blkdir));
+
+                jo2p = sgj_named_subobject_r(jsp, jop, "protection");
+                if (sd_scan(sddir) &&
+                    if_directory_chdir(sddir, ".") &&
+                    get_value(".", prott_s, value, vlen)) {
+
+                        if (one_ln) {
+                                if (!strncmp(value, "0", 1))
+                                        q += scnpr(o + q, omlen - q,
+                                                   "  %-9s", "-");
+                                else
+                                        q += scnpr(o + q, omlen - q,
+                                                   "  DIF/Type%1s", value);
+                        } else {
+                                q += scnpr(o + q, omlen - q, " %s=%s%s",
+                                           prott_s, value, sep);
+                        }
+                        if (as_json)
+                                sgj_js_nv_s(jsp, jo2p, prott_s, value);
+			if (get_value(".", ato_s, value, vlen)) {
+				if (as_json)
+                                        sgj_js_nv_s(jsp, jo2p, ato_s, value);
+				else if (! one_ln)
+					q += scnpr(o + q, omlen - q,
+						   " %s=%s%s", ato_s, value,
+						   sep);
+                        }
+                } else
+                        q += scnpr(o + q, omlen - q, "  %-9s", "-");
+
+                if (block_scan(blkdir) &&
+                    if_directory_chdir(blkdir, "integrity")) {
+                        if (get_value(".", form_s, value, vlen)) {
+                                if (one_ln)
+                                        q += scnpr(o + q, omlen - q,
+                                                   "  %-16s", value);
+                                else
+                                        q += scnpr(o + q, omlen - q,
+                                                   " %s=%s%s", form_s, value,
+                                                   sep);
+                                if (as_json)
+                                        sgj_js_nv_s(jsp, jo2p, form_s, value);
+                        }
+                        if (get_value(".", tgsz_s, value, vlen)) {
+				if (as_json)
+					sgj_js_nv_s(jsp, jo2p, tgsz_s, value);
+                                else if (! one_ln)
+                                        q += scnpr(o + q, omlen - q,
+                                                   " %s=%s%s", tgsz_s, value,
+                                                   sep);
+                        }
+                } else
+                        q += scnpr(o + q, omlen - q, "  %-16s", "-");
+        }
+        if (op->protmode) {
+                my_strcopy(sddir, rb, sizeof(sddir));
+
+                if (sd_scan(sddir) && if_directory_chdir(sddir, ".") &&
+                    get_value(sddir, protm_s, value, vlen)) {
+
+                        if (one_ln) {
+                                if (0 == strcmp(value, none_s))
+                                        q += scnpr(o + q, omlen - q, "  %-4s",
+                                                   "-");
+                                else
+                                        q += scnpr(o + q, omlen - q, "  %-4s",
+                                                   value);
+                        } else {
+                                q += scnpr(o + q, omlen - q, " %s=%s%s",
+                                           protm_s, value, sep);
+                        }
+                        if (as_json)
+                                sgj_js_nv_s(jsp, jop, protm_s, value);
+                } else
+                        q += scnpr(o + q, omlen - q, "  %-4s", "-");
+        }
+        return q;
+}
+
+
 static void
 longer_sdev_entry(const char * path_name, const char * devname,
                   struct lsscsi_opts * op, sgj_opaque_p jop)
@@ -3296,7 +3407,7 @@ longer_sdev_entry(const char * path_name, const char * devname,
         }
 
         if (get_value(path_name, stat_s, value, vlen)) {
-                q += scnpr(b + q, blen - q, "  %s=%s", stat_s, value);
+                q += scnpr(b + q, blen - q, " %s=%s", stat_s, value);
                 sgj_js_nv_s(jsp, jop, stat_s, value);
         } else
                 q += scnpr(b + q, blen - q, "  %s=?", stat_s);
@@ -3321,15 +3432,15 @@ longer_sdev_entry(const char * path_name, const char * devname,
         } else
                 q += scnpr(b + q, blen - q, " %s=?", db_s);
         if (get_value(path_name, tm_s, value, vlen)) {
-                /* q += */ scnpr(b + q, blen - q, " %s=%s", tm_s, value);
+                q += scnpr(b + q, blen - q, " %s=%s", tm_s, value);
                 sgj_js_nv_s(jsp, jop, tm_s, value);
         } else
-                /* q += */ scnpr(b + q, blen - q, " %s=?", tm_s);
-        sgj_pr_hr(jsp, "%s\n", b);
-        q = 0;
+                q += scnpr(b + q, blen - q, " %s=?", tm_s);
         if (op->long_opt == 2) {
+                sgj_pr_hr(jsp, " %s\n", b);
+                q = 0;
                 if (get_value(path_name, iocb_s, value, vlen)) {
-                        q += scnpr(b + q, blen - q, "  %s=%s\n", iocb_s,
+                        q += scnpr(b + q, blen - q, "  %s=%s", iocb_s,
                                    value);
                         sgj_js_nv_s(jsp, jop, iocb_s, value);
                 } else if (op->verbose > 0)
@@ -3351,13 +3462,18 @@ longer_sdev_entry(const char * path_name, const char * devname,
                 } else
                         /* q += */ scnpr(b + q, blen - q, " %s=%s", iorc_s,
                                          value);
-                sgj_pr_hr(jsp, "%s\n", b);
+                sgj_pr_hr(jsp, " %s\n", b);
                 if (get_value(path_name, qt_s, value, vlen)) {
                         scnpr(b, blen, " %s=%s", qt_s, value);
                         sgj_js_nv_s(jsp, jop, qt_s, value);
                 } else
                         scnpr(b, blen, " %s=%s", qt_s, value);
-                sgj_pr_hr(jsp, "%s\n", b);
+// yyyyyyyyyyyyyyyyy
+        }
+        sgj_pr_hr(jsp, "  %s\n", b);
+        if (op->protection || op->protmode) {
+                rend_prot_protmode(path_name, b, blen, false, op, jop);
+                sgj_pr_hr(jsp, "  %s\n", b);
         }
 }
 
@@ -3529,7 +3645,7 @@ one_classic_sdev_entry(const char * dir_name, const char * devname,
         } else if (1 != sscanf(value, "%d", &scsi_level)) {
                 printf("ANSI SCSI revision: ??\n");
         } else if (scsi_level == 0) {
-                printf("ANSI SCSI revision: none\n");
+                printf("ANSI SCSI revision: %s\n", none_s);
         } else
                 printf("ANSI SCSI revision: %02x\n", (scsi_level - 1) ?
                                             scsi_level - 1 : 1);
@@ -3680,9 +3796,6 @@ one_sdev_entry(const char * dir_name, const char * devname,
         static const char * llun_s = "linux_lun";
         static const char * t10_lun_s = "t10_lun_array";
         static const char * hctl_s = "hctl_string";
-        static const char * prott_s = "protection_type";
-        static const char * form_s = "format";
-        static const char * protm_s = "protection_mode";
 
         as_json = jsp->pr_as_json;
         if (op->classic) {
@@ -3770,7 +3883,7 @@ one_sdev_entry(const char * dir_name, const char * devname,
                 get_lu_name(devname, value, vlen, op->unit > 3);
                 n = strlen(value);
                 if (n < 1)      /* left justified "none" means no lu name */
-                        q += scnpr(b + q, blen - q, "%-32s  ", "none");
+                        q += scnpr(b + q, blen - q, "%-32s  ", none_s);
                 else if (1 == op->unit) {
                         if (n < 33)
                                 q += scnpr(b + q, blen - q, "%-32s  ", value);
@@ -3947,58 +4060,8 @@ one_sdev_entry(const char * dir_name, const char * devname,
                 } else
                         q += scnpr(b + q, blen - q, "  %-9s", "-");
         }
-
-        if (op->protection) {
-                char sddir[LMAX_DEVPATH];
-                char blkdir[LMAX_DEVPATH];
-
-                my_strcopy(sddir,  buff, sizeof(sddir));
-                my_strcopy(blkdir, buff, sizeof(blkdir));
-
-                jo2p = sgj_named_subobject_r(jsp, jop, "protection");
-                if (sd_scan(sddir) &&
-                    if_directory_chdir(sddir, ".") &&
-                    get_value(".", prott_s, value, vlen)) {
-
-                        if (!strncmp(value, "0", 1))
-                                q += scnpr(b + q, blen - q, "  %-9s", "-");
-                        else
-                                q += scnpr(b + q, blen - q, "  DIF/Type%1s",
-                                           value);
-                        if (as_json)
-                                sgj_js_nv_s(jsp, jo2p, prott_s, value);
-
-                } else
-                        q += scnpr(b + q, blen - q, "  %-9s", "-");
-
-                if (block_scan(blkdir) &&
-                    if_directory_chdir(blkdir, "integrity") &&
-                    get_value(".", form_s, value, vlen)) {
-                        q += scnpr(b + q, blen - q, "  %-16s", value);
-                        if (as_json)
-                                sgj_js_nv_s(jsp, jo2p, form_s, value);
-                } else
-                        q += scnpr(b + q, blen - q, "  %-16s", "-");
-        }
-
-        if (op->protmode) {
-                char sddir[LMAX_DEVPATH];
-
-                my_strcopy(sddir, buff, sizeof(sddir));
-
-                if (sd_scan(sddir) &&
-                    if_directory_chdir(sddir, ".") &&
-                    get_value(sddir, protm_s, value, vlen)) {
-
-                        if (!strcmp(value, "none"))
-                                q += scnpr(b + q, blen - q, "  %-4s", "-");
-                        else
-                                q += scnpr(b + q, blen - q, "  %-4s", value);
-                        if (as_json)
-                                sgj_js_nv_s(jsp, jop, protm_s, value);
-                } else
-                        q += scnpr(b + q, blen - q, "  %-4s", "-");
-        }
+        if (op->protection || op->protmode)
+                q += rend_prot_protmode(buff, b + q, blen - q, true, op, jop);
 
         if (op->ssize) {
                 uint64_t blk512s;
@@ -4816,7 +4879,7 @@ list_sdevices(struct lsscsi_opts * op, sgj_opaque_p jop)
         num = scandir(buff, &namelist, sdev_dir_scan_select,
                       sdev_scandir_sort);
         if (num < 0) {  /* scsi mid level may not be loaded */
-                if (op->verbose > 0) {
+                if (op->verbose > 1) {
                         n = 0;
                         n += scnpr(name + n, nlen - n, "%s: scandir: ",
                                    __func__);
@@ -4825,11 +4888,11 @@ list_sdevices(struct lsscsi_opts * op, sgj_opaque_p jop)
                         sgj_pr_hr(jsp, "SCSI mid level %s\n", mmnbl_s);
                 }
                 if (op->classic)
-                        sgj_pr_hr(jsp, "Attached devices: none\n");
+                        sgj_pr_hr(jsp, "Attached devices: %s\n", none_s);
                 return;
         }
         if (op->classic)
-                sgj_pr_hr(jsp, "Attached devices: %s\n", (num ? "" : "none"));
+                sgj_pr_hr(jsp, "Attached devices: %s\n", (num ? "" : none_s));
 
         if (jsp->pr_as_json) {
                 sgj_js_nv_i(jsp, jsp->basep,
@@ -4877,7 +4940,7 @@ list_ndevices(struct lsscsi_opts * op, sgj_opaque_p jop)
         num = scandir(buff, &name_list, ndev_dir_scan_select,
                       nhost_scandir_sort);
         if (num < 0) {  /* NVMe module may not be loaded */
-                if (op->verbose > 0) {
+                if (op->verbose > 1) {
                         n = 0;
                         n += scnpr(ebuf + n, elen - n, "%s: scandir: ",
                                    __func__);
@@ -5200,7 +5263,7 @@ list_shosts(struct lsscsi_opts * op, sgj_opaque_p jop)
                 return;
         }
         if (op->classic)
-                sgj_pr_hr(jsp, "Attached hosts: %s\n", (num ? "" : "none"));
+                sgj_pr_hr(jsp, "Attached hosts: %s\n", (num ? "" : none_s));
 
         if (jsp->pr_as_json) {
                 sgj_js_nv_i(jsp, jsp->basep,
@@ -5242,7 +5305,7 @@ list_nhosts(struct lsscsi_opts * op, sgj_opaque_p jop)
         num = scandir(buff, &namelist, ndev_dir_scan_select,
                       nhost_scandir_sort);
         if (num < 0) {  /* NVMe module may not be loaded */
-                if (op->verbose > 0) {
+                if (op->verbose > 1) {
                         n = 0;
                         n += scnpr(ebuf + n, elen - n, "%s: scandir: ",
                                    __func__);
@@ -5404,14 +5467,113 @@ err_out:
         return false;
 }
 
+/* Handles short options after '-j' including a sequence of short options
+ * that include one 'j' (for JSON). Want optional argument to '-j' to be
+ * prefixed by '='. Return 0 for good, 1 for syntax error and 2 for exit
+ * with no error. */
+static int
+chk_short_opts(const char sopt_ch, struct lsscsi_opts * op)
+{
+        switch (sopt_ch) {
+        case 'b':
+                op->brief = true;
+                break;
+        case 'c':
+                op->classic = true;
+                break;
+        case 'C':       /* synonym for --hosts, NVMe perspective */
+                op->do_hosts = true;
+                break;
+        case 'd':
+                op->dev_maj_min = true;
+                break;
+        case 'D':       /* --pdt */
+                op->pdt = true;
+                break;
+        case 'g':
+                op->generic = true;
+                break;
+        case 'h':
+                usage();
+                return 2;
+        case 'H':
+                op->do_hosts = true;
+                break;
+        case 'i':
+                if (op->scsi_id)
+                        op->scsi_id_twice = true;
+                else
+                        op->scsi_id = true;
+                break;
+        case 'j':
+                break;  /* simply ignore second 'j' (e.g. '-jxj') */
+        case 'k':
+                op->kname = true;
+                break;
+        case 'l':
+                ++op->long_opt;
+                break;
+        case 'L':
+                op->long_opt += 3;
+                break;
+        case 'N':
+                op->no_nvme = true;
+                break;
+        case 'p':
+                op->protection = true;
+                break;
+        case 'P':
+                op->protmode = true;
+                break;
+        case 's':
+                ++op->ssize;
+                break;
+        case 'S':
+                op->ssize += 3;
+                break;
+        case 't':
+                op->transport_info = true;
+                break;
+        case 'u':
+                ++op->unit;
+                break;
+        case 'U':
+                op->unit += 3;
+                break;
+        case 'v':
+                ++op->verbose;
+                break;
+        case 'V':
+                ++op->version_count;
+                break;
+        case 'w':
+                if (op->wwn)
+                        op->wwn_twice = true;
+                else
+                        op->wwn = true;
+                break;
+        case 'x':
+                ++op->lunhex;
+                break;
+        case '?':
+                usage();
+                return 1;
+        default:
+                pr2serr("?? getopt returned character code 0x%x ??\n",
+                        sopt_ch);
+                usage();
+                return 1;
+        }
+        return 0;
+}
+
 
 int
 main(int argc, char **argv)
 {
         bool do_sdevices = true;  /* op->do_hosts checked before this */
-        int c;
+        int c, k, n, q;
         int res = 0;
-        int version_count = 0;
         const char * cp;
         sgj_state * jsp;
         sgj_opaque_p jop = NULL;
@@ -5463,7 +5625,23 @@ main(int argc, char **argv)
                         break;
                 case 'j':
                         op->do_json = true;
-                        op->json_arg = optarg;
+                        /* Now want '=' to precede JSON optional arguments */
+                        if (optarg) {
+                                if ('=' == *optarg) {
+                                        op->json_arg = optarg + 1;
+                                        break;
+                                }
+                                k = 0;
+                                n = strlen(optarg);
+                                for (k = 0; k < n; ++k) {
+                                        q = chk_short_opts(*(optarg + k), op);
+                                        if (1 == q)
+                                                return 1;
+                                        if (2 == q)
+                                                return 0;
+                                }
+                        } else
+                                op->json_arg = NULL;
                         break;
                 case 'J':
                         op->do_json = true;
@@ -5506,7 +5684,7 @@ main(int argc, char **argv)
                         ++op->verbose;
                         break;
                 case 'V':
-                        ++version_count;
+                        ++op->version_count;
                         break;
                 case 'w':
                         if (op->wwn)
@@ -5530,12 +5708,12 @@ main(int argc, char **argv)
                         return 1;
                }
         }
-        if (version_count > 0) {
+        if (op->version_count > 0) {
                 int yr, mon, day;
                 char * p;
                 char b[64];
 
-                if (1 == version_count) {
+                if (1 == op->version_count) {
                         pr2serr("pre-release: %s\n", release_str);
                         return 0;
                 }

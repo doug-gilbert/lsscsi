@@ -34,6 +34,20 @@ data\-mining in Linux's sysfs pseudo file system. Conveniently the naming
 convention used in the sysfs pseudo file system is also the 'snake_case'
 convention.
 .PP
+In the plain text, "single line per device" mode each line of lsscsi output
+starts with a lsscsi_locator. It is surrounded by square brackets and has a
+four element tuple with colon as a separator. For SCSI/ATA devices, its
+four elements are "h" for host_id, "c" for controller_id, "t" for target_id
+and "l" for LUN (Logical Unit Number). For NVMe devices the first element is
+the letter "N", followed by the char device node minor number, followed by
+the controller_id and finally the namespace_id. Many of these "id"s are
+discovered/enuerated by Linux, starting with 0 for the first found. The
+LUN and namespace_id are specified by the storage device and in the case
+of NVMe, the lowest namespace id is 1. In the JSON output, when devices
+or hosts/controllers are being listed, one of the first properties output
+is named "lscsi_locator" and it value is the string (including the
+surrounding square brackets) described in this paragraph.
+.PP
 The user interface to JSON functionality in this utility is heavily based on
 what has been done by Christian Franke and others in smartctl, a utility in
 the smartmontools package for getting S.M.A.R.T. information from disks and
@@ -62,15 +76,19 @@ stderr: 'error parsing SG3_UTILS_JSON_OPTS environment variable, ignore'.
 Since the argument to \fI\-\-json[=JO]\fR is optional, in the shorter form
 there can be no space(s) between the option and its argument.
 .TP
-\fB\-j[JO]\fR, \fB\-\-json\fR\fI[=JO]\fR
-\fIJO\fR is a string of 0 or more characters whose order is not significant
+\fB\-j[=JO]\fR, \fB\-\-json\fR\fI[=JO]\fR
+\fIJO\fR is a string of zero or more characters whose order is not significant
 apart from the negation characters ('\-' is preferred). The negation character
 must appear immediately before the (boolean) feature it is toggling.
 .br
-Since the argument to the short form option is itself optional, there can be
-no space between the short form option and \fIJO\fR, if it is given. To make
-this read a little better on the command line, '=' may be first character of
-\fIJO\fR, so for example, this is valid '\-j=av'.
+In the short form the option letter may be other than \fI\-j\fR if that letter
+has already been used (\fI\-J\fR is preferred next). For example the sg_ses
+utility uses \fI\-j\fR for its 'join' operation. Also since the argument to
+the short form option is itself optional, there can be no spaces between the
+short form option, the "=", and \fIJO\fR, if it is given. Some short form
+examples: '-jl' requests JSON output (with no argument option) and whatever
+the '-l' short option means in the invoked utility; '-j=h' requests JSON
+output with some integers additional rendered as JSON strings of hex.
 .TP
 \fB\-J\fR, \fB\-\-js\-file\fR=\fIJFN\fR
 output is in JSON format and it is sent to a file named \fIJFN\fR. If that
