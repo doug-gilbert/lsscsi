@@ -9,7 +9,8 @@ bin_PROGRAMS = lsscsi
 if DEBUG
 # This is active if --enable-debug given to ./configure
 # removed -Wduplicated-branches because needs gcc-8
-DBG_CFLAGS = -Wextra -Wmisleading-indentation -Wduplicated-cond -Wlogical-op -Wnull-dereference -Wshadow -Wjump-misses-init
+DBG_CFLAGS = -Wextra -Wmisleading-indentation -Wduplicated-cond -Wlogical-op -Wnull-dereference -Wshadow -Wunused -Wsizeof-array-argument -Wduplicated-branches
+# DBG_CFLAGS = -Wextra -Wmisleading-indentation -Wduplicated-cond -Wlogical-op -Wnull-dereference -Wshadow -Wunused -Wsizeof-array-argument -Wduplicated-branches -Wjump-misses-init
 DBG_CPPFLAGS = -DDEBUG
 else
 DBG_CFLAGS =
@@ -23,7 +24,8 @@ endif
 # -std=<s> can be c99, c11, gnu11, etc.
 AM_CPPFLAGS = -iquote ${top_srcdir}/src -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 $(DBG_CPPFLAGS)
 AM_CFLAGS = -Wall -W $(DBG_CFLAGS)
-# AM_CFLAGS = -Wall -W -Wextra -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wshadow -Wjump-misses-init
+# AM_CFLAGS = -Wall -W -Wextra -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wshadow
+# AM_CFLAGS = -Wall -W $(DBG_CFLAGS) -fanalyzer
 # AM_CFLAGS = -Wall -W -pedantic -std=c99
 # AM_CFLAGS = -Wall -W -pedantic -std=c11
 # AM_CFLAGS = -Wall -W -pedantic -std=c11 --analyze

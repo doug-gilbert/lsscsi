@@ -46,7 +46,7 @@
 #include "sg_pr2serr.h"
 
 /* Package release number is first number, whole string is version */
-static const char * release_str = "0.33  2023/05/05 [svn: r179]";
+static const char * release_str = "0.33  2023/05/07 [svn: r179]";
 
 #define FT_OTHER 0
 #define FT_BLOCK 1
@@ -393,7 +393,7 @@ static const char * usage_message1 =
 "    --help|-h         this usage information\n"
 "    --hosts|-H        lists scsi hosts rather than scsi devices\n"
 "    --json[=JO]|-j[=JO]    output in JSON instead of plain text. "
-"use\n"
+"Use\n"
 "                           --json=? or '-j=?' for JSON help\n"
 "    --js-file=JFN|-J JFN    JFN is a filename to which JSON output is\n"
 "                            written (def: stdout); truncates then writes\n"
@@ -432,7 +432,7 @@ static const char * usage_message2 =
 "List SCSI devices or hosts, followed by NVMe namespaces or controllers.\n"
 "Many storage devices (e.g. SATA disks and USB attached storage) use SCSI\n"
 "command sets and hence are also listed by this utility. Hyphenated long\n"
-"options can also take underscore (and vice versa).\n";
+"option names can also take underscore (and vice versa).\n";
 
 
 #ifdef __GNUC__
@@ -3266,13 +3266,13 @@ rend_prot_protmode(const char * rb, char * o, int omlen, bool one_ln,
                         }
                         if (as_json)
                                 sgj_js_nv_s(jsp, jo2p, prott_s, value);
-			if (get_value(".", ato_s, value, vlen)) {
-				if (as_json)
+                        if (get_value(".", ato_s, value, vlen)) {
+                                if (as_json)
                                         sgj_js_nv_s(jsp, jo2p, ato_s, value);
-				else if (! one_ln)
-					q += scnpr(o + q, omlen - q,
-						   " %s=%s%s", ato_s, value,
-						   sep);
+                                else if (! one_ln)
+                                        q += scnpr(o + q, omlen - q,
+                                                   " %s=%s%s", ato_s, value,
+                                                   sep);
                         }
                 } else
                         q += scnpr(o + q, omlen - q, "  %-9s", "-");
@@ -3291,8 +3291,8 @@ rend_prot_protmode(const char * rb, char * o, int omlen, bool one_ln,
                                         sgj_js_nv_s(jsp, jo2p, form_s, value);
                         }
                         if (get_value(".", tgsz_s, value, vlen)) {
-				if (as_json)
-					sgj_js_nv_s(jsp, jo2p, tgsz_s, value);
+                                if (as_json)
+                                        sgj_js_nv_s(jsp, jo2p, tgsz_s, value);
                                 else if (! one_ln)
                                         q += scnpr(o + q, omlen - q,
                                                    " %s=%s%s", tgsz_s, value,
@@ -3432,10 +3432,10 @@ longer_sdev_entry(const char * path_name, const char * devname,
         } else
                 q += scnpr(b + q, blen - q, " %s=?", db_s);
         if (get_value(path_name, tm_s, value, vlen)) {
-                q += scnpr(b + q, blen - q, " %s=%s", tm_s, value);
+                /* q += */ scnpr(b + q, blen - q, " %s=%s", tm_s, value);
                 sgj_js_nv_s(jsp, jop, tm_s, value);
         } else
-                q += scnpr(b + q, blen - q, " %s=?", tm_s);
+                /* q += */ scnpr(b + q, blen - q, " %s=?", tm_s);
         if (op->long_opt == 2) {
                 sgj_pr_hr(jsp, " %s\n", b);
                 q = 0;
@@ -3601,7 +3601,7 @@ longer_nd_entry(const char * path_name, const char * devname,
 
 #endif          /* (HAVE_NVME && (! IGNORE_NVME)) */
 
-/* Leave this function as human readable text only. */
+/* Leave this function as plain text only (i.e. no JSON rendering) . */
 static void
 one_classic_sdev_entry(const char * dir_name, const char * devname,
                        struct lsscsi_opts * op)
@@ -5559,7 +5559,7 @@ chk_short_opts(const char sopt_ch, struct lsscsi_opts * op)
                 usage();
                 return 1;
         default:
-                pr2serr("?? getopt returned character code 0x%x ??\n",
+                pr2serr("unrecognised option code: '%c' [0x%x]\n\n", sopt_ch,
                         sopt_ch);
                 usage();
                 return 1;
@@ -5572,7 +5572,7 @@ int
 main(int argc, char **argv)
 {
         bool do_sdevices = true;  /* op->do_hosts checked before this */
-        int c, k, n, q;
+        int c;
         int res = 0;
         const char * cp;
         sgj_state * jsp;
@@ -5627,11 +5627,12 @@ main(int argc, char **argv)
                         op->do_json = true;
                         /* Now want '=' to precede JSON optional arguments */
                         if (optarg) {
+                                int k, n, q;
+
                                 if ('=' == *optarg) {
                                         op->json_arg = optarg + 1;
                                         break;
                                 }
-                                k = 0;
                                 n = strlen(optarg);
                                 for (k = 0; k < n; ++k) {
                                         q = chk_short_opts(*(optarg + k), op);
@@ -5702,8 +5703,7 @@ main(int argc, char **argv)
                         usage();
                         return 1;
                 default:
-                        pr2serr("?? getopt returned character code 0x%x ??\n",
-                                c);
+                        pr2serr("unrecognised option code %c [0x%x]\n", c, c);
                         usage();
                         return 1;
                }

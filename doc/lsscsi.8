@@ -1,4 +1,4 @@
-.TH LSSCSI "8" "April 2023" "lsscsi\-0.33" LSSCSI
+.TH LSSCSI "8" "May 2023" "lsscsi\-0.33" LSSCSI
 .SH NAME
 lsscsi \- list SCSI devices (or hosts), list NVMe devices
 .SH SYNOPSIS
@@ -99,7 +99,9 @@ between the tuple and the primary device name. For NVMe namespaces "0x0"
 is displayed (for a disk or direct access device).
 .TP
 \fB\-c\fR, \fB\-\-classic\fR
-The output is similar to that obtained from 'cat /proc/scsi/scsi'
+The output is similar to that obtained from 'cat /proc/scsi/scsi' .
+There is no JSON rendering of this output, the output is always in plain
+text.
 .TP
 \fB\-C\fR, \fB\-\-controllers\fR
 Lists NVMe controllers and SCSI hosts. This is a synonym for the
@@ -134,13 +136,18 @@ the system. If this option is not given (and the \fI\-\-controllers\fR
 option is not given) then SCSI devices (logical units (LUs)) followed by
 NVMe devices (namespaces) are listed.
 .TP
-\fB\-j[JO]\fR, \fB\-\-json[=JO]\fR
-See the accompanying lsscsi_json(8) manpage. Note that the \fIJO\fR argument
-is itself optional. The optional argument to the short form is shown here
-to stress that in this case there is no space between the "j" and its
-optional argument.
+\fB\-j\fR[=\fIJO\fR], \fB\-\-json\fR[=\fIJO\fR]
+output is in JSON format instead of plain text form. Note that arguments
+to the short and long form are themselves optional and if present start
+with "=" and no whitespace is permitted around that "=".
+.br
+See the lsscsi_json(8) manpage or use '?' for \fIJO\fR to get a summary.
 .TP
 \fB\-J\fR, \fB\-\-js\-file\fR=\fIJFN\fR
+Send the JSON output to a file named \fIJFN\fR instead of stdout. When
+this option is given, the \fI\-\-json\fR option is not required unless
+JSON settings in \fIJO\fR are needed.
+.br
 See the accompanying lsscsi_json(8) manpage.
 .TP
 \fB\-k\fR, \fB\-\-kname\fR
@@ -246,7 +253,7 @@ To show the identifier without that leading value, use \fI\-\-scsi_id\fR
 twice (or simply \fI\-ii\fR).
 .TP
 \fB\-s\fR, \fB\-\-size\fR
-Print disk capacity in human readable form. When given once, normal base
+Print disk capacity in plain text form. When given once, normal base
 10 SI units are used as a prefix for 'B' which is bytes (aka octets).
 For example MB, GB and TB stand for 10^6, 10^9 and 10^12 bytes
 respectively. When given twice, IEC 80000\-3 prefixes for 'B' are used;
