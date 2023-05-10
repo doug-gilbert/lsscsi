@@ -46,7 +46,7 @@
 #include "sg_pr2serr.h"
 
 /* Package release number is first number, whole string is version */
-static const char * release_str = "0.33  2023/05/07 [svn: r179]";
+static const char * release_str = "0.33  2023/05/08 [svn: r181]";
 
 #define FT_OTHER 0
 #define FT_BLOCK 1
@@ -960,15 +960,15 @@ sub_scan(char * dir_name, const char * sub_str, dirent_select_fn fn)
 }
 
 /* Scan for block:sdN or block/sdN directory in
- * /sys/bus/scsi/devices/h:c:i:l  */
+ * /sys/bus/scsi/devices/h:c:t:l  */
 static bool
 block_scan(char * dir_name)
 {
         return sub_scan(dir_name, "block:", block_dir_scan_select);
 }
 
-/* Scan for scsi_disk:h:c:i:l or scsi_disk/h:c:i:l directory in
- * /sys/bus/scsi/devices/h:c:i:l  */
+/* Scan for scsi_disk:h:c:t:l or scsi_disk/h:c:t:l directory in
+ * /sys/bus/scsi/devices/h:c:t:l  */
 static bool
 sd_scan(char * dir_name)
 {
@@ -2825,7 +2825,6 @@ transport_tport(const char * devname, const struct lsscsi_opts * op,
         snprintf(buff, bufflen, "%s%s/%s", sysfsroot, bus_scsi_dev_s,
                  devname);
         if (if_directory_chdir(buff, sasdev_s)) {
-/* this case looks like dead code */
                 transport_id = TRANSPORT_SAS_CLASS;
                 snprintf(b, b_len, "sas:");
                 off = strlen(b);
@@ -3221,7 +3220,8 @@ transport_tport_longer(const char * devname, struct lsscsi_opts * op,
 
 static int
 rend_prot_protmode(const char * rb, char * o, int omlen, bool one_ln,
-                   struct lsscsi_opts * op, sgj_opaque_p jop)
+                   const char * leadin, struct lsscsi_opts * op,
+                   sgj_opaque_p jop)
 {
         bool as_json;
         bool sing = (op->long_opt > 2);
@@ -3231,7 +3231,7 @@ rend_prot_protmode(const char * rb, char * o, int omlen, bool one_ln,
         sgj_opaque_p jo2p = NULL;
         char value[LMAX_NAME];
         char sddir[LMAX_DEVPATH];
-                char blkdir[LMAX_DEVPATH];
+	char blkdir[LMAX_DEVPATH];
         static const int vlen = sizeof(value);
         static const char * ato_s = "app_tag_own";
         static const char * prott_s = "protection_type";
@@ -3243,7 +3243,6 @@ rend_prot_protmode(const char * rb, char * o, int omlen, bool one_ln,
         if (! one_ln)
                 sep = sing ? "\n" : "";
 
-// pr2serr("%s: one_ln=%d, rb: %s\n", __func__, one_ln, rb);
         if (op->protection) {
                 my_strcopy(sddir,  rb, sizeof(sddir));
                 my_strcopy(blkdir, rb, sizeof(blkdir));
@@ -3261,8 +3260,8 @@ rend_prot_protmode(const char * rb, char * o, int omlen, bool one_ln,
                                         q += scnpr(o + q, omlen - q,
                                                    "  DIF/Type%1s", value);
                         } else {
-                                q += scnpr(o + q, omlen - q, " %s=%s%s",
-                                           prott_s, value, sep);
+                                q += scnpr(o + q, omlen - q, "%s%s=%s%s",
+                                           leadin, prott_s, value, sep);
                         }
                         if (as_json)
                                 sgj_js_nv_s(jsp, jo2p, prott_s, value);
@@ -3271,8 +3270,8 @@ rend_prot_protmode(const char * rb, char * o, int omlen, bool one_ln,
                                         sgj_js_nv_s(jsp, jo2p, ato_s, value);
                                 else if (! one_ln)
                                         q += scnpr(o + q, omlen - q,
-                                                   " %s=%s%s", ato_s, value,
-                                                   sep);
+                                                   "%s%s=%s%s", leadin,
+                                                   ato_s, value, sep);
                         }
                 } else
                         q += scnpr(o + q, omlen - q, "  %-9s", "-");
@@ -3285,8 +3284,8 @@ rend_prot_protmode(const char * rb, char * o, int omlen, bool one_ln,
                                                    "  %-16s", value);
                                 else
                                         q += scnpr(o + q, omlen - q,
-                                                   " %s=%s%s", form_s, value,
-                                                   sep);
+                                                   "%s%s=%s%s", leadin,
+                                                   form_s, value, sep);
                                 if (as_json)
                                         sgj_js_nv_s(jsp, jo2p, form_s, value);
                         }
@@ -3295,8 +3294,8 @@ rend_prot_protmode(const char * rb, char * o, int omlen, bool one_ln,
                                         sgj_js_nv_s(jsp, jo2p, tgsz_s, value);
                                 else if (! one_ln)
                                         q += scnpr(o + q, omlen - q,
-                                                   " %s=%s%s", tgsz_s, value,
-                                                   sep);
+                                                   "%s%s=%s%s", leadin,
+                                                   tgsz_s, value, sep);
                         }
                 } else
                         q += scnpr(o + q, omlen - q, "  %-16s", "-");
@@ -3315,8 +3314,8 @@ rend_prot_protmode(const char * rb, char * o, int omlen, bool one_ln,
                                         q += scnpr(o + q, omlen - q, "  %-4s",
                                                    value);
                         } else {
-                                q += scnpr(o + q, omlen - q, " %s=%s%s",
-                                           protm_s, value, sep);
+                                q += scnpr(o + q, omlen - q, "%s%s=%s%s",
+                                           leadin, protm_s, value, sep);
                         }
                         if (as_json)
                                 sgj_js_nv_s(jsp, jop, protm_s, value);
@@ -3325,7 +3324,6 @@ rend_prot_protmode(const char * rb, char * o, int omlen, bool one_ln,
         }
         return q;
 }
-
 
 static void
 longer_sdev_entry(const char * path_name, const char * devname,
@@ -3397,12 +3395,23 @@ longer_sdev_entry(const char * path_name, const char * devname,
                         sgj_haj_vs(jsp, jop, 2, tm_s, SEP_EQ_NO_SP, value);
                 else if (op->verbose > 0)
                         sgj_pr_hr(jsp, "  %s=?\n", tm_s);
-                if (get_value(path_name, ty_s, value, vlen))
+                if (get_value(path_name, ty_s, value, vlen)) {
+                        int pdt = -1;
+                        const char * pdt_s = "? ?";
+
+                        if ((1 == sscanf(value, "%d", &pdt)) &&
+                            (pdt >= 0) && (pdt < 32))
+                                pdt_s = scsi_device_types[pdt];
+                        sgj_haj_vistr_nex(jsp, jop, 2, ty_s, SEP_EQ_NO_SP,
+                                          pdt, true, pdt_s,
+                                          "Peripheral Device Type (PDT)");
                         sgj_haj_vs(jsp, jop, 2, ty_s, SEP_EQ_NO_SP, value);
-                else if (op->verbose > 0)
+                } else if (op->verbose > 0)
                         sgj_pr_hr(jsp, "  %s=?\n", ty_s);
                 if (get_value(path_name, uniqi_s, value, vlen))
                         sgj_haj_vs(jsp, jop, 2, uniqi_s, SEP_EQ_NO_SP, value);
+                rend_prot_protmode(path_name, b, blen, false, "  ", op, jop);
+                sgj_pr_hr(jsp, "%s", b);
                 return;
         }
 
@@ -3468,11 +3477,10 @@ longer_sdev_entry(const char * path_name, const char * devname,
                         sgj_js_nv_s(jsp, jop, qt_s, value);
                 } else
                         scnpr(b, blen, " %s=%s", qt_s, value);
-// yyyyyyyyyyyyyyyyy
         }
         sgj_pr_hr(jsp, "  %s\n", b);
         if (op->protection || op->protmode) {
-                rend_prot_protmode(path_name, b, blen, false, op, jop);
+                rend_prot_protmode(path_name, b, blen, false, " ", op, jop);
                 sgj_pr_hr(jsp, "  %s\n", b);
         }
 }
@@ -3638,7 +3646,7 @@ one_classic_sdev_entry(const char * dir_name, const char * devname,
                 printf("  Type:   %-33s", "??");
         } else if ((type < 0) || (type > 31)) {
                 printf("  Type:   %-33s", "???");
-        } else
+        } else  /* PDT */
                 printf("  Type:   %-33s", scsi_device_types[type]);
         if (! get_value(buff, "scsi_level", value, sizeof(value))) {
                 printf("ANSI SCSI revision: ?\n");
@@ -4061,7 +4069,8 @@ one_sdev_entry(const char * dir_name, const char * devname,
                         q += scnpr(b + q, blen - q, "  %-9s", "-");
         }
         if (op->protection || op->protmode)
-                q += rend_prot_protmode(buff, b + q, blen - q, true, op, jop);
+                q += rend_prot_protmode(buff, b + q, blen - q, true, " ",
+                                        op, jop);
 
         if (op->ssize) {
                 uint64_t blk512s;
