@@ -44,9 +44,10 @@
 
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
+#include "sg_json.h"
 
 /* Package release number is first number, whole string is version */
-static const char * release_str = "0.33  2023/05/08 [svn: r181]";
+static const char * release_str = "0.33  2023/05/13 [svn: r182]";
 
 #define FT_OTHER 0
 #define FT_BLOCK 1

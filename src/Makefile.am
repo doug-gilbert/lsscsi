@@ -41,6 +41,8 @@ lsscsi_SOURCES =	lsscsi.c \
 			sg_json_builder.c \
 			sg_pr2serr.h \
 			sg_pr2serr.c \
+			sg_json.h \
+			sg_json.c \
 			sg_unaligned.h
 
 distclean-local:
