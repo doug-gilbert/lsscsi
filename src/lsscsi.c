@@ -47,7 +47,7 @@
 #include "sg_json.h"
 
 /* Package release number is first number, whole string is version */
-static const char * release_str = "0.33  2023/05/13 [svn: r182]";
+static const char * release_str = "0.33  2023/05/15 [svn: r183]";
 
 #define FT_OTHER 0
 #define FT_BLOCK 1
@@ -120,8 +120,8 @@ static const char * model_s = "model";
 static const char * product_sn = "product_identification";
 static const char * rev_s = "rev";
 static const char * revis_s = "revision";
-static const char * lbs_s = "logical_block_size";
-static const char * pbs_s = "physical_block_size";
+static const char * lbs_sn = "logical_block_size";
+static const char * pbs_sn = "physical_block_size";
 static const char * qu_s = "queue";
 static const char * sas_ad_s = "sas_address";
 static const char * sas_ad2_s = "sas_addr";
@@ -3232,7 +3232,7 @@ rend_prot_protmode(const char * rb, char * o, int omlen, bool one_ln,
         sgj_opaque_p jo2p = NULL;
         char value[LMAX_NAME];
         char sddir[LMAX_DEVPATH];
-	char blkdir[LMAX_DEVPATH];
+        char blkdir[LMAX_DEVPATH];
         static const int vlen = sizeof(value);
         static const char * ato_s = "app_tag_own";
         static const char * prott_s = "protection_type";
@@ -3585,21 +3585,21 @@ longer_nd_entry(const char * path_name, const char * devname,
                                 scnpr(b + n, blen - n, "  %s=?%s", wc_s, sep);
                         sgj_pr_hr(jsp, "%s%s", b, sing ? "" : "\n");
                         n = 0;
-                        if (get2_value(path_name, qu_s, lbs_s, value, vlen)) {
+                        if (get2_value(path_name, qu_s, lbs_sn, value, vlen)) {
                                 if (as_json)
-                                        sgj_js_nv_s(jsp, jop, lbs_s, value);
+                                        sgj_js_nv_s(jsp, jop, lbs_sn, value);
                                 n += scnpr(b + n, blen - n, "  %s=%s%s",
-                                           lbs_s, value, sep);
+                                           lbs_sn, value, sep);
                         } else
                                 n += scnpr(b + n, blen - n, "  %s=?%s",
-                                           lbs_s, sep);
-                        if (get2_value(path_name, qu_s, pbs_s, value, vlen)) {
+                                           lbs_sn, sep);
+                        if (get2_value(path_name, qu_s, pbs_sn, value, vlen)) {
                                 if (as_json)
-                                        sgj_js_nv_s(jsp, jop, pbs_s, value);
-                                scnpr(b + n, blen - n, "  %s=%s%s", pbs_s,
+                                        sgj_js_nv_s(jsp, jop, pbs_sn, value);
+                                scnpr(b + n, blen - n, "  %s=%s%s", pbs_sn,
                                       value, sep);
                         } else
-                                scnpr(b + n, blen - n, "  %s=?%s", pbs_s,
+                                scnpr(b + n, blen - n, "  %s=?%s", pbs_sn,
                                       sep);
                         sgj_pr_hr(jsp, "%s%s", b, sing ? "" : "\n");
                 }
@@ -3621,6 +3621,7 @@ one_classic_sdev_entry(const char * dir_name, const char * devname,
         char dev_node[LMAX_NAME];
         char value[LMAX_NAME];
         struct addr_hctl hctl;
+        static const char * ansi_ver_s = "ANSI SCSI revision:";
 
         snprintf(buff, sizeof(buff), "%s/%s", dir_name, devname);
         if (! parse_colon_list(devname, &hctl))
@@ -3650,14 +3651,14 @@ one_classic_sdev_entry(const char * dir_name, const char * devname,
         } else  /* PDT */
                 printf("  Type:   %-33s", scsi_device_types[type]);
         if (! get_value(buff, "scsi_level", value, sizeof(value))) {
-                printf("ANSI SCSI revision: ?\n");
+                printf("%s ?\n", ansi_ver_s);
         } else if (1 != sscanf(value, "%d", &scsi_level)) {
-                printf("ANSI SCSI revision: ??\n");
+                printf("%s ??\n", ansi_ver_s);
         } else if (scsi_level == 0) {
-                printf("ANSI SCSI revision: %s\n", none_s);
+                printf("%s %s\n", ansi_ver_s, none_s);
         } else
-                printf("ANSI SCSI revision: %02x\n", (scsi_level - 1) ?
-                                            scsi_level - 1 : 1);
+                printf("%s %02x\n", ansi_ver_s,
+                       (scsi_level - 1) ? scsi_level - 1 : 1);
         if (op->generic) {
                 if (if_directory_ch2generic(buff)) {
                         if (NULL == getcwd(wd, sizeof(wd)))
@@ -4104,7 +4105,7 @@ one_sdev_entry(const char * dir_name, const char * devname,
                         char bb[32];
                         static const int bblen = sizeof(bb);
 
-                        if (get2_value(".", qu_s, lbs_s, bb, bblen))
+                        if (get2_value(".", qu_s, lbs_sn, bb, bblen))
                                 lbs = atoi(bb);
                         if (512 == lbs)
                                 q += scnpr(b + q, blen - q, "  %12s%s", vp,
@@ -4120,12 +4121,12 @@ one_sdev_entry(const char * dir_name, const char * devname,
                                                    vp);
                         }
                         if (as_json && jo2p) {
-                                sgj_js_nv_ihex_nex(jsp, jo2p, lbs_s, lbs,
+                                sgj_js_nv_ihex_nex(jsp, jo2p, lbs_sn, lbs,
                                                    true, "t10 name: Logical "
                                                    "block length in bytes");
-                                if (get2_value(".", qu_s, pbs_s, bb, bblen)) {
+                                if (get2_value(".", qu_s, pbs_sn, bb, bblen)) {
                                         lbs = atoi(bb);
-                                        sgj_js_nv_ihex(jsp, jo2p, pbs_s, lbs);
+                                        sgj_js_nv_ihex(jsp, jo2p, pbs_sn, lbs);
                                 }
                                 sgj_js_nv_ihex(jsp, jo2p, mbs_s,
                                                 num_by / 1000000);
@@ -4452,15 +4453,15 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
                         int pbs = 0;
                         char * vp = value;
 
-                        if (get2_value(buff, qu_s, lbs_s, bb, bblen)) {
+                        if (get2_value(buff, qu_s, lbs_sn, bb, bblen)) {
                                 lbs = atoi(bb);
                                 if (as_json)
-                                        sgj_js_nv_ihex(jsp, jo2p, lbs_s, lbs);
+                                        sgj_js_nv_ihex(jsp, jo2p, lbs_sn, lbs);
                         }
-                        if (as_json && get2_value(buff, qu_s, pbs_s, bb,
+                        if (as_json && get2_value(buff, qu_s, pbs_sn, bb,
                                                   bblen)) {
                                 pbs = atoi(bb);
-                                sgj_js_nv_ihex(jsp, jo2p, pbs_s, pbs);
+                                sgj_js_nv_ihex(jsp, jo2p, pbs_sn, pbs);
                         }
                         if (512 == lbs)
                                 scnpr(b + q, blen - q, "  %12s%s", vp,
@@ -5370,7 +5371,7 @@ one_filter_arg(const char * arg, struct addr_hctl * filtp)
                 val = -1;
                 val64 = UINT64_LAST;
                 if (n > ((int)sizeof(buff) - 1)) {
-                        pr2serr("intermediate sting in %s too long (n=%d)\n",
+                        pr2serr("intermediate string in %s too long (n=%d)\n",
                                 arg, n);
                         return false;
                 }
@@ -5864,7 +5865,7 @@ main(int argc, char **argv)
                         }
                 }
                 if (fp)
-                        sgj_js2file(jsp, NULL, res, fp);
+                        sgj_js2file_estr(jsp, NULL, res, NULL, fp);
                 if (op->js_file && fp && (stdout != fp))
                         fclose(fp);
                 sgj_finish(jsp);
