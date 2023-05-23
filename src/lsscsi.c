@@ -47,7 +47,7 @@
 #include "sg_json.h"
 
 /* Package release number is first number, whole string is version */
-static const char * release_str = "0.33  2023/05/17 [svn: r184]";
+static const char * release_str = "0.33  2023/05/23 [svn: r185]";
 
 #define FT_OTHER 0
 #define FT_BLOCK 1
@@ -436,37 +436,6 @@ static const char * usage_message2 =
 "option names can also take underscore (and vice versa).\n";
 
 
-/* Want safe 'off += snprintf(fcp + off, fcp_len - off, ...);' string
- * building function that can be called repeatedly, even when
- * (fcp_len - off) is exhausted. Returns the number of chars placed
- * in (fcp + off) excluding the trailing null char. So for
- * (fcp_len - off) > 0 the return value is always < (fcp_len - off);
- * for (fcp_len - off) <= 1 the return value is 0 and no chars are
- * written to fcp. Note this means that when (fcp_len - off) = 1, this
- * function assumes that fcp[0] is the null character and does nothing
- * (and returns 0). The "3" in the function name alludes to the three
- * arguments before the 'fmt' (format) string. */
-#ifdef __GNUC__
-static int scn3pr(char * fcp, int fcp_len, int off, const char * fmt, ...)
-        __attribute__ ((format (printf, 4, 5)));
-#else
-static int scn3pr(char * fcp, int fcp_len, int off, const char * fmt, ...);
-#endif
-static int
-scn3pr(char * fcp, int fcp_len, int off, const char * fmt, ...)
-{
-        va_list args;
-        const int cp_max_len = fcp_len - off;
-        int n;
-
-        if (cp_max_len < 2)
-                return 0;
-        va_start(args, fmt);
-        n = vsnprintf(fcp + off, fcp_len - off, fmt, args);
-        va_end(args);
-        return (n < cp_max_len) ? n : (cp_max_len - 1);
-}
-
 #if (HAVE_NVME && (! IGNORE_NVME))
 
 /* trims leading whitespaces, if trim_leading is true; and trims trailing
@@ -684,17 +653,17 @@ tuple2string(const struct addr_hctl * tp, int sel_mask, int blen, char * b)
 
         if (0x8 & sel_mask) {
                 if (is_nvme)
-                        n += scn3pr(b, blen, n, "N");
+                        n += sg_scn3pr(b, blen, n, "N");
                 else
-                        n += scn3pr(b, blen, n, "%d", tp->h);
+                        n += sg_scn3pr(b, blen, n, "%d", tp->h);
                 got1 = true;
         }
         if (0x4 & sel_mask) {
-                n += scn3pr(b, blen, n, "%s%d", got1 ? ":" : "", tp->c);
+                n += sg_scn3pr(b, blen, n, "%s%d", got1 ? ":" : "", tp->c);
                 got1 = true;
         }
         if (0x2 & sel_mask) {
-                n += scn3pr(b, blen, n, "%s%d", got1 ? ":" : "", tp->t);
+                n += sg_scn3pr(b, blen, n, "%s%d", got1 ? ":" : "", tp->t);
                 got1 = true;
         }
         if ((! is_nvme) && (0x1 & sel_mask)) {
@@ -704,40 +673,40 @@ tuple2string(const struct addr_hctl * tp, int sel_mask, int blen, char * b)
                         int ta, k;
                         int tag_arr[16];
 
-                        n += scn3pr(b, blen, n, "%s0x", got1 ? ":" : "");
+                        n += sg_scn3pr(b, blen, n, "%s0x", got1 ? ":" : "");
                         tag_lun(tp->lun_arr, tag_arr);
                         for (k = 0; k < 8; ++k) {
                                 ta = tag_arr[k];
                                 if (ta <= 0)
                                         break;
-                                n += scn3pr(b, blen, n, "%s%02x",
-                                            ((ta > 1) ? "_" : ""),
-                                            tp->lun_arr[k]);
+                                n += sg_scn3pr(b, blen, n, "%s%02x",
+                                               ((ta > 1) ? "_" : ""),
+                                               tp->lun_arr[k]);
                         }
                 } else if (lunhex > 1) /* -xx (--lunhex twice) */
-                        n += scn3pr(b, blen, n, "%s0x%016" PRIx64,
-                                    got1 ? ":" : "", lun_word_flip(tp->l));
+                        n += sg_scn3pr(b, blen, n, "%s0x%016" PRIx64,
+                                       got1 ? ":" : "", lun_word_flip(tp->l));
                 else if (UINT64_LAST == tp->l)
-                        n += scn3pr(b, blen, n, "%s", got1 ? ":-1" : "-1");
+                        n += sg_scn3pr(b, blen, n, "%s", got1 ? ":-1" : "-1");
                 else
-                        n += scn3pr(b, blen, n, "%s%" PRIu64, got1 ? ":" : "",
-                                    tp->l);
+                        n += sg_scn3pr(b, blen, n, "%s%" PRIu64,
+                                       got1 ? ":" : "", tp->l);
         } else if (0x1 & sel_mask) {    /* now must be NVMe */
                 int lunhex = (sel_mask >> 4) & 0x3;
 
                 if (1 == lunhex) {  /* -x (--lunhex) format */
-                        n += scn3pr(b, blen, n, "%s0x", got1 ? ":" : "");
-                        n += scn3pr(b, blen, n, "%04" PRIx32,
-                                    (uint32_t)tp->l);
+                        n += sg_scn3pr(b, blen, n, "%s0x", got1 ? ":" : "");
+                        n += sg_scn3pr(b, blen, n, "%04" PRIx32,
+                                       (uint32_t)tp->l);
                 } else if (lunhex > 1) { /* -xx (--lunhex twice) */
-                        n += scn3pr(b, blen, n, "%s0x", got1 ? ":" : "");
-                        n += scn3pr(b, blen, n, "%08" PRIx32,
-                                    (uint32_t)tp->l);
+                        n += sg_scn3pr(b, blen, n, "%s0x", got1 ? ":" : "");
+                        n += sg_scn3pr(b, blen, n, "%08" PRIx32,
+                                       (uint32_t)tp->l);
                 } else if (UINT32_MAX == tp->l)
-                        n += scn3pr(b, blen, n, "%s", got1 ? ":-1" : "-1");
+                        n += sg_scn3pr(b, blen, n, "%s", got1 ? ":-1" : "-1");
                 else
-                        n += scn3pr(b, blen, n, "%s%" PRIu32,
-                                    got1 ? ":" : "", (uint32_t)tp->l);
+                        n += sg_scn3pr(b, blen, n, "%s%" PRIu32,
+                                       got1 ? ":" : "", (uint32_t)tp->l);
         }
         if ((0 == n) && (blen > 0))
                 b[0] = '\0';
@@ -1005,9 +974,9 @@ enclosure_device_scan(const char * dir_name, const struct lsscsi_opts * op)
                         int n = 0;
                         int elen = sizeof(errpath);
 
-                        n += scn3pr(errpath, elen, n, "%s: scandir: ",
-                                    __func__);
-                        scn3pr(errpath, elen, n, "%s", dir_name);
+                        n += sg_scn3pr(errpath, elen, n, "%s: scandir: ",
+                                       __func__);
+                        sg_scn3pr(errpath, elen, n, "%s", dir_name);
                         perror(errpath);
                 }
                 return false;
@@ -1033,9 +1002,9 @@ scan_for_first(const char * dir_name, const struct lsscsi_opts * op)
                         int n = 0;
                         int elen = sizeof(errpath);
 
-                        n += scn3pr(errpath, elen, n, "%s: scandir: ",
-                                    __func__);
-                        scn3pr(errpath, elen, n, "%s", dir_name);
+                        n += sg_scn3pr(errpath, elen, n, "%s: scandir: ",
+                                       __func__);
+                        sg_scn3pr(errpath, elen, n, "%s", dir_name);
                         perror(errpath);
                 }
                 return -1;
@@ -2580,8 +2549,9 @@ transport_init_longer(const char * path_name, struct lsscsi_opts * op,
                                 sgj_pr_hr(jsp, "  %s: num_phys=%s,", pln,
                                           value);
                                 for (j = 0; j < phynum; ++j) {
-                                        n += scn3pr(b2, b2len, n, "  %s: num"
-                                                    "_phys=%s,", pln, value);
+                                        n += sg_scn3pr(b2, b2len, n, "  %s: "
+                                                       "num_phys=%s,", pln,
+                                                       value);
                                         free(phylist[j]);
                                 }
                                 sgj_pr_hr(jsp, "%s\n", b2);
@@ -2837,8 +2807,8 @@ transport_tport(const char * devname, const struct lsscsi_opts * op,
                 /* IEEE1394 SBP device */
                 transport_id = TRANSPORT_SBP;
                 n = 0;
-                n += scn3pr(b, b_len, n, "%s", "sbp:");
-                scn3pr(b, b_len, n, "%s:", wd);
+                n += sg_scn3pr(b, b_len, n, "%s", "sbp:");
+                sg_scn3pr(b, b_len, n, "%s:", wd);
                 return true;
         }
 
@@ -2857,8 +2827,8 @@ transport_tport(const char * devname, const struct lsscsi_opts * op,
                         return false;
                 // output target port name as per sam4r08, annex A, table A.3
                 n = 0;
-                n += scn3pr(b, b_len, n, "%s", nm);
-                scn3pr(b, b_len, n, ",t,0x%x", (uint32_t)atoi(tpgt));
+                n += sg_scn3pr(b, b_len, n, "%s", nm);
+                sg_scn3pr(b, b_len, n, ",t,0x%x", (uint32_t)atoi(tpgt));
 // >>>       That reference says maximum length of targetname is 223 bytes
 //           (UTF-8) excluding trailing null.
                 return true;
@@ -2892,8 +2862,8 @@ transport_tport(const char * devname, const struct lsscsi_opts * op,
                 }
                 if (ata_dev) {
                         off = strlen(b);
-                        scn3pr(b, b_len, off, "%s",
-                               get_lu_name(devname, wd, wdlen, false));
+                        sg_scn3pr(b, b_len, off, "%s",
+                                  get_lu_name(devname, wd, wdlen, false));
                         return true;
                 }
         }
@@ -3018,8 +2988,8 @@ transport_tport_longer(const char * devname, struct lsscsi_opts * op,
                                  cl_s, fc_rem_pts_s, cp);
                 }
                 n = 0;
-                n += scn3pr(b2, b2len, n, "%s", path_name);
-                scn3pr(b2, b2len, n, "%s", "/device/");
+                n += sg_scn3pr(b2, b2len, n, "%s", path_name);
+                sg_scn3pr(b2, b2len, n, "%s", "/device/");
                 if (get_value(b2, vend_s, value, vlen))
                         sgj_haj_vs(jsp, jop, 2, vend_s, SEP_EQ_NO_SP, value);
                 if (get_value(b2, model_s, value, vlen))
@@ -3063,9 +3033,9 @@ transport_tport_longer(const char * devname, struct lsscsi_opts * op,
                 break;
         case TRANSPORT_SAS:
                 sgj_haj_vs(jsp, jop, 2, trans_s, SEP_EQ_NO_SP, "sas");
-                n = scn3pr(b2, b2len, 0, "%s/%s/%s", sysfsroot, cl_s,
-                           sasdev_s);
-                scn3pr(b2, b2len, n, "%s", sas_hold_end_device);
+                n = sg_scn3pr(b2, b2len, 0, "%s/%s/%s", sysfsroot, cl_s,
+                              sasdev_s);
+                sg_scn3pr(b2, b2len, n, "%s", sas_hold_end_device);
                 if (get_value(b2, bid_s, value, vlen))
                         sgj_haj_vs(jsp, jop, 2, bid_s, SEP_EQ_NO_SP, value);
                 if (get_value(b2, eid_s, value, vlen))
@@ -3084,16 +3054,16 @@ transport_tport_longer(const char * devname, struct lsscsi_opts * op,
                 if (op->verbose > 2)
                         pr2serr("%s: %s\n", ffd_s, b2);
                 n = 0;
-                n += scn3pr(b2, b2len, n, "%s", path_name);
-                scn3pr(b2, b2len, n, "%s", "/device/");
+                n += sg_scn3pr(b2, b2len, n, "%s", path_name);
+                sg_scn3pr(b2, b2len, n, "%s", "/device/");
                 if (get_value(b2, vend_s, value, vlen))
                         sgj_haj_vs(jsp, jop, 2, vend_s, SEP_EQ_NO_SP, value);
                 if (get_value(b2, model_s, value, vlen))
                         sgj_haj_vs(jsp, jop, 2, model_s, SEP_EQ_NO_SP, value);
                 n = 0;
-                n += scn3pr(b2, b2len, n, "%s", sysfsroot);
-                n += scn3pr(b2, b2len, n, "%s", "/class/sas_end_device/");
-                scn3pr(b2, b2len, n, "%s", sas_hold_end_device);
+                n += sg_scn3pr(b2, b2len, n, "%s", sysfsroot);
+                n += sg_scn3pr(b2, b2len, n, "%s", "/class/sas_end_device/");
+                sg_scn3pr(b2, b2len, n, "%s", sas_hold_end_device);
                 print_enclosure_device(devname, b2, op);
                 if (get_value(b2, irt_s, value, vlen))
                         sgj_haj_vs(jsp, jop, 2, irt_s, SEP_EQ_NO_SP, value);
@@ -3113,8 +3083,8 @@ transport_tport_longer(const char * devname, struct lsscsi_opts * op,
                 sgj_haj_vs(jsp, jop, 2, subtrans_s, SEP_EQ_NO_SP,
                            "sas_class");
                 n = 0;
-                n += scn3pr(buff, bufflen, n, "%s", path_name);
-                scn3pr(buff, bufflen, n, "/%s/%s", dvc_s, sasdev_s);
+                n += sg_scn3pr(buff, bufflen, n, "%s", path_name);
+                sg_scn3pr(buff, bufflen, n, "/%s/%s", dvc_s, sasdev_s);
                 if (get_value(buff, dev_n_s, value, vlen))
                         sgj_haj_vs(jsp, jop, 2, dev_n_s, SEP_EQ_NO_SP, value);
                 if (get_value(buff, devt_s, value, vlen))
@@ -3153,10 +3123,10 @@ transport_tport_longer(const char * devname, struct lsscsi_opts * op,
         case TRANSPORT_ISCSI:
                 sgj_haj_vs(jsp, jop, 2, trans_s, SEP_EQ_NO_SP, "iSCSI");
                 n = 0;
-                n += scn3pr(buff, bufflen, n, "%s", sysfsroot);
-                n += scn3pr(buff, bufflen, n, "%s", iscsi_sess_s);
-                n += scn3pr(buff, bufflen, n, "%s", "session");
-                scn3pr(buff, bufflen, n, "%d", iscsi_tsession_num);
+                n += sg_scn3pr(buff, bufflen, n, "%s", sysfsroot);
+                n += sg_scn3pr(buff, bufflen, n, "%s", iscsi_sess_s);
+                n += sg_scn3pr(buff, bufflen, n, "%s", "session");
+                sg_scn3pr(buff, bufflen, n, "%d", iscsi_tsession_num);
                 if (get_value(buff, tgtn_s, value, vlen))
                         sgj_haj_vs(jsp, jop, 2, tgtn_s, SEP_EQ_NO_SP, value);
                 if (get_value(buff, tpgt_s, value, vlen))
@@ -3256,14 +3226,15 @@ rend_prot_protmode(const char * rb, char * o, int omlen, bool one_ln,
 
                         if (one_ln) {
                                 if (!strncmp(value, "0", 1))
-                                        q += scn3pr(o, omlen, q, "  %-9s",
-                                                    "-");
+                                        q += sg_scn3pr(o, omlen, q, "  %-9s",
+                                                       "-");
                                 else
-                                        q += scn3pr(o, omlen, q,
-                                                    "  DIF/Type%1s", value);
+                                        q += sg_scn3pr(o, omlen, q,
+                                                       "  DIF/Type%1s",
+                                                       value);
                         } else {
-                                q += scn3pr(o, omlen, q, "%s%s=%s%s", leadin,
-                                            prott_s, value, sep);
+                                q += sg_scn3pr(o, omlen, q, "%s%s=%s%s",
+                                               leadin, prott_s, value, sep);
                         }
                         if (as_json)
                                 sgj_js_nv_s(jsp, jo2p, prott_s, value);
@@ -3271,23 +3242,23 @@ rend_prot_protmode(const char * rb, char * o, int omlen, bool one_ln,
                                 if (as_json)
                                         sgj_js_nv_s(jsp, jo2p, ato_s, value);
                                 else if (! one_ln)
-                                        q += scn3pr(o, omlen, q, "%s%s=%s%s",
-                                                    leadin, ato_s, value,
-                                                    sep);
+                                        q += sg_scn3pr(o, omlen, q,
+                                                       "%s%s=%s%s", leadin,
+                                                       ato_s, value, sep);
                         }
                 } else
-                        q += scn3pr(o, omlen, q, "  %-9s", "-");
+                        q += sg_scn3pr(o, omlen, q, "  %-9s", "-");
 
                 if (block_scan(blkdir) &&
                     if_directory_chdir(blkdir, "integrity")) {
                         if (get_value(".", form_s, value, vlen)) {
                                 if (one_ln)
-                                        q += scn3pr(o, omlen, q, "  %-16s",
-                                                    value);
+                                        q += sg_scn3pr(o, omlen, q, "  %-16s",
+                                                       value);
                                 else
-                                        q += scn3pr(o, omlen, q, "%s%s=%s%s",
-                                                    leadin, form_s, value,
-                                                    sep);
+                                        q += sg_scn3pr(o, omlen, q,
+                                                       "%s%s=%s%s", leadin,
+                                                       form_s, value, sep);
                                 if (as_json)
                                         sgj_js_nv_s(jsp, jo2p, form_s, value);
                         }
@@ -3295,12 +3266,12 @@ rend_prot_protmode(const char * rb, char * o, int omlen, bool one_ln,
                                 if (as_json)
                                         sgj_js_nv_s(jsp, jo2p, tgsz_s, value);
                                 else if (! one_ln)
-                                        q += scn3pr(o, omlen, q, "%s%s=%s%s",
-                                                    leadin, tgsz_s, value,
-                                                    sep);
+                                        q += sg_scn3pr(o, omlen, q,
+                                                       "%s%s=%s%s", leadin,
+                                                       tgsz_s, value, sep);
                         }
                 } else
-                        q += scn3pr(o, omlen, q, "  %-16s", "-");
+                        q += sg_scn3pr(o, omlen, q, "  %-16s", "-");
         }
         if (op->protmode) {
                 my_strcopy(sddir, rb, sizeof(sddir));
@@ -3310,19 +3281,19 @@ rend_prot_protmode(const char * rb, char * o, int omlen, bool one_ln,
 
                         if (one_ln) {
                                 if (0 == strcmp(value, none_s))
-                                        q += scn3pr(o, omlen, q, "  %-4s",
-                                                    "-");
+                                        q += sg_scn3pr(o, omlen, q, "  %-4s",
+                                                       "-");
                                 else
-                                        q += scn3pr(o, omlen, q, "  %-4s",
-                                                    value);
+                                        q += sg_scn3pr(o, omlen, q, "  %-4s",
+                                                       value);
                         } else {
-                                q += scn3pr(o, omlen, q, "%s%s=%s%s", leadin,
-                                            protm_s, value, sep);
+                                q += sg_scn3pr(o, omlen, q, "%s%s=%s%s",
+                                               leadin, protm_s, value, sep);
                         }
                         if (as_json)
                                 sgj_js_nv_s(jsp, jop, protm_s, value);
                 } else
-                        q += scn3pr(o, omlen, q, "  %-4s", "-");
+                        q += sg_scn3pr(o, omlen, q, "  %-4s", "-");
         }
         return q;
 }
@@ -3418,66 +3389,66 @@ longer_sdev_entry(const char * path_name, const char * devname,
         }
 
         if (get_value(path_name, stat_s, value, vlen)) {
-                q += scn3pr(b, blen, q, " %s=%s", stat_s, value);
+                q += sg_scn3pr(b, blen, q, " %s=%s", stat_s, value);
                 sgj_js_nv_s(jsp, jop, stat_s, value);
         } else
-                q += scn3pr(b, blen, q, "  %s=?", stat_s);
+                q += sg_scn3pr(b, blen, q, "  %s=?", stat_s);
         if (get_value(path_name, qd_s, value, vlen)) {
-                q += scn3pr(b, blen, q, " %s=%s", qd_s, value);
+                q += sg_scn3pr(b, blen, q, " %s=%s", qd_s, value);
                 sgj_js_nv_s(jsp, jop, qd_s, value);
         } else
-                q += scn3pr(b, blen, q, " %s=?", qd_s);
+                q += sg_scn3pr(b, blen, q, " %s=?", qd_s);
         if (get_value(path_name, sl_s, value, vlen)) {
-                q += scn3pr(b, blen, q, " %s=%s", sl_s, value);
+                q += sg_scn3pr(b, blen, q, " %s=%s", sl_s, value);
                 sgj_js_nv_s(jsp, jop, sl_s, value);
         } else
-                q += scn3pr(b, blen, q, " %s=?", sl_s);
+                q += sg_scn3pr(b, blen, q, " %s=?", sl_s);
         if (get_value(path_name, ty_s, value, vlen)) {
-                q += scn3pr(b, blen, q, " %s=%s", ty_s, value);
+                q += sg_scn3pr(b, blen, q, " %s=%s", ty_s, value);
                 sgj_js_nv_s(jsp, jop, ty_s, value);
         } else
-                q += scn3pr(b, blen, q, " %s=?", ty_s);
+                q += sg_scn3pr(b, blen, q, " %s=?", ty_s);
         if (get_value(path_name, db_s, value, vlen)) {
-                q += scn3pr(b, blen, q, " %s=%s", db_s, value);
+                q += sg_scn3pr(b, blen, q, " %s=%s", db_s, value);
                 sgj_js_nv_s(jsp, jop, db_s, value);
         } else
-                q += scn3pr(b, blen, q, " %s=?", db_s);
+                q += sg_scn3pr(b, blen, q, " %s=?", db_s);
         if (get_value(path_name, tm_s, value, vlen)) {
-                /* q += */ scn3pr(b, blen, q, " %s=%s", tm_s, value);
+                /* q += */ sg_scn3pr(b, blen, q, " %s=%s", tm_s, value);
                 sgj_js_nv_s(jsp, jop, tm_s, value);
         } else
-                /* q += */ scn3pr(b, blen, q, " %s=?", tm_s);
+                /* q += */ sg_scn3pr(b, blen, q, " %s=?", tm_s);
         if (op->long_opt == 2) {
                 sgj_pr_hr(jsp, " %s\n", b);
                 q = 0;
                 if (get_value(path_name, iocb_s, value, vlen)) {
-                        q += scn3pr(b, blen, q, "  %s=%s", iocb_s, value);
+                        q += sg_scn3pr(b, blen, q, "  %s=%s", iocb_s, value);
                         sgj_js_nv_s(jsp, jop, iocb_s, value);
                 } else if (op->verbose > 0)
-                        q += scn3pr(b, blen, q, "  %s=?\n", iocb_s);
+                        q += sg_scn3pr(b, blen, q, "  %s=?\n", iocb_s);
                 if (get_value(path_name, iodc_s, value, vlen)) {
-                        q += scn3pr(b, blen, q, " %s=%s", iodc_s, value);
+                        q += sg_scn3pr(b, blen, q, " %s=%s", iodc_s, value);
                         sgj_js_nv_s(jsp, jop, iodc_s, value);
                 } else
-                        q += scn3pr(b, blen, q, " %s=?", iodc_s);
+                        q += sg_scn3pr(b, blen, q, " %s=?", iodc_s);
                 if (get_value(path_name, ioec_s, value, vlen)) {
-                        q += scn3pr(b, blen, q, " %s=%s", ioec_s, value);
+                        q += sg_scn3pr(b, blen, q, " %s=%s", ioec_s, value);
                         sgj_js_nv_s(jsp, jop, ioec_s, value);
                 } else
-                        q += scn3pr(b, blen, q, " %s=%s", ioec_s, value);
+                        q += sg_scn3pr(b, blen, q, " %s=%s", ioec_s, value);
                 if (get_value(path_name, iorc_s, value, vlen)) {
-                        /* q += */ scn3pr(b, blen, q, " %s=%s", iorc_s,
+                        /* q += */ sg_scn3pr(b, blen, q, " %s=%s", iorc_s,
                                           value);
                         sgj_js_nv_s(jsp, jop, iorc_s, value);
                 } else
-                        /* q += */ scn3pr(b, blen, q, " %s=%s", iorc_s,
+                        /* q += */ sg_scn3pr(b, blen, q, " %s=%s", iorc_s,
                                           value);
                 sgj_pr_hr(jsp, " %s\n", b);
                 if (get_value(path_name, qt_s, value, vlen)) {
-                        scn3pr(b, blen, 0, " %s=%s", qt_s, value);
+                        sg_scn3pr(b, blen, 0, " %s=%s", qt_s, value);
                         sgj_js_nv_s(jsp, jop, qt_s, value);
                 } else
-                        scn3pr(b, blen, 0, " %s=%s", qt_s, value);
+                        sg_scn3pr(b, blen, 0, " %s=%s", qt_s, value);
         }
         sgj_pr_hr(jsp, "  %s\n", b);
         if (op->protection || op->protmode) {
@@ -3517,89 +3488,90 @@ longer_nd_entry(const char * path_name, const char * devname,
                 if (get_value(path_name, cap_s, value, vlen)) {
                         if (as_json)
                                 sgj_js_nv_s(jsp, jop, cap_s, value);
-                        n += scn3pr(b, blen, n, "  %s=%s%s", cap_s, value,
-                                    sep);
+                        n += sg_scn3pr(b, blen, n, "  %s=%s%s", cap_s, value,
+                                       sep);
                 } else
-                        n += scn3pr(b, blen, n, "  %s=?%s", cap_s, sep);
+                        n += sg_scn3pr(b, blen, n, "  %s=?%s", cap_s, sep);
                 if (get_value(path_name, er_s, value, vlen)) {
                         if (as_json)
                                 sgj_js_nv_s(jsp, jop, er_s, value);
-                        n += scn3pr(b, blen, n, "  %s=%s%s", er_s, value,
-                                    sep);
+                        n += sg_scn3pr(b, blen, n, "  %s=%s%s", er_s, value,
+                                       sep);
                 } else
-                        n += scn3pr(b, blen, n, "  %s=?%s", er_s, sep);
+                        n += sg_scn3pr(b, blen, n, "  %s=?%s", er_s, sep);
                 if (get_value(path_name, hi_s, value, vlen)) {
                         if (as_json)
                                 sgj_js_nv_s(jsp, jop, hi_s, value);
-                        n += scn3pr(b, blen, n, "  %s=%s%s", hi_s, value,
-                                    sep);
+                        n += sg_scn3pr(b, blen, n, "  %s=%s%s", hi_s, value,
+                                       sep);
                 } else
-                        n += scn3pr(b, blen, n, "  %s=?%s", hi_s, sep);
+                        n += sg_scn3pr(b, blen, n, "  %s=?%s", hi_s, sep);
                 if (get_value(path_name, nsid_s, value, vlen)) {
                         if (as_json)
                                 sgj_js_nv_s(jsp, jop, nsid_s, value);
-                        n += scn3pr(b, blen, n, "  %s=%s%s", nsid_s, value,
-                                    sep);
+                        n += sg_scn3pr(b, blen, n, "  %s=%s%s", nsid_s, value,
+                                       sep);
                 } else
-                        n += scn3pr(b, blen, n, "  %s=?%s", nsid_s, sep);
+                        n += sg_scn3pr(b, blen, n, "  %s=?%s", nsid_s, sep);
                 if (get_value(path_name, ra_s, value, vlen)) {
                         if (as_json)
                                 sgj_js_nv_s(jsp, jop, ra_s, value);
-                        n += scn3pr(b, blen, n, "  %s=%s%s", ra_s, value,
-                                    sep);
+                        n += sg_scn3pr(b, blen, n, "  %s=%s%s", ra_s, value,
+                                       sep);
                 } else
-                        n += scn3pr(b, blen, n, "  %s=?%s", ra_s, sep);
+                        n += sg_scn3pr(b, blen, n, "  %s=?%s", ra_s, sep);
                 if (get_value(path_name, rem_s, value, vlen)) {
                         if (as_json)
                                 sgj_js_nv_s(jsp, jop, rem_s, value);
-                        scn3pr(b, blen, n, "  %s=%s%s", rem_s, value, sep);
+                        sg_scn3pr(b, blen, n, "  %s=%s%s", rem_s, value, sep);
                 } else
-                        scn3pr(b, blen, n, "  %s=?%s", rem_s, sep);
+                        sg_scn3pr(b, blen, n, "  %s=?%s", rem_s, sep);
                 sgj_pr_hr(jsp, "%s%s", b, sing ? "" : "\n");
                 n = 0;
                 if (op->long_opt > 1) {
                         if (get2_value(path_name, qu_s, nrq_s, value, vlen)) {
                                 if (as_json)
                                         sgj_js_nv_s(jsp, jop, nrq_s, value);
-                                n += scn3pr(b, blen, n, "  %s=%s%s", nrq_s,
-                                            value, sep);
+                                n += sg_scn3pr(b, blen, n, "  %s=%s%s", nrq_s,
+                                               value, sep);
                         } else
-                                n += scn3pr(b, blen, n, "  %s=?%s", nrq_s,
-                                            sep);
+                                n += sg_scn3pr(b, blen, n, "  %s=?%s", nrq_s,
+                                               sep);
                         if (get2_value(path_name, qu_s, rakb_s, value,
                                        vlen)) {
                                 if (as_json)
                                         sgj_js_nv_s(jsp, jop, rakb_s, value);
-                                n += scn3pr(b, blen, n, "  %s=%s%s", rakb_s,
-                                            value, sep);
+                                n += sg_scn3pr(b, blen, n, "  %s=%s%s",
+                                               rakb_s, value, sep);
                         } else
-                                n += scn3pr(b, blen, n, "  %s=?%s", rakb_s,
-                                            sep);
+                                n += sg_scn3pr(b, blen, n, "  %s=?%s", rakb_s,
+                                               sep);
                         if (get2_value(path_name, qu_s, wc_s, value, vlen)) {
                                 if (as_json)
                                         sgj_js_nv_s(jsp, jop, wc_s, value);
-                                scn3pr(b, blen, n, "  %s=%s%s", wc_s, value,
-                                       sep);
+                                sg_scn3pr(b, blen, n, "  %s=%s%s", wc_s,
+                                          value, sep);
                         } else
-                                scn3pr(b, blen, n, "  %s=?%s", wc_s, sep);
+                                sg_scn3pr(b, blen, n, "  %s=?%s", wc_s, sep);
                         sgj_pr_hr(jsp, "%s%s", b, sing ? "" : "\n");
                         n = 0;
                         if (get2_value(path_name, qu_s, lbs_sn, value, vlen)) {
                                 if (as_json)
                                         sgj_js_nv_s(jsp, jop, lbs_sn, value);
-                                n += scn3pr(b, blen, n, "  %s=%s%s", lbs_sn,
-                                            value, sep);
+                                n += sg_scn3pr(b, blen, n, "  %s=%s%s",
+                                               lbs_sn, value, sep);
                         } else
-                                n += scn3pr(b, blen, n, "  %s=?%s", lbs_sn,
-                                            sep);
+                                n += sg_scn3pr(b, blen, n, "  %s=?%s", lbs_sn,
+                                               sep);
                         if (get2_value(path_name, qu_s, pbs_sn, value,
                                        vlen)) {
                                 if (as_json)
                                         sgj_js_nv_s(jsp, jop, pbs_sn, value);
-                                scn3pr(b, blen, n, "  %s=%s%s", pbs_sn, value,
-                                       sep);
+                                sg_scn3pr(b, blen, n, "  %s=%s%s", pbs_sn,
+                                          value, sep);
                         } else
-                                scn3pr(b, blen, n, "  %s=?%s", pbs_sn, sep);
+                                sg_scn3pr(b, blen, n, "  %s=?%s", pbs_sn,
+                                          sep);
                         sgj_pr_hr(jsp, "%s%s", b, sing ? "" : "\n");
                 }
                 // if (! sing)
@@ -3805,6 +3777,7 @@ one_sdev_entry(const char * dir_name, const char * devname,
         static const char * llun_s = "linux_lun";
         static const char * t10_lun_s = "t10_lun_array";
         static const char * hctl_s = "hctl_string";
+        static const char * sp32_s = "                                ";
 
         as_json = jsp->pr_as_json;
         if (op->classic) {
@@ -3855,9 +3828,9 @@ one_sdev_entry(const char * dir_name, const char * devname,
         }
 
         if ((int)strlen(value) >= devname_len) /* if long, append a space */
-                q += scn3pr(b, blen, q, "%s ", value);
+                q += sg_scn3pr(b, blen, q, "%s ", value);
         else /* left justified with field length of devname_len */
-                q += scn3pr(b, blen, q, "%-*s", devname_len, value);
+                q += sg_scn3pr(b, blen, q, "%-*s", devname_len, value);
         if (op->pdt) {
                 if (get_value(buff, "type", value, vlen) &&
                     (1 == sscanf(value, "%d", &dec_pdt)) &&
@@ -3865,18 +3838,18 @@ one_sdev_entry(const char * dir_name, const char * devname,
                         snprintf(e, elen, "0x%x", dec_pdt);
                 else
                         snprintf(e, elen, "-1");
-                q += scn3pr(b, blen, q, "%-8s", e);
+                q += sg_scn3pr(b, blen, q, "%-8s", e);
         } else if (op->brief)
                 ;
         else if (! get_value(buff, "type", value, vlen)) {
-                q += scn3pr(b, blen, q, "type?   ");
+                q += sg_scn3pr(b, blen, q, "type?   ");
         } else if (1 != sscanf(value, "%d", &dec_pdt)) {
-                q += scn3pr(b, blen, q, "type??  ");
+                q += sg_scn3pr(b, blen, q, "type??  ");
         } else if ((dec_pdt < 0) || (dec_pdt > 31)) {
-                q += scn3pr(b, blen, q, "type??? ");
+                q += sg_scn3pr(b, blen, q, "type??? ");
         } else {
                 cp = scsi_short_device_types[dec_pdt];
-                q += scn3pr(b, blen, q, "%s ", cp);
+                q += sg_scn3pr(b, blen, q, "%s ", cp);
                 sgj_js_nv_ihexstr(jsp, jop, pdt_sn, dec_pdt, NULL, cp);
         }
 
@@ -3884,58 +3857,58 @@ one_sdev_entry(const char * dir_name, const char * devname,
                 get_wwn = true;
         if (op->transport_info) {
                 if (transport_tport(devname, op, vlen, value))
-                        q += scn3pr(b, blen, q, "%-30s  ", value);
+                        q += sg_scn3pr(b, blen, q, "%-30s  ", value);
                 else
-                        q += scn3pr(b, blen, q,
-                                    "                                ");
+                        q += sg_scn3pr(b, blen, q,
+                                       "                                ");
         } else if (op->unit) {
                 get_lu_name(devname, value, vlen, op->unit > 3);
                 n = strlen(value);
                 if (n < 1)      /* left justified "none" means no lu name */
-                        q += scn3pr(b, blen, q, "%-32s  ", none_s);
+                        q += sg_scn3pr(b, blen, q, "%-32s  ", none_s);
                 else if (1 == op->unit) {
                         if (n < 33)
-                                q += scn3pr(b, blen, q, "%-32s  ", value);
+                                q += sg_scn3pr(b, blen, q, "%-32s  ", value);
                         else {
                                 value[32] = '_';
                                 value[33] = ' ';
                                 value[34] = '\0';
-                                q += scn3pr(b, blen, q, "%-34s", value);
+                                q += sg_scn3pr(b, blen, q, "%-34s", value);
                         }
                 } else if (2 == op->unit) {
                         if (n < 33)
-                                q += scn3pr(b, blen, q, "%-32s  ", value);
+                                q += sg_scn3pr(b, blen, q, "%-32s  ", value);
                         else {
                                 value[n - 32] = '_';
-                                q += scn3pr(b, blen, q, "%-32s  ",
-                                            value + n - 32);
+                                q += sg_scn3pr(b, blen, q, "%-32s  ",
+                                               value + n - 32);
                         }
                 } else     /* -uuu, output in full, append rest of line */
-                        q += scn3pr(b, blen, q, "%-s  ", value);
+                        q += sg_scn3pr(b, blen, q, "%-s  ", value);
         } else if (! op->brief) {
                 if (as_json)
                         jo2p = sgj_named_subobject_r(jsp, jop,
                                                      "t10_id_strings");
                 if (get_value(buff, vend_s, value, vlen)) {
-                        q += scn3pr(b, blen, q, "%-8s ", value);
+                        q += sg_scn3pr(b, blen, q, "%-8s ", value);
                         if (as_json)
                                 sgj_js_nv_s(jsp, jo2p, vend_sn, value);
                 } else
-                        q += scn3pr(b, blen, q, "vendor?  ");
+                        q += sg_scn3pr(b, blen, q, "vendor?  ");
 
                 if (get_value(buff, model_s, value, vlen)) {
-                        q += scn3pr(b, blen, q, "%-16s ", value);
+                        q += sg_scn3pr(b, blen, q, "%-16s ", value);
                         if (as_json)
                                 sgj_js_nv_s(jsp, jo2p, product_sn, value);
                 } else
-                        q += scn3pr(b, blen, q, "model?           ");
+                        q += sg_scn3pr(b, blen, q, "model?           ");
 
                 if (get_value(buff, rev_s, value, vlen)) {
-                        q += scn3pr(b, blen, q, "%-4s  ", value);
+                        q += sg_scn3pr(b, blen, q, "%-4s  ", value);
                         if (as_json)
                                 sgj_js_nv_s(jsp, jo2p, revis_s, value);
                 } else
-                        q += scn3pr(b, blen, q, "rev?  ");
+                        q += sg_scn3pr(b, blen, q, "rev?  ");
         }
 
         if (1 == non_sg_scan(buff, op)) {       /* expect 1 or 0 */
@@ -3945,8 +3918,8 @@ one_sdev_entry(const char * dir_name, const char * devname,
                                 my_strcopy(extra, aa_first.name,
                                            sizeof(extra));
                         else {
-                                q += scn3pr(b, blen, q, "unexpected "
-                                            "scan_for_first error");
+                                q += sg_scn3pr(b, blen, q, "unexpected "
+                                               "scan_for_first error");
                                 wd[0] = '\0';
                         }
                 } else {
@@ -3955,7 +3928,7 @@ one_sdev_entry(const char * dir_name, const char * devname,
                 }
                 if (wd[0] && (if_directory_chdir(wd, extra))) {
                         if (NULL == getcwd(wd, sizeof(wd))) {
-                                q += scn3pr(b, blen, q, "getcwd error");
+                                q += sg_scn3pr(b, blen, q, "getcwd error");
                                 wd[0] = '\0';
                         }
                 }
@@ -3968,13 +3941,12 @@ one_sdev_entry(const char * dir_name, const char * devname,
                                 if ((BLK_DEV == d_typ) &&
                                     get_disk_wwn(wd, wwn_str, sizeof(wwn_str),
                                                  op->wwn_twice))
-                                        q += scn3pr(b, blen, q, "%-*s  ",
-                                                    DSK_WWN_MXLEN - 1,
-                                                    wwn_str);
+                                        q += sg_scn3pr(b, blen, q, "%-*s  ",
+                                                       DSK_WWN_MXLEN - 1,
+                                                       wwn_str);
                                 else
-                                        q += scn3pr(b, blen, q, "        "
-                                                    "                        "
-                                                   );
+                                        q += sg_scn3pr(b, blen, q, "%s",
+                                                       sp32_s);
                         }
                         cp = NULL;
                         if (op->kname) {
@@ -3988,20 +3960,20 @@ one_sdev_entry(const char * dir_name, const char * devname,
                                         snprintf(dev_node, dev_node_sz,
                                                  "-       ");
                         }
-                        q += scn3pr(b, blen, q, "%-9s", dev_node);
+                        q += sg_scn3pr(b, blen, q, "%-9s", dev_node);
                         if (cp && as_json)
                                 sgj_js_nv_s(jsp, jop, cp, dev_node);
 
                         if (op->dev_maj_min) {
                                 if (get_value(wd, dv_s, value, vlen)) {
-                                        q += scn3pr(b, blen, q, "[%s]",
-                                                    value);
+                                        q += sg_scn3pr(b, blen, q, "[%s]",
+                                                       value);
                                         if (as_json)
                                                 sgj_js_nv_s(jsp, jop,
                                                             "major_minor",
                                                             value);
                                 } else
-                                        q += scn3pr(b, blen, q, "[dev?]");
+                                        q += sg_scn3pr(b, blen, q, "[dev?]");
                         }
 
                         if (op->scsi_id) {
@@ -4009,8 +3981,8 @@ one_sdev_entry(const char * dir_name, const char * devname,
 
                                 scsi_id = get_disk_scsi_id(dev_node,
                                                            op->scsi_id_twice);
-                                q += scn3pr(b, blen, q, "  %s",
-                                            scsi_id ? scsi_id : "-");
+                                q += sg_scn3pr(b, blen, q, "  %s",
+                                               scsi_id ? scsi_id : "-");
                                 if (scsi_id && as_json)
                                         sgj_js_nv_s(jsp, jop, "scsi_id",
                                                     scsi_id);
@@ -4019,19 +3991,18 @@ one_sdev_entry(const char * dir_name, const char * devname,
                 }
         } else {        /* non_sg_scan() didn't return 1, probably 0 */
                 if (get_wwn)
-                        q += scn3pr(b, blen, q, "%s",
-                                    "                                ");
+                        q += sg_scn3pr(b, blen, q, "%s", sp32_s);
                 if (op->scsi_id)
-                        q += scn3pr(b, blen, q, "%-9s  -", "-");
+                        q += sg_scn3pr(b, blen, q, "%-9s  -", "-");
                 else
-                        q += scn3pr(b, blen, q, "%-9s", "-");
+                        q += sg_scn3pr(b, blen, q, "%-9s", "-");
         }
 
         if (op->generic) {
                 if (if_directory_ch2generic(buff)) {
                         if (NULL == getcwd(wd, sizeof(wd)))
-                                q += scn3pr(b, blen, q,
-                                            "  generic_dev error");
+                                q += sg_scn3pr(b, blen, q,
+                                               "  generic_dev error");
                         else {
                                 cp = NULL;
                                 dev_node[0] = '\0';
@@ -4048,25 +4019,26 @@ one_sdev_entry(const char * dir_name, const char * devname,
                                                 snprintf(dev_node,
                                                          dev_node_sz, "-");
                                 }
-                                q += scn3pr(b, blen, q, "  %-9s", dev_node);
+                                q += sg_scn3pr(b, blen, q, "  %-9s",
+                                               dev_node);
                                 if (cp && as_json)
                                         sgj_js_nv_s(jsp, jop, cp, dev_node);
                                 if (op->dev_maj_min) {
                                         if (get_value(wd, dv_s, value,
                                                       vlen)) {
-                                                q += scn3pr(b, blen, q,
-                                                            "[%s]", value);
+                                                q += sg_scn3pr(b, blen, q,
+                                                               "[%s]", value);
                                                 if (as_json)
                                                         sgj_js_nv_s(jsp, jop,
                                                             "sg_major_minor",
                                                                     value);
                                         } else
-                                                q += scn3pr(b, blen, q,
-                                                            "[dev?]");
+                                                q += sg_scn3pr(b, blen, q,
+                                                               "[dev?]");
                                 }
                         }
                 } else
-                        q += scn3pr(b, blen, q, "  %-9s", "-");
+                        q += sg_scn3pr(b, blen, q, "  %-9s", "-");
         }
         if (op->protection || op->protmode)
                 q += rend_prot_protmode(buff, b + q, blen - q, true, " ",
@@ -4084,7 +4056,7 @@ one_sdev_entry(const char * dir_name, const char * devname,
                        block_scan(blkdir) &&
                        if_directory_chdir(blkdir, ".") &&
                        get_value(".", "size", vp, vlen))) {
-                        /* q += */ scn3pr(b, blen, q, "  %6s", "-");
+                        /* q += */ sg_scn3pr(b, blen, q, "  %6s", "-");
                         goto fini_line;
                 }
                 blk512s = atoll(vp);
@@ -4106,16 +4078,17 @@ one_sdev_entry(const char * dir_name, const char * devname,
                         if (get2_value(".", qu_s, lbs_sn, bb, bblen))
                                 lbs = atoi(bb);
                         if (512 == lbs)
-                                q += scn3pr(b, blen, q, "  %12s%s", vp,
-                                            (op->ssize > 3) ? ",512" : "");
+                                q += sg_scn3pr(b, blen, q, "  %12s%s", vp,
+                                               (op->ssize > 3) ? ",512" : "");
                         else if (lbs > 512) {
                                 snprintf(vp, vlen, "%" PRId64,
                                          (num_by / lbs));
                                 if (op->ssize > 3)
-                                        q += scn3pr(b, blen, q, "  %12s,%d",
-                                                    vp, lbs);
+                                        q += sg_scn3pr(b, blen, q,
+                                                       "  %12s,%d", vp, lbs);
                                 else
-                                        q += scn3pr(b, blen, q, "  %12s", vp);
+                                        q += sg_scn3pr(b, blen, q, "  %12s",
+                                                       vp);
                         }
                         if (as_json && jo2p) {
                                 sgj_js_nv_ihex_nex(jsp, jo2p, lbs_sn, lbs,
@@ -4130,7 +4103,7 @@ one_sdev_entry(const char * dir_name, const char * devname,
                                 sgj_js_nv_ihex(jsp, jo2p, gbs_s,
                                                 num_by / 1000000000);
                         } else
-                                q += scn3pr(b, blen, q, "  %12s,512", vp);
+                                q += sg_scn3pr(b, blen, q, "  %12s,512", vp);
                 } else {
                         enum string_size_units unit_val = (0x1 & op->ssize) ?
                                          STRING_UNITS_10 : STRING_UNITS_2;
@@ -4138,9 +4111,9 @@ one_sdev_entry(const char * dir_name, const char * devname,
                         blk512s <<= 9;
                         if (blk512s > 0 &&
                             size2string(blk512s, unit_val, vp, vlen))
-                                q += scn3pr(b, blen, q, "  %6s", vp);
+                                q += sg_scn3pr(b, blen, q, "  %6s", vp);
                         else
-                                q += scn3pr(b, blen, q, "  %6s", "-");
+                                q += sg_scn3pr(b, blen, q, "  %6s", "-");
                 }
                 if (op->verbose > 6)    /* stop 'unused' compiler noise */
                         pr2serr("%s: actual blen=%d\n", __func__, q);
@@ -4151,12 +4124,12 @@ fini_line:
         if (op->long_opt > 0)
                 longer_sdev_entry(buff, devname, op, jop);
         if (op->verbose > 0) {
-                q = scn3pr(b, blen, 0, "  dir: %s  [", buff);
+                q = sg_scn3pr(b, blen, 0, "  dir: %s  [", buff);
                 if (if_directory_chdir(buff, "")) {
                         if (NULL == getcwd(wd, sizeof(wd)))
-                                scn3pr(b, blen, q, "?");
+                                sg_scn3pr(b, blen, q, "?");
                         else
-                                scn3pr(b, blen, q, "%s", wd);
+                                sg_scn3pr(b, blen, q, "%s", wd);
                 }
                 sgj_pr_hr(jsp, "%s]\n", b);
         }
@@ -4242,7 +4215,7 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
 
         as_json = jsp->pr_as_json;
         b[0] = '\0';
-        scn3pr(buff, bufflen, 0, "%s/%s", nvme_ctl_abs, nvme_ns_rel);
+        sg_scn3pr(buff, bufflen, 0, "%s/%s", nvme_ctl_abs, nvme_ns_rel);
         if ((0 == strncmp(nvme_ns_rel, "nvme", 4)) &&
             (1 == sscanf(nvme_ns_rel + 4, "%d", &cdev_minor)))
                 ;
@@ -4305,18 +4278,18 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
         }
 
         if ((int)strlen(value) >= devname_len) /* if long, append a space */
-                q += scn3pr(b, blen, q, "%s ", value);
+                q += sg_scn3pr(b, blen, q, "%s ", value);
         else /* left justified with field length of devname_len */
-                q += scn3pr(b, blen, q, "%-*s", devname_len, value);
+                q += sg_scn3pr(b, blen, q, "%-*s", devname_len, value);
 
         if (op->pdt)
-                q += scn3pr(b, blen, q, "%-8s", "0x0");
+                q += sg_scn3pr(b, blen, q, "%-8s", "0x0");
         else if (op->brief)
                 ;
         else if (vb) /* NVMe namespace can only be NVM device */
-                q += scn3pr(b, blen, q, "dsk/nvm ");
+                q += sg_scn3pr(b, blen, q, "dsk/nvm ");
         else
-                q += scn3pr(b, blen, q, "disk    ");
+                q += sg_scn3pr(b, blen, q, "disk    ");
 
         if (op->transport_info) {
                 value[0] = '\0';
@@ -4330,33 +4303,35 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
                                     get2_value(bp, dev2_s, sdp_s, e, elen)) {
                                         snprintf(value , vlen, "%s %s:%s",
                                                  pcie_s, d, e);
-                                        q += scn3pr(b, blen, q, "%-*s  ",
-                                                    model_len, value);
+                                        q += sg_scn3pr(b, blen, q, "%-*s  ",
+                                                       model_len, value);
                                 } else
-                                        q += scn3pr(b, blen, q, "%-*s  ",
-                                                    model_len, "transport?");
+                                        q += sg_scn3pr(b, blen, q, "%-*s  ",
+                                                       model_len,
+                                                       "transport?");
                         } else
-                                q += scn3pr(b, blen, q, "%-*s  ", model_len,
-                                            value);
+                                q += sg_scn3pr(b, blen, q, "%-*s  ",
+                                               model_len, value);
                 } else
-                        q += scn3pr(b, blen, q, "%-*s  ", model_len,
-                                    "transport?");
+                        q += sg_scn3pr(b, blen, q, "%-*s  ", model_len,
+                                       "transport?");
                 if (as_json && value[0])
                         sgj_js_nv_s(jsp, jop, trans_s, value);
         } else if (op->unit) {
                 if (get_value(buff, wwid_s, value, vlen)) {
                         if ((op->unit < 4) &&
                             (0 == strncmp("eui.", value, 4))) {
-                                q += scn3pr(b, blen, q, "%-*s  ", model_len,
-                                            value + 4);
+                                q += sg_scn3pr(b, blen, q, "%-*s  ",
+                                               model_len, value + 4);
                                 if (as_json)
                                         sgj_js_nv_s(jsp, jop, wwid_s,
                                                     value + 4);
                         } else
-                                q += scn3pr(b, blen, q, "%-*s  ", model_len,
-                                            value);
+                                q += sg_scn3pr(b, blen, q, "%-*s  ",
+                                               model_len, value);
                 } else
-                        q += scn3pr(b, blen, q, "%-*s?  ", model_len, wwid_s);
+                        q += sg_scn3pr(b, blen, q, "%-*s?  ", model_len,
+                                       wwid_s);
         } else if (! op->brief) {
                 int n;
 
@@ -4370,16 +4345,18 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
                         memcpy(ctl_model + model_len - m, d, m + 1);
                 else
                         strcat(ctl_model, d);
-                q += scn3pr(b, blen, q, "%-*s  ", model_len, ctl_model);
+                q += sg_scn3pr(b, blen, q, "%-*s  ", model_len, ctl_model);
         }
 
         if (op->wwn) {
                 if (get_value(buff, wwid_s, value, vlen)) {
-                        q += scn3pr(b, blen, q, "%-*s  ", model_len, value);
+                        q += sg_scn3pr(b, blen, q, "%-*s  ", model_len,
+                                       value);
                         if (as_json)
                                 sgj_js_nv_s(jsp, jop, wwid_s, value);
                 } else
-                        q += scn3pr(b, blen, q, "%-*s?  ", model_len, wwid_s);
+                        q += sg_scn3pr(b, blen, q, "%-*s?  ", model_len,
+                                       wwid_s);
         }
 
         if (op->kname) {
@@ -4393,14 +4370,14 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
         } else
                 snprintf(dev_node, devnlen, "-       ");
 
-        q += scn3pr(b, blen, q, "%-9s", dev_node);
+        q += sg_scn3pr(b, blen, q, "%-9s", dev_node);
         if (op->dev_maj_min) {
                 if (get_value(buff, dv_s, value, vlen)) {
-                        q += scn3pr(b, blen, q, " [%s]", value);
+                        q += sg_scn3pr(b, blen, q, " [%s]", value);
                         if (as_json)
                                 sgj_js_nv_s(jsp, jop, dv_s, value);
                 } else
-                        q += scn3pr(b, blen, q, " [dev?]");
+                        q += sg_scn3pr(b, blen, q, " [dev?]");
         }
         if (op->generic && (1 == ng_scan(nvme_ctl_abs))) {
                 /* found a <nvme_ctl_abs>/ng* 'nvme-generic' device */
@@ -4419,16 +4396,16 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
                                             value);
                 } else
                         snprintf(value, vlen, "%s", "-");
-                q += scn3pr(b, blen, q, "  %-9s", value);
+                q += sg_scn3pr(b, blen, q, "  %-9s", value);
         } else if (op->generic)
-                q += scn3pr(b, blen, q, "  %-9s", "-");
+                q += sg_scn3pr(b, blen, q, "  %-9s", "-");
 
         if (op->ssize) {
                 uint64_t blk512s;
                 int64_t num_by = 0;
 
                 if (! get_value(buff, "size", value, vlen)) {
-                        scn3pr(b, blen, q, "  %6s", "-");
+                        sg_scn3pr(b, blen, q, "  %6s", "-");
                         goto fini_line;
                 }
                 blk512s = atoll(value);
@@ -4458,16 +4435,16 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
                                 sgj_js_nv_ihex(jsp, jo2p, pbs_sn, pbs);
                         }
                         if (512 == lbs)
-                                scn3pr(b, blen, q, "  %12s%s", vp,
-                                       (op->ssize > 3) ? ",512" : "");
+                                sg_scn3pr(b, blen, q, "  %12s%s", vp,
+                                          (op->ssize > 3) ? ",512" : "");
                         else if (lbs > 512) {
-                                scn3pr(vp, vlen, 0, "%" PRId64,
-                                       (num_by / lbs));
+                                sg_scn3pr(vp, vlen, 0, "%" PRId64,
+                                          (num_by / lbs));
                                 if (op->ssize > 3)
-                                        scn3pr(b, blen, q, "  %12s,%d", vp,
-                                               lbs);
+                                        sg_scn3pr(b, blen, q, "  %12s,%d", vp,
+                                                  lbs);
                                 else
-                                        scn3pr(b, blen, q, "  %12s", vp);
+                                        sg_scn3pr(b, blen, q, "  %12s", vp);
                         }
                         if (as_json) {
                                 sgj_js_nv_ihex(jsp, jo2p, mbs_s,
@@ -4483,9 +4460,9 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
                         blk512s <<= 9;
                         if (blk512s > 0 &&
                             size2string(blk512s, unit_val, value, vlen))
-                                scn3pr(b, blen, q, "  %6s", value);
+                                sg_scn3pr(b, blen, q, "  %6s", value);
                         else
-                                scn3pr(b, blen, q, "  %6s", "-");
+                                sg_scn3pr(b, blen, q, "  %6s", "-");
                 }
         }
 
@@ -4495,12 +4472,12 @@ fini_line:
                 longer_nd_entry(buff, devname, op, jop);
         if (vb > 0) {
                 q = 0;
-                q += scn3pr(b, blen, q, "  dir: %s  [", buff);
+                q += sg_scn3pr(b, blen, q, "  dir: %s  [", buff);
                 if (if_directory_chdir(buff, "")) {
                         if (NULL == getcwd(wd, sizeof(wd)))
-                                scn3pr(b, blen, q, "?");
+                                sg_scn3pr(b, blen, q, "?");
                         else
-                                scn3pr(b, blen, q, "%s", wd);
+                                sg_scn3pr(b, blen, q, "%s", wd);
                 }
                 sgj_pr_hr(jsp, "%s]\n", b);
         }
@@ -4585,12 +4562,12 @@ one_nhost_entry(const char * dir_name, const char * nvme_ctl_rel,
 
         as_json = jsp->pr_as_json;
         if (1 == sscanf(nvme_ctl_rel, "nvme%u", &cdev_minor)) {
-                n += scn3pr(a, alen, n, "[N:%u]", cdev_minor);
+                n += sg_scn3pr(a, alen, n, "[N:%u]", cdev_minor);
                 if (as_json)
                         sgj_js_nv_s(jsp, jop, lsscsi_loc_s, a);
-                n += scn3pr(a, alen, n, "  ");
+                n += sg_scn3pr(a, alen, n, "  ");
         } else
-                n += scn3pr(a, alen, n, "[N:?]  ");
+                n += sg_scn3pr(a, alen, n, "[N:?]  ");
         snprintf(buff, sizeof(buff), "%.256s%.32s", dir_name, nvme_ctl_rel);
         if (as_json) {
                 if (get_value(buff, cntlid_s, value, vlen))
@@ -4619,7 +4596,7 @@ one_nhost_entry(const char * dir_name, const char * nvme_ctl_rel,
                         sgj_js_nv_s(jsp, jop, dev_node_s, value);
         } else
                 snprintf(value, vlen, "-       ");
-        n += scn3pr(a, alen, n, "%-9s", value);
+        n += sg_scn3pr(a, alen, n, "%-9s", value);
         if (op->dev_maj_min) {
                 const char * bp;
 
@@ -4628,28 +4605,29 @@ one_nhost_entry(const char * dir_name, const char * nvme_ctl_rel,
                         const char * b2p = name_eq2value(buff, "uevent",
                                                          "MINOR", bblen, bb);
 
-                        scn3pr(value, vlen, 0, "%s:%s", bp, b2p);
+                        sg_scn3pr(value, vlen, 0, "%s:%s", bp, b2p);
                         if (as_json)
                                 sgj_js_nv_s(jsp, jop, dv_s, value);
-                        n += scn3pr(a, alen, n, " [%s]", value);
+                        n += sg_scn3pr(a, alen, n, " [%s]", value);
                 } else
-                        n += scn3pr(a, alen, n, " [dev?]");
+                        n += sg_scn3pr(a, alen, n, " [dev?]");
         }
         if (op->transport_info) {
-                n += scn3pr(a, alen, n, "    ");
+                n += sg_scn3pr(a, alen, n, "    ");
                 if (get_value(buff, trans_s, value, vlen)) {
                         if (0 == strcmp(pcie_s, value)) {
                                 if (get2_value(buff, dvc_s, svp_s, b, blen) &&
                                     get2_value(buff, dvc_s, sdp_s, bb, bblen))
-                                        scn3pr(a, alen, n, "%s %s:%s", pcie_s,
-                                               b, bb);
+                                        sg_scn3pr(a, alen, n, "%s %s:%s",
+                                                  pcie_s, b, bb);
                                 else
-                                        scn3pr(a, alen, n, "%s ?:?", pcie_s);
+                                        sg_scn3pr(a, alen, n, "%s ?:?",
+                                                  pcie_s);
                         } else
-                                scn3pr(a, alen, n, "%s%s",
-                                       (vb ? "transport=" : ""), value);
+                                sg_scn3pr(a, alen, n, "%s%s",
+                                          (vb ? "transport=" : ""), value);
                 } else if (vb)
-                        scn3pr(a, alen, n, "%s=?", trans_s);
+                        sg_scn3pr(a, alen, n, "%s=?", trans_s);
                 sgj_pr_hr(jsp, "%s\n", a);
                 n = 0;
         } else if (op->wwn) {
@@ -4663,8 +4641,8 @@ one_nhost_entry(const char * dir_name, const char * nvme_ctl_rel,
                 n = 0;
         } else if (op->unit) {
                 if (get2_value(buff, dvc_s, svp_s, value, vlen)) {
-                        scn3pr(a, alen, n, "   %s%s:",
-                               (vb ? "vin=" : ""), value);
+                        sg_scn3pr(a, alen, n, "   %s%s:",
+                                  (vb ? "vin=" : ""), value);
                         if (as_json)
                                 sgj_js_nv_s(jsp, jop, svp_s, value);
                         if (get2_value(buff, dvc_s, sdp_s, value, vlen)) {
@@ -4685,30 +4663,30 @@ one_nhost_entry(const char * dir_name, const char * nvme_ctl_rel,
                         n = 0;
                 }
                 if (get_value(buff, cntlid_s, value, vlen)) {
-                        n += scn3pr(a, alen, n, "%s  %s=%s%s", sep, cntlid_s,
-                                    value, sep);
+                        n += sg_scn3pr(a, alen, n, "%s  %s=%s%s", sep,
+                                       cntlid_s, value, sep);
                 } else if (vb)
-                        n += scn3pr(a, alen, n, "%s  %s=?%s", sep, cntlid_s,
-                                    sep);
+                        n += sg_scn3pr(a, alen, n, "%s  %s=?%s", sep,
+                                       cntlid_s, sep);
                 if (get_value(buff, stat_s, value, vlen)) {
                         if (as_json)
                                 sgj_js_nv_s(jsp, jop, stat_s, value);
-                        n += scn3pr(a, alen, n, "  %s=%s%s", stat_s, value,
-                                    sep);
+                        n += sg_scn3pr(a, alen, n, "  %s=%s%s", stat_s, value,
+                                       sep);
                 } else if (vb)
-                        n += scn3pr(a, alen, n, "  %s=?%s", stat_s, sep);
+                        n += sg_scn3pr(a, alen, n, "  %s=?%s", stat_s, sep);
                 if (get2_value(buff, dvc_s, clw_s, value, vlen)) {
                         if (as_json)
                                 sgj_js_nv_s(jsp, jop, clw_s, value);
-                        n += scn3pr(a, alen, n, "  %s=%s%s", clw_s, value,
-                                    sep);
+                        n += sg_scn3pr(a, alen, n, "  %s=%s%s", clw_s, value,
+                                       sep);
                 } else if (vb)
-                        n += scn3pr(a, alen, n, "  %s=?%s", clw_s, sep);
+                        n += sg_scn3pr(a, alen, n, "  %s=?%s", clw_s, sep);
                 if (get_value(buff, fr_s, value, vlen))
-                        n += scn3pr(a, alen, n, "  %s=%s%s", fr_s, value,
-                                    sep);
+                        n += sg_scn3pr(a, alen, n, "  %s=%s%s", fr_s, value,
+                                       sep);
                 else if (vb)
-                        n += scn3pr(a, alen, n, "  %s=?%s", fr_s, sep);
+                        n += sg_scn3pr(a, alen, n, "  %s=?%s", fr_s, sep);
                 if (! sing) {
                         sgj_pr_hr(jsp, "%s\n", a);
                         n = 0;
@@ -4717,25 +4695,25 @@ one_nhost_entry(const char * dir_name, const char * nvme_ctl_rel,
                         if (get2_value(buff, dvc_s, cls_s, value, vlen)) {
                                 if (as_json)
                                         sgj_js_nv_s(jsp, jop, cls_s, value);
-                                n += scn3pr(a, alen, n, "  %s=%s%s", cls_s,
-                                            value, sep);
+                                n += sg_scn3pr(a, alen, n, "  %s=%s%s", cls_s,
+                                               value, sep);
                         } else if (vb)
-                                n += scn3pr(a, alen, n, "  %s=?%s", cls_s,
-                                            sep);
+                                n += sg_scn3pr(a, alen, n, "  %s=?%s", cls_s,
+                                               sep);
                         if (get_value(buff, model_s, value, vlen)) {
                                 trim_lead_trail(value, true, true);
-                                n += scn3pr(a, alen, n, "  %s=%s%s", model_s,
-                                            value, sep);
+                                n += sg_scn3pr(a, alen, n, "  %s=%s%s",
+                                               model_s, value, sep);
                         } else if (vb)
-                                n += scn3pr(a, alen, n, "  %s=?%s", model_s,
-                                            sep);
+                                n += sg_scn3pr(a, alen, n, "  %s=?%s",
+                                               model_s, sep);
                         if (get_value(buff, ser_s, value, vlen)) {
                                 trim_lead_trail(value, true, true);
-                                n += scn3pr(a, alen, n, "  %s=%s%s", ser_s,
-                                            value, sep);
+                                n += sg_scn3pr(a, alen, n, "  %s=%s%s", ser_s,
+                                               value, sep);
                         } else if (vb)
-                                n += scn3pr(a, alen, n, "  %s=?%s", ser_s,
-                                            sep);
+                                n += sg_scn3pr(a, alen, n, "  %s=?%s", ser_s,
+                                               sep);
                         if (! sing) {
                                 sgj_pr_hr(jsp, "%s\n", a);
                                 n = 0;
@@ -4749,7 +4727,7 @@ one_nhost_entry(const char * dir_name, const char * nvme_ctl_rel,
                         trunc_pad2n(value, 32, true);
                 } else
                         strcpy(value, nulln1_s);
-                n += scn3pr(a, alen, n, "  %-32s ", value);
+                n += sg_scn3pr(a, alen, n, "  %-32s ", value);
 
                 if (get_value(buff, ser_s, value, vlen) &&
                     strncmp(value, nulln1_s, 6) &&
@@ -4758,7 +4736,7 @@ one_nhost_entry(const char * dir_name, const char * nvme_ctl_rel,
                         trunc_pad2n(value, 18, true);
                 } else
                         strcpy(value, nulln1_s);
-                n += scn3pr(a, alen, n, " %-18s ", value);
+                n += sg_scn3pr(a, alen, n, " %-18s ", value);
 
                 if (get_value(buff, fr_s, value, vlen) &&
                     strncmp(value, nulln1_s, 6) &&
@@ -4767,7 +4745,7 @@ one_nhost_entry(const char * dir_name, const char * nvme_ctl_rel,
                         trunc_pad2n(value, 8, false);
                 } else
                         strcpy(value, nulln1_s);
-                n += scn3pr(a, alen, n, " %-8s", value);
+                n += sg_scn3pr(a, alen, n, " %-8s", value);
         } else {
                 sgj_pr_hr(jsp, "%s\n", a);
                 n = 0;
@@ -4775,12 +4753,12 @@ one_nhost_entry(const char * dir_name, const char * nvme_ctl_rel,
         if (n > 0)
                 sgj_pr_hr(jsp, "%s\n", a);
         if (vb > 0) {
-                n = scn3pr(a, alen, 0, "  dir: %s\n  device dir: ", buff);
+                n = sg_scn3pr(a, alen, 0, "  dir: %s\n  device dir: ", buff);
                 if (if_directory_chdir(buff, dvc_s)) {
                         if (NULL == getcwd(wd, sizeof(wd)))
-                                scn3pr(a, alen, n, "?");
+                                sg_scn3pr(a, alen, n, "?");
                         else
-                                scn3pr(a, alen, n, "%s", wd);
+                                sg_scn3pr(a, alen, n, "%s", wd);
                 }
                 sgj_pr_hr(jsp, "%s\n", a);
         }
@@ -4886,8 +4864,9 @@ list_sdevices(struct lsscsi_opts * op, sgj_opaque_p jop)
         if (num < 0) {  /* scsi mid level may not be loaded */
                 if (op->verbose > 1) {
                         n = 0;
-                        n += scn3pr(name, nlen, n, "%s: scandir: ", __func__);
-                        scn3pr(name, nlen, n, "%s", buff);
+                        n += sg_scn3pr(name, nlen, n, "%s: scandir: ",
+                                       __func__);
+                        sg_scn3pr(name, nlen, n, "%s", buff);
                         perror(name);
                         sgj_pr_hr(jsp, "SCSI mid level %s\n", mmnbl_s);
                 }
@@ -4937,15 +4916,16 @@ list_ndevices(struct lsscsi_opts * op, sgj_opaque_p jop)
         blen = sizeof(buff);
         b2len = sizeof(buff2);
         elen = sizeof(ebuf);
-        n = scn3pr(buff, blen, 0, "%s", sysfsroot);
-        scn3pr(buff, blen, n, "%s", class_nvme);
+        n = sg_scn3pr(buff, blen, 0, "%s", sysfsroot);
+        sg_scn3pr(buff, blen, n, "%s", class_nvme);
 
         num = scandir(buff, &name_list, ndev_dir_scan_select,
                       nhost_scandir_sort);
         if (num < 0) {  /* NVMe module may not be loaded */
                 if (op->verbose > 1) {
-                        n = scn3pr(ebuf, elen, 0, "%s: scandir: ", __func__);
-                        scn3pr(ebuf, elen, n, "%s", buff);
+                        n = sg_scn3pr(ebuf, elen, 0, "%s: scandir: ",
+                                      __func__);
+                        sg_scn3pr(ebuf, elen, n, "%s", buff);
                         perror(ebuf);
                         sgj_pr_hr(jsp, "NVMe %s\n", mmnbl_s);
                 }
@@ -4959,16 +4939,16 @@ list_ndevices(struct lsscsi_opts * op, sgj_opaque_p jop)
         }
 
         for (k = 0; k < num; ++k) {
-                n = scn3pr(buff2, b2len, 0, "%s", buff);
-                scn3pr(buff2, b2len, n, "%s", name_list[k]->d_name);
+                n = sg_scn3pr(buff2, b2len, 0, "%s", buff);
+                sg_scn3pr(buff2, b2len, n, "%s", name_list[k]->d_name);
                 free(name_list[k]);
                 num2 = scandir(buff2, &namelist2, ndev_dir_scan_select2,
                                sdev_scandir_sort);
                 if (num2 < 0) {
                         if (op->verbose > 0) {
-                                n = scn3pr(ebuf, elen, 0, "%s: scandir(2): ",
-                                           __func__);
-                                scn3pr(ebuf, elen, n, "%s", buff);
+                                n = sg_scn3pr(ebuf, elen, 0,
+                                              "%s: scandir(2): ", __func__);
+                                sg_scn3pr(ebuf, elen, n, "%s", buff);
                                 perror(ebuf);
                         }
                         /* already freed name_list[k] so move to next */
@@ -5056,28 +5036,29 @@ longer_sh_entry(const char * path_name, struct lsscsi_opts * op,
         } else if (op->long_opt > 0) {
                 n = 0;
                 if (get_value(path_name, cpl_s, value, vlen)) {
-                        n += scn3pr(b, blen, n, "  %s=%-4s ", cpl_s, value);
+                        n += sg_scn3pr(b, blen, n, "  %s=%-4s ", cpl_s,
+                                       value);
                         if (jsp->pr_as_json)
                                 sgj_js_nv_s(jsp, jop, cpl_s, value);
                 } else if (op->verbose)
-                        n += scn3pr(b, blen, n, "  %s=????\n", cpl_s);
+                        n += sg_scn3pr(b, blen, n, "  %s=????\n", cpl_s);
 
                 if (get_value(path_name, hb_s, value, vlen)) {
-                        n += scn3pr(b, blen, n, "%s=%-4s ", hb_s, value);
+                        n += sg_scn3pr(b, blen, n, "%s=%-4s ", hb_s, value);
                         if (jsp->pr_as_json)
                                 sgj_js_nv_s(jsp, jop, hb_s, value);
                 } else if (op->verbose)
-                        n += scn3pr(b, blen, n, "%s=????\n", hb_s);
+                        n += sg_scn3pr(b, blen, n, "%s=????\n", hb_s);
 
                 if (get_value(path_name, sgt_s, value, vlen)) {
-                        n += scn3pr(b, blen, n, "%s=%-4s ", sgt_s, value);
+                        n += sg_scn3pr(b, blen, n, "%s=%-4s ", sgt_s, value);
                         if (jsp->pr_as_json)
                                 sgj_js_nv_s(jsp, jop, sgt_s, value);
                 } else if (op->verbose)
-                        n += scn3pr(b, blen, n, "%s=????\n", sgt_s);
+                        n += sg_scn3pr(b, blen, n, "%s=????\n", sgt_s);
 
                 if (get_value(path_name, am_s, value, vlen)) {
-                        scn3pr(b, blen, n, "%s=%-4s ", am_s, value);
+                        sg_scn3pr(b, blen, n, "%s=%-4s ", am_s, value);
                         if (jsp->pr_as_json)
                                 sgj_js_nv_s(jsp, jop, am_s, value);
                 }
@@ -5086,26 +5067,26 @@ longer_sh_entry(const char * path_name, struct lsscsi_opts * op,
                 if (2 == op->long_opt) {
                         n = 0;
                         if (get_value(path_name, cq_s, value, vlen)) {
-                                n += scn3pr(b, blen, n, "  %s=%-4s ", cq_s,
-                                            value);
+                                n += sg_scn3pr(b, blen, n, "  %s=%-4s ", cq_s,
+                                               value);
                                 if (jsp->pr_as_json)
                                         sgj_js_nv_s(jsp, jop, cq_s, value);
                         }
                         if (get_value(path_name, state_s, value, vlen)) {
-                                n += scn3pr(b, blen, n, "  %s=%-8s ", state_s,
-                                            value);
+                                n += sg_scn3pr(b, blen, n, "  %s=%-8s ",
+                                               state_s, value);
                                 if (jsp->pr_as_json)
                                         sgj_js_nv_s(jsp, jop, state_s, value);
                         }
                         if (get_value(path_name, uniqi_s, value, vlen)) {
-                                n += scn3pr(b, blen, n, "  %s=%-8s ", uniqi_s,
-                                            value);
+                                n += sg_scn3pr(b, blen, n, "  %s=%-8s ",
+                                               uniqi_s, value);
                                 if (jsp->pr_as_json)
                                         sgj_js_nv_s(jsp, jop, uniqi_s, value);
                         }
                         if (get_value(path_name, ubm_s, value, vlen)) {
-                                scn3pr(b, blen, n, "  %s=%-8s ", ubm_s,
-                                       value);
+                                sg_scn3pr(b, blen, n, "  %s=%-8s ", ubm_s,
+                                          value);
                                 if (jsp->pr_as_json)
                                         sgj_js_nv_s(jsp, jop, ubm_s, value);
                         }
@@ -5138,30 +5119,30 @@ one_shost_entry(const char * dir_name, const char * devname,
         n = 0;
         q = 0;
         if (1 == sscanf(devname, "host%u", &host_id)) {
-                q += scn3pr(o, olen, q, "[%u]", host_id);
+                q += sg_scn3pr(o, olen, q, "[%u]", host_id);
                 if (jsp->pr_as_json) {
                         sgj_js_nv_s(jsp, jop, lsscsi_loc_s, o);
                         sgj_js_nv_i(jsp, jop, host_id_s, host_id);
                 }
-                q += scn3pr(o, olen, q, "  ");
+                q += sg_scn3pr(o, olen, q, "  ");
         } else
-                q += scn3pr(o, olen, q, "[?]  ");
-        n += scn3pr(b, blen, n, "%s", dir_name);
-        // n += scn3pr(b, blen, n, "%s", "/");
-        scn3pr(b, blen, n, "%s", devname);
+                q += sg_scn3pr(o, olen, q, "[?]  ");
+        n += sg_scn3pr(b, blen, n, "%s", dir_name);
+        // n += sg_scn3pr(b, blen, n, "%s", "/");
+        sg_scn3pr(b, blen, n, "%s", devname);
         if ((get_value(b, "proc_name", value, vlen)) &&
             (strncmp(value, nulln1_s, 6)) && (strncmp(value, nulln2_s, 6))) {
-                q += scn3pr(o, olen, q, "  %-12s  ", value);
+                q += sg_scn3pr(o, olen, q, "  %-12s  ", value);
                 if (jsp->pr_as_json)
                         sgj_js_nv_s(jsp, jop, "driver_name", value);
         } else if (if_directory_chdir(b, "device/../driver")) {
                 if (NULL == getcwd(wd, sizeof(wd)))
-                        q += scn3pr(o, olen, q, "  %-12s  ", nulln2_s);
+                        q += sg_scn3pr(o, olen, q, "  %-12s  ", nulln2_s);
                 else
-                        q += scn3pr(o, olen, q, "  %-12s  ", basename(wd));
+                        q += sg_scn3pr(o, olen, q, "  %-12s  ", basename(wd));
 
         } else
-                q += scn3pr(o, olen, q, "  proc_name=????  ");
+                q += sg_scn3pr(o, olen, q, "  proc_name=????  ");
         if (op->transport_info) {
                 if (! transport_init(devname, olen - q, o + q)) {
                         if (op->verbose > 3)
@@ -5180,12 +5161,12 @@ one_shost_entry(const char * dir_name, const char * devname,
                 char b2[LMAX_DEVPATH];
                 static const int b2len = sizeof(b2);
 
-                n = scn3pr(b2, b2len, 0, "  dir: %s\n  device dir: ", b);
+                n = sg_scn3pr(b2, b2len, 0, "  dir: %s\n  device dir: ", b);
                 if (if_directory_chdir(b, dvc_s)) {
                         if (getcwd(wd, sizeof(wd)))
-                                scn3pr(b2, b2len, n, "%s", wd);
+                                sg_scn3pr(b2, b2len, n, "%s", wd);
                         else
-                                scn3pr(b2, b2len, n, "?");
+                                sg_scn3pr(b2, b2len, n, "?");
                 }
                 sgj_pr_hr(jsp, "%s\n", b2);
         }
@@ -5251,8 +5232,8 @@ list_shosts(struct lsscsi_opts * op, sgj_opaque_p jop)
         if (num < 0) {
                 int n = 0;
 
-                n += scn3pr(name, namelen, n, "%s: scandir: ", __func__);
-                scn3pr(name, namelen, n, "%s", buff);
+                n += sg_scn3pr(name, namelen, n, "%s: scandir: ", __func__);
+                sg_scn3pr(name, namelen, n, "%s", buff);
                 perror(name);
                 return;
         }
@@ -5292,15 +5273,16 @@ list_nhosts(struct lsscsi_opts * op, sgj_opaque_p jop)
         static const int blen = sizeof(buff);
         static const int elen = sizeof(ebuf);
 
-        n = scn3pr(buff, blen, 0, "%s", sysfsroot);
-        scn3pr(buff, blen, n, "%s", class_nvme);
+        n = sg_scn3pr(buff, blen, 0, "%s", sysfsroot);
+        sg_scn3pr(buff, blen, n, "%s", class_nvme);
 
         num = scandir(buff, &namelist, ndev_dir_scan_select,
                       nhost_scandir_sort);
         if (num < 0) {  /* NVMe module may not be loaded */
                 if (op->verbose > 1) {
-                        n = scn3pr(ebuf, elen, 0, "%s: scandir: ", __func__);
-                        scn3pr(ebuf, elen, n, "%s", buff);
+                        n = sg_scn3pr(ebuf, elen, 0, "%s: scandir: ",
+                                      __func__);
+                        sg_scn3pr(ebuf, elen, n, "%s", buff);
                         perror(ebuf);
                         sgj_pr_hr(jsp, "NVMe %s\n", mmnbl_s);
                 }
