@@ -1,0 +1,244 @@
+#!/bin/bash
+
+# Copyright (c) 2023 Douglas Gilbert.
+# SPDX-License-Identifier: BSD-2-Clause
+
+# This script is designed to print out pseudo file system file names
+# followed by their ASCII contents (i.e. their values) as appropriate.
+# It targets sysfs (/sys ) in Linux but may be useful in other contexts.
+
+dir=0
+show=0
+is_root=0     # 0 for true; 1 for false (sorry C)
+nosym=0
+otherfs=0
+first_st_dev=0
+verbose_arg=""
+verbose_num=0
+
+version_str="1.04 20230523"
+
+
+usage()
+{
+  echo "Usage: ls_name_value [-d] [-h] [-N] [-o] [-s] [-v] [-V] [<name>*]"
+  echo "  where:  -d, --dir         descend if <name> is directory"
+  echo "                            descends 1 level; -dd descends 2 levels"
+  echo "          -h, --help        print usage message"
+  echo "          -N, --nosym       do not descend symlinks to directories"
+  echo "          -o, --otherfs     not descending to other fs is default, override"
+  echo "          -s, --show        show directories, symlinks and specials"
+  echo "          -v, --verbose     increase verbosity of output"
+  echo "          -V, --version     print version string then exit"
+  echo ""
+  echo "Prints '<name> : <value>' where <name> is a regular filename or a"
+  echo "filename in a given directory name. <value> is the ASCII contents of"
+  echo "each filename. Designed for viewing sysfs (under /sys ) in Linux."
+}
+
+get_root_perm()
+{
+  local s
+
+  s=$(stat -c '%a' $1) 
+  if [ -n $s ] ; then
+    echo ${s:0:1}
+  else
+    echo "0"
+  fi
+}
+
+# Takes filename to display name:value of as $1. Optionally takes
+# leading pad as $2
+one_name_value()
+{
+  local grp
+  local value
+  local pad
+
+  if [ $# -gt 1 ] ; then
+    pad=$2
+  else
+    pad=""
+  fi
+
+  if [ -f ${1} ] ; then
+    if [ ${is_root} -eq 1 ] ; then    # false, so non-root
+      if [ -r ${1} ] ; then
+        value=$( head -c 256 ${1} 2> /dev/null | tr -d '\0' | tr '\n' " " )
+        if [ ${1:0:1} = "/" ] || [ ${1:0:1} = "." ] ; then
+          echo -n "${pad}$( basename $1 ) : "
+        else
+          echo -n "${pad}${1} : "
+        fi
+        if [[ ${value} = *[![:ascii:]]* ]]; then
+          echo "<contains non-ASCII chars>"
+        else
+          echo "${value//[![:print:]]/}"
+        fi
+      elif [ -w ${1} ] ; then
+        echo "${pad}${1} : <writable>"
+      else
+        echo "${pad}${1} : <cannot access>"
+      fi
+    else
+      grp=$( get_root_perm ${1} )
+      if [ ${grp} -ge 4 ] ; then
+        value=$( head -c 256 ${1} 2> /dev/null | tr -d '\0' | tr '\n' " " )
+        if [ ${1:0:1} = "/" ] || [ ${1:0:1} = "." ] ; then
+          echo -n "${pad}$( basename $1 ) : "
+        else
+          echo -n "${pad}${1} : "
+        fi
+        if [[ ${value} = *[![:ascii:]]* ]]; then
+          echo "<contains non-ASCII chars>"
+        else
+          echo "${value//[![:print:]]/}"
+        fi
+      elif [ ${grp} -ge 2 ] ; then
+        echo "${pad}${1} : <writable>"
+      else
+        echo "${pad}${1} : <cannot access>"
+      fi
+    fi
+  elif [ $show -gt 0 ] ; then
+    if [ -h ${1} ] ; then
+      echo -n "${pad}${1} : ---> "
+      readlink ${1}
+    elif [ -d ${1} ] ; then
+      echo "${pad}${1} : -->"
+    elif [ -c ${1} ] ; then
+      echo "${pad}${1} : <char device>"
+    elif [ -b ${1} ] ; then
+      echo "${pad}${1} : <block device>"
+    elif [ -p ${1} ] ; then
+      echo "${pad}${1} : <named pipe>"
+    elif [ -S ${1} ] ; then
+      echo "${pad}${1} : <socket>"
+    fi
+  fi
+}
+
+
+if (( $EUID != 0 )); then
+  is_root=1     # false
+fi
+
+opt="$1"
+while test ! -z "$opt" -a -z "${opt##-*}"; do
+  opt=${opt#-}
+  case "$opt" in
+    d|-dir) let dir=$dir+1 ;;
+    dd) let dir=$dir+2 ;;
+    ddd) let dir=$dir+2 ;;
+    h|-help) usage ; exit 0 ;;
+    N|-nosym) let nosym=$nosym+1 ;;
+    o|-otherfs) let otherfs=$otherfs+1 ;;
+    s|-show) let show=$show+1 ;;
+    v|-verbose) verbose_arg="-v" ; let verbose_num=$verbose_num+1 ;;
+    vv) verbose_arg="-vv" ; let verbose_num=$verbose_num+2 ;;
+    vvv) verbose_arg="-vvv" ; let verbose_num=$verbose_num+3 ;;
+    V|-version) echo ${version_str} ; exit 0 ;;
+    *) echo "Unknown option: -$opt " ; exit 1 ;;
+  esac
+  shift
+  opt="$1"
+done
+
+# If one arguent given and it's a directory, cd to it and swallow
+if [ $# -eq 1 ] && [ -d $1 ] && [ -x $1 ] ; then
+  first_st_dev=$( stat -c %d $1 )
+  cd $1
+  shift
+fi
+
+if [ $verbose_num -gt 0 ] ; then
+  echo -n "> current working directory: "
+  pwd
+  if [ $verbose_num -gt 1 ] ; then
+    echo -n "> physical working directory: "
+    pwd -P
+  fi
+  echo ""
+fi
+
+if [ $# -gt 0 ] ; then
+  FILES=$@
+else
+  FILES=$( ls )
+fi
+
+for file in ${FILES}; do
+  if [ ${first_st_dev} -eq 0 ] ; then
+      first_st_dev=$( stat -c %d ${file} )
+  fi
+  if [ -h ${file} ] ; then
+    symlnk1=0
+    [ ${nosym} -gt 0 ]
+    nosym_active1=$?
+  else
+    symlnk1=1
+    nosym_active1=1
+  fi
+  if [ ${dir} -gt 0 ] && [ -d ${file} ] && [ -x ${file} ] && [ ${nosym_active1} -ne 0 ] ; then
+    if [ ${otherfs} -eq 0 ] ; then
+      a_st_dev=$( stat -c %d ${file} )
+    else
+      a_st_dev=${first_st_dev}
+    fi
+    if [ ${first_st_dev} -eq ${a_st_dev} ] ; then
+      echo ">> descend to: ${file}/:"
+      cur=$( pwd )
+      cd ${file}
+      if [ ${verbose_num} -gt 2 ] && [ ${symlnk1} -eq 0 ] ; then
+        echo -n "  > physical working directory: "
+        pwd -P
+      fi
+      FI2=$( ls )
+      for fi2 in ${FI2}; do
+        if [ -h ${fi2} ] ; then
+          symlnk2=0
+          [ ${nosym} -gt 0 ]
+          nosym_active2=$?
+        else
+          symlnk2=1
+          nosym_active2=1
+        fi
+        [ ${nosym} -gt 0 ] && [ -h ${fi2} ]
+        nosym_active2=$?
+        if [ ${dir} -gt 1 ] && [ -d ${fi2} ] && [ -x ${fi2} ] && [ ${nosym_active2} -ne 0 ] ; then
+          if [ ${otherfs} -eq 0 ] ; then
+            b_st_dev=$( stat -c %d ${fi2} )
+          else
+            b_st_dev=${first_st_dev}
+          fi
+          if [ ${first_st_dev} -eq ${b_st_dev} ] ; then
+            echo "    >> descend to: ${fi2}/:"
+            cur2=$( pwd )
+            cd ${fi2}
+            if [ ${verbose_num} -gt 2 ] && [ ${symlnk2} -eq 0 ] ; then
+              echo -n "      > physical working directory: "
+              pwd -P
+            fi
+            FI3=$( ls )
+            for fi3 in ${FI3}; do
+              one_name_value ${fi3} "        "
+            done
+            cd ${cur2}
+            echo ""
+          else
+            echo "    >> not descending to: ${fi2}/: <different filesystem>"
+          fi
+        else
+          one_name_value ${fi2} "    "
+        fi
+      done
+      cd ${cur}
+      echo ""
+    else
+      echo ">> not descending to: ${file}/: <different filesystem>"
+    fi
+  else
+    one_name_value ${file}
+  fi
+done
