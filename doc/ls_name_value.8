@@ -19,7 +19,7 @@ A simple example follows where "power_role" is a regular file:
 The emphasis of this script is to get an overview of multiple name:value
 pairs in the same or nearby directories. This is done at the expense
 of accurate renderings of the associated values. Other tools may be used
-to get better renderings of those values, for example the
+to get better renderings of particular values, for example the
 .B od
 and
 .B hd
@@ -31,8 +31,8 @@ pseudo file system has waiting read(2)s and this is an issue since an
 instance of tracefs is often mounted under sysfs (e.g. /sys/kernel/trace ).
 Due to this issue, every time this script tries to descend into a
 directory, it checks if it is still in the original file system instance.
-If not, then it does not descend and outputs a "<different filesystem>"
-message. An example that shows this action is:
+If not, it does not descend and outputs a "<different filesystem>" message.
+An example that shows this action is:
     $ ls_name_value \-d /dev /sys
     >> descend to: /dev/:
         ....
@@ -50,11 +50,6 @@ permissions set for the accessing user then the whole value is replaced
 by "<writable>" (even if read permissions are also set). If the value in
 the name cannot be read (and the name is a regular file) then the whole
 value is replaced by "<cannot access>".
-.PP
-Simplified command line parsing is performed in this script. This means
-that all options must appear before the \fINAME\fR list on the command
-line. Also short options cannot be elided (e.g. \fB\-ds\fR ) unless
-explicitly allowed in the OPTIONS section.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -66,8 +61,8 @@ If the \fINAME\fR list is empty, then the contents of the current
 working directory are used as a name list.
 .br
 If this option is given twice, then up to two levels directories are
-entered. Those name:value pairs are preceded by eight spaces. Note that
-the repeated short form option \fB\-dd\fR can be used.
+entered. The name:value pairs at the second level are preceded by eight
+spaces.
 .br
 The is a special case when a single element \fINAME\fR list is given and
 that name is a directory. This script will enter that directory and list
@@ -84,15 +79,15 @@ adds too much noise so this option prunes out symlinks to directories.
 \fB\-o\fR, \fB\-\-otherfs\fR
 as explained in the DESCRIPTION section above, sometimes descending into
 directories in other file systems can cause issues. So the default action
-is to prune any branch (directory) that is not file system as the first
-file (which may be a directory). Giving this option skips the file system
-check.
+is to prune any branch (directory) that is not in the same file system as
+the first file (which may be a directory) processed. Giving this option skips
+the file system check.
 .TP
 \fB\-s\fR, \fB\-\-show\fR
 usually only regular files are shown in name:value pair format. The main
 exception is a directory which this utility will "descend" into. For
 example it is shown like this:
-    $ ls_name_value -d /sys/class/typec/port1
+    $ ls_name_value \-d /sys/class/typec/port1
     data_role : [host] device
     >> descend to: device/:
         driver_override : (null)
@@ -105,8 +100,8 @@ char and block devices, pipes and sockets.
 .br
 When this option is given all file types are shown. For directories that
 are not descended into there are two cases:
-    \fBalso a symlink\fR : the value is "---> <link_destination>"
-    \fBnot a symlink\fR : the value is "-->"
+    \fBalso a symlink\fR : the value is "\-\-\-> <link_destination>"
+    \fBnot a symlink\fR : the value is "\-\->"
 .br
 For other special file types the value is the file type between angle
 brackets (e.g. "<block device>" ).
@@ -124,4 +119,4 @@ Copyright \(co 2023 Douglas Gilbert
 This software is distributed under a BSD\-2\-Clause license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B lsscsi(this package), od(GNU coreutils), hd(util-linux)
+.B lsscsi(this package), od(GNU coreutils), hd(util\-linux)

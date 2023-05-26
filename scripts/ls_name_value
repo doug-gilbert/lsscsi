@@ -7,16 +7,21 @@
 # followed by their ASCII contents (i.e. their values) as appropriate.
 # It targets sysfs (/sys ) in Linux but may be useful in other contexts.
 
+version_str="1.05 20230526"
+
 dir=0
 show=0
 is_root=0     # 0 for true; 1 for false (sorry C)
 nosym=0
 otherfs=0
 first_st_dev=0
-verbose_arg=""
-verbose_num=0
+verbose=0
 
-version_str="1.04 20230523"
+# The following are for the getopt(1) command from util-linux which
+# follows the function definitions, about 100 lines down.
+script_name=$(basename "$0")
+short=dhNosvV
+long=dir,help,nosym,otherfs,show,verbose,version
 
 
 usage()
@@ -40,9 +45,9 @@ get_root_perm()
 {
   local s
 
-  s=$(stat -c '%a' $1) 
-  if [ -n $s ] ; then
-    echo ${s:0:1}
+  s=$(stat -c '%a' "$1") 
+  if [ -n "$s" ] ; then
+    echo "${s:0:1}"
   else
     echo "0"
   fi
@@ -62,12 +67,12 @@ one_name_value()
     pad=""
   fi
 
-  if [ -f ${1} ] ; then
+  if [ -f "${1}" ] ; then
     if [ ${is_root} -eq 1 ] ; then    # false, so non-root
-      if [ -r ${1} ] ; then
-        value=$( head -c 256 ${1} 2> /dev/null | tr -d '\0' | tr '\n' " " )
-        if [ ${1:0:1} = "/" ] || [ ${1:0:1} = "." ] ; then
-          echo -n "${pad}$( basename $1 ) : "
+      if [ -r "${1}" ] ; then
+        value=$( head -c 256 "${1}" 2> /dev/null | tr -d '\0' | tr '\n' " " )
+        if [ "${1:0:1}" = "/" ] || [ "${1:0:1}" = "." ] ; then
+          echo -n "${pad}$( basename "$1" ) : "
         else
           echo -n "${pad}${1} : "
         fi
@@ -76,17 +81,17 @@ one_name_value()
         else
           echo "${value//[![:print:]]/}"
         fi
-      elif [ -w ${1} ] ; then
+      elif [ -w "${1}" ] ; then
         echo "${pad}${1} : <writable>"
       else
         echo "${pad}${1} : <cannot access>"
       fi
     else
-      grp=$( get_root_perm ${1} )
-      if [ ${grp} -ge 4 ] ; then
-        value=$( head -c 256 ${1} 2> /dev/null | tr -d '\0' | tr '\n' " " )
-        if [ ${1:0:1} = "/" ] || [ ${1:0:1} = "." ] ; then
-          echo -n "${pad}$( basename $1 ) : "
+      grp=$( get_root_perm "${1}" )
+      if [ "${grp}" -ge 4 ] ; then
+        value=$( head -c 256 "${1}" 2> /dev/null | tr -d '\0' | tr '\n' " " )
+        if [ "${1:0:1}" = "/" ] || [ "${1:0:1}" = "." ] ; then
+          echo -n "${pad}$( basename "$1" ) : "
         else
           echo -n "${pad}${1} : "
         fi
@@ -95,67 +100,100 @@ one_name_value()
         else
           echo "${value//[![:print:]]/}"
         fi
-      elif [ ${grp} -ge 2 ] ; then
+      elif [ "${grp}" -ge 2 ] ; then
         echo "${pad}${1} : <writable>"
       else
         echo "${pad}${1} : <cannot access>"
       fi
     fi
   elif [ $show -gt 0 ] ; then
-    if [ -h ${1} ] ; then
+    if [ -h "${1}" ] ; then
       echo -n "${pad}${1} : ---> "
-      readlink ${1}
-    elif [ -d ${1} ] ; then
-      echo "${pad}${1} : -->"
-    elif [ -c ${1} ] ; then
+      readlink "${1}"
+    elif [ -d "${1}" ] ; then
+      if [ $verbose -gt 0 ] ; then
+        echo "${pad}${1} : --> [directory]"
+      else
+        echo "${pad}${1} : -->"
+      fi
+    elif [ -c "${1}" ] ; then
       echo "${pad}${1} : <char device>"
-    elif [ -b ${1} ] ; then
+    elif [ -b "${1}" ] ; then
       echo "${pad}${1} : <block device>"
-    elif [ -p ${1} ] ; then
+    elif [ -p "${1}" ] ; then
       echo "${pad}${1} : <named pipe>"
-    elif [ -S ${1} ] ; then
+    elif [ -S "${1}" ] ; then
       echo "${pad}${1} : <socket>"
     fi
   fi
 }
 
 
-if (( $EUID != 0 )); then
+if (( EUID != 0 )); then
   is_root=1     # false
 fi
 
-opt="$1"
-while test ! -z "$opt" -a -z "${opt##-*}"; do
-  opt=${opt#-}
-  case "$opt" in
-    d|-dir) let dir=$dir+1 ;;
-    dd) let dir=$dir+2 ;;
-    ddd) let dir=$dir+2 ;;
-    h|-help) usage ; exit 0 ;;
-    N|-nosym) let nosym=$nosym+1 ;;
-    o|-otherfs) let otherfs=$otherfs+1 ;;
-    s|-show) let show=$show+1 ;;
-    v|-verbose) verbose_arg="-v" ; let verbose_num=$verbose_num+1 ;;
-    vv) verbose_arg="-vv" ; let verbose_num=$verbose_num+2 ;;
-    vvv) verbose_arg="-vvv" ; let verbose_num=$verbose_num+3 ;;
-    V|-version) echo ${version_str} ; exit 0 ;;
-    *) echo "Unknown option: -$opt " ; exit 1 ;;
+# Reference: /usr/share/doc/util-linux/examples/getopt-example.bash
+TEMP=$(getopt -o $short --long $long --name "$script_name" -- "$@")
+
+if [ $? -ne 0 ]; then
+  echo 'Terminating...' >&2
+  exit 1
+fi
+
+eval set -- "${TEMP}"
+
+while :; do
+  case "${1}" in
+    -d | --dir        ) (( dir=dir+1 )) ;          shift 1 ;;
+    -h | --help       ) usage;                     exit 0 ;;
+    -N | --nosym      ) (( nosym=nosym+1 )) ;      shift 1 ;;
+    -o | --otherfs    ) (( otherfs=otherfs+1 )) ;  shift 1 ;;
+    -s | --show       ) (( show=show+1 )) ;        shift 1 ;;
+    -v | --verbose    ) (( verbose=verbose+1 )) ;  shift 1 ;;
+    -V | --version    ) echo "${version_str}" ;    exit 0 ;;
+    --                ) shift;                     break ;;
+    *                 ) echo "Error parsing $1";   exit 1 ;;
   esac
-  shift
-  opt="$1"
 done
 
+# The following code with leading "##"s is the previous way of handling
+# command line options (i.e. prior to using getopt(1) ).
+## opt="$1"
+## while test ! -z "$opt" -a -z "${opt##-*}"; do
+##   opt=${opt#-}
+##   case "$opt" in
+##     d|-dir) let dir=$dir+1 ;;
+##     dd) let dir=$dir+2 ;;
+##     ddd) let dir=$dir+2 ;;
+##     h|-help) usage ; exit 0 ;;
+##     N|-nosym) let nosym=$nosym+1 ;;
+##     o|-otherfs) let otherfs=$otherfs+1 ;;
+##     s|-show) let show=$show+1 ;;
+##     v|-verbose) verbose_arg="-v" ; let verbose=$verbose+1 ;;
+##     vv) verbose_arg="-vv" ; let verbose=$verbose+2 ;;
+##     vvv) verbose_arg="-vvv" ; let verbose=$verbose+3 ;;
+##     V|-version) echo ${version_str} ; exit 0 ;;
+##     *) echo "Unknown option: -$opt " ; exit 1 ;;
+##   esac
+##   shift
+##   opt="$1"
+## done
+
 # If one arguent given and it's a directory, cd to it and swallow
-if [ $# -eq 1 ] && [ -d $1 ] && [ -x $1 ] ; then
-  first_st_dev=$( stat -c %d $1 )
-  cd $1
+if [ $# -eq 1 ] && [ -d "$1" ] && [ -x "$1" ] ; then
+  first_st_dev=$( stat -c %d "$1" )
+  if ! cd "$1" ; then
+    echo "cd to $1 failed from $( pwd -P) "
+    exit 1
+  fi
   shift
 fi
 
-if [ $verbose_num -gt 0 ] ; then
+if [ $verbose -gt 0 ] ; then
   echo -n "> current working directory: "
   pwd
-  if [ $verbose_num -gt 1 ] ; then
+  if [ $verbose -gt 1 ] ; then
     echo -n "> physical working directory: "
     pwd -P
   fi
@@ -163,16 +201,16 @@ if [ $verbose_num -gt 0 ] ; then
 fi
 
 if [ $# -gt 0 ] ; then
-  FILES=$@
+  FILES=$*
 else
   FILES=$( ls )
 fi
 
 for file in ${FILES}; do
-  if [ ${first_st_dev} -eq 0 ] ; then
-      first_st_dev=$( stat -c %d ${file} )
+  if [ "${first_st_dev}" -eq 0 ] ; then
+      first_st_dev=$( stat -c %d "${file}" )
   fi
-  if [ -h ${file} ] ; then
+  if [ -h "${file}" ] ; then
     symlnk1=0
     [ ${nosym} -gt 0 ]
     nosym_active1=$?
@@ -180,23 +218,26 @@ for file in ${FILES}; do
     symlnk1=1
     nosym_active1=1
   fi
-  if [ ${dir} -gt 0 ] && [ -d ${file} ] && [ -x ${file} ] && [ ${nosym_active1} -ne 0 ] ; then
+  if [ ${dir} -gt 0 ] && [ -d "${file}" ] && [ -x "${file}" ] && [ ${nosym_active1} -ne 0 ] ; then
     if [ ${otherfs} -eq 0 ] ; then
-      a_st_dev=$( stat -c %d ${file} )
+      a_st_dev=$( stat -c %d "${file}" )
     else
       a_st_dev=${first_st_dev}
     fi
-    if [ ${first_st_dev} -eq ${a_st_dev} ] ; then
+    if [ "${first_st_dev}" -eq "${a_st_dev}" ] ; then
       echo ">> descend to: ${file}/:"
       cur=$( pwd )
-      cd ${file}
-      if [ ${verbose_num} -gt 2 ] && [ ${symlnk1} -eq 0 ] ; then
+      if ! cd "${file}" ; then
+        echo "cd to ${file} failed from $( pwd -P) "
+        exit 1
+      fi
+      if [ ${verbose} -gt 2 ] && [ ${symlnk1} -eq 0 ] ; then
         echo -n "  > physical working directory: "
         pwd -P
       fi
       FI2=$( ls )
       for fi2 in ${FI2}; do
-        if [ -h ${fi2} ] ; then
+        if [ -h "${fi2}" ] ; then
           symlnk2=0
           [ ${nosym} -gt 0 ]
           nosym_active2=$?
@@ -204,41 +245,50 @@ for file in ${FILES}; do
           symlnk2=1
           nosym_active2=1
         fi
-        [ ${nosym} -gt 0 ] && [ -h ${fi2} ]
+        [ ${nosym} -gt 0 ] && [ -h "${fi2}" ]
         nosym_active2=$?
-        if [ ${dir} -gt 1 ] && [ -d ${fi2} ] && [ -x ${fi2} ] && [ ${nosym_active2} -ne 0 ] ; then
+        if [ ${dir} -gt 1 ] && [ -d "${fi2}" ] && [ -x "${fi2}" ] && [ ${nosym_active2} -ne 0 ] ; then
           if [ ${otherfs} -eq 0 ] ; then
-            b_st_dev=$( stat -c %d ${fi2} )
+            b_st_dev=$( stat -c %d "${fi2}" )
           else
             b_st_dev=${first_st_dev}
           fi
-          if [ ${first_st_dev} -eq ${b_st_dev} ] ; then
+          if [ "${first_st_dev}" -eq "${b_st_dev}" ] ; then
             echo "    >> descend to: ${fi2}/:"
             cur2=$( pwd )
-            cd ${fi2}
-            if [ ${verbose_num} -gt 2 ] && [ ${symlnk2} -eq 0 ] ; then
+            if ! cd "${fi2}" ; then
+              echo "cd to ${fi2} failed from $( pwd -P) "
+              exit 1
+            fi
+            if [ ${verbose} -gt 2 ] && [ ${symlnk2} -eq 0 ] ; then
               echo -n "      > physical working directory: "
               pwd -P
             fi
             FI3=$( ls )
             for fi3 in ${FI3}; do
-              one_name_value ${fi3} "        "
+              one_name_value "${fi3}" "        "
             done
-            cd ${cur2}
+            if ! cd "${cur2}" ; then
+              echo "cd to ${cur2} failed from $( pwd -P) "
+              exit 1
+            fi
             echo ""
           else
             echo "    >> not descending to: ${fi2}/: <different filesystem>"
           fi
         else
-          one_name_value ${fi2} "    "
+          one_name_value "${fi2}" "    "
         fi
       done
-      cd ${cur}
+      if ! cd "${cur}" ; then
+        echo "cd to ${cur} failed from $( pwd -P) "
+        exit 1
+      fi
       echo ""
     else
       echo ">> not descending to: ${file}/: <different filesystem>"
     fi
   else
-    one_name_value ${file}
+    one_name_value "${file}"
   fi
 done

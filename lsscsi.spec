@@ -55,7 +55,7 @@ fi
 
 
 %changelog
-* Sun Apr 30 2023 - dgilbert at interlog dot com
+* Fri May 26 2023 - dgilbert at interlog dot com
 - fixes, minor tweaks
   * lsscsi-0.33
 * Wed May 05 2021 - dgilbert at interlog dot com

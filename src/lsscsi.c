@@ -47,7 +47,7 @@
 #include "sg_json.h"
 
 /* Package release number is first number, whole string is version */
-static const char * release_str = "0.33  2023/05/23 [svn: r185]";
+static const char * release_str = "0.33  2023/05/26 [svn: r187]";
 
 #define FT_OTHER 0
 #define FT_BLOCK 1
