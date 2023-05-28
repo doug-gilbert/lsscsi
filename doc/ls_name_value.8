@@ -3,9 +3,9 @@
 ls_name_value \- for browsing names and corresponding values in sysfs
 .SH SYNOPSIS
 .B ls_name_value
-[\fI\-\-dir\fR] [\fI\-\-help\fR] [\fI\-\-nosym\fR] [\fI\-\-otherfs\fR]
-[\fI\-\-show\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-[\fINAME\fR ...]
+[\fI\-\-all\fR] [\fI\-\-dir\fR] [\fI\-\-empty\fR] [\fI\-\-help\fR]
+[\fI\-\-nosym\fR] [\fI\-\-otherfs\fR] [\fI\-\-show\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] [\fINAME\fR ...]
 .SH DESCRIPTION
 .\" Add any additional description here
 This bash shell script is designed to give an overview of the (file)names
@@ -53,9 +53,16 @@ value is replaced by "<cannot access>".
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
+\fB\-a\fR, \fB\-\-all\fR
+following Unix practice, by default when filenames in a directory are listed,
+those starting with '.' are hidden (i.e. not listed). When this option
+is given, filenames starting with '.' are included. The pseudo
+filenames '.' and '..' are excluded making the filenames shown similar to
+the output of 'ls -A'.
+.TP
 \fB\-d\fR, \fB\-\-dir\fR
 When give once, if any files in the \fINAME\fR list are directories, then
-this script enters each directory and list its name:value pairs. Those
+this script enters each directory and lists its name:value pairs. Those
 name:value pairs are preceded by four spaces to show 1 level of nesting.
 If the \fINAME\fR list is empty, then the contents of the current
 working directory are used as a name list.
@@ -67,6 +74,11 @@ spaces.
 The is a special case when a single element \fINAME\fR list is given and
 that name is a directory. This script will enter that directory and list
 its name:value pairs without the need for this option.
+.TP
+\fB\-e\fR, \fB\-\-empty\fR
+any many cases the value associated a filename is empty. By default, nothing
+will appear to the right of then colon separating  the name and value. When
+this option is given, if the value is empty, the string '<empty>' is output.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 print out the usage message then exit.
