@@ -7,12 +7,13 @@
 # followed by their ASCII contents (i.e. their values) as appropriate.
 # It targets sysfs (/sys ) in Linux but may be useful in other contexts.
 
-version_str="1.08 20230527"
+version_str="1.09 20230528"
 
 all=0
 dir=0
 empty=0
 nosym=0
+num_val=256   # may not be the best default
 otherfs=0
 show=0
 is_root=0     # 0 for true; 1 for false (sorry C)
@@ -22,19 +23,21 @@ verbose=0
 # The following are for the getopt(1) command from util-linux which
 # follows the function definitions, about 100 lines down.
 script_name=$(basename "$0")
-short="adehNosvV"
-long="all,dir,empty,help,nosym,otherfs,show,verbose,version"
+short="adehn:NosvV"
+long="all,dir,empty,help,num:,nosym,otherfs,show,verbose,version"
 
 
 usage()
 {
-  echo "Usage: ls_name_value [-a] [-d] [-e] [-h] [-N] [-o] [-s] [-v] [-V] [<name>*]"
+  echo "Usage: ls_name_value [-a] [-d] [-e] [-h] [-N] [-n NUM] [-o] [-s] "
+  echo "                     [-v] [-V] [<name>*]"
   echo "  where:  -a, --all         include hidden filename (start with '.')"
   echo "          -d, --dir         descend if <name> is directory"
   echo "                            descends 1 level; -dd descends 2 levels"
   echo "          -e, --empty       output <value> as '<empty>' rather than blank"
   echo "          -h, --help        print usage message"
   echo "          -N, --nosym       do not descend symlinks to directories"
+  echo "          -n, --num=NUM     max bytes in value (def: 256)"
   echo "          -o, --otherfs     not descending to other fs is default, override"
   echo "          -s, --show        show directories, symlinks and specials"
   echo "          -v, --verbose     increase verbosity of output"
@@ -42,7 +45,8 @@ usage()
   echo ""
   echo "Prints '<name> : <value>' where <name> is a regular filename or a"
   echo "filename in a given directory name. <value> is the ASCII contents of"
-  echo "each filename. Designed for viewing sysfs (under /sys ) in Linux."
+  echo "each filename. The <value> may be truncated. Designed for viewing sysfs"
+  echo "(under /sys directory) in Linux."
 }
 
 get_root_perm()
@@ -74,7 +78,7 @@ one_name_value()
   if [ -f "${1}" ] ; then
     if [ ${is_root} -ne 0 ] ; then    # false, so non-root
       if [ -r "${1}" ] ; then
-        value=$( head -c 256 "${1}" 2> /dev/null | tr -d '\0' )
+        value=$( head -c "${num_val}" "${1}" 2> /dev/null | tr -d '\0' )
         if [ $empty -eq 0 ] || [ -n "${value}" ] ; then
           value=$( echo  "${value}" | tr '\n' " " )
         else
@@ -98,7 +102,7 @@ one_name_value()
     else        # run by root
       grp=$( get_root_perm "${1}" )
       if [ "${grp}" -ge 4 ] ; then
-        value=$( head -c 256 "${1}" 2> /dev/null | tr -d '\0' )
+        value=$( head -c "${num_val}" "${1}" 2> /dev/null | tr -d '\0' )
         if [ $empty -eq 0 ] || [ -n "${value}" ] ; then
           value=$( echo  "${value}" | tr '\n' " " )
         else
@@ -163,6 +167,16 @@ while :; do
     -d | --dir        ) (( dir=dir+1 )) ;          shift 1 ;;
     -e | --empty      ) (( empty=empty+1 )) ;      shift 1 ;;
     -h | --help       ) usage;                     exit 0 ;;
+    -n | --num        )
+                num_val="$2"
+                if ! [ "$num_val" -eq "$num_val" ] 2> /dev/null ; then
+                  echo "--num expects an integer as its argument"
+                  exit 1
+                elif [ "$num_val" -lt 1 ] ; then
+                  echo "--num expects an integer > 0"
+                  exit 1
+                fi
+                shift 2 ;;
     -N | --nosym      ) (( nosym=nosym+1 )) ;      shift 1 ;;
     -o | --otherfs    ) (( otherfs=otherfs+1 )) ;  shift 1 ;;
     -s | --show       ) (( show=show+1 )) ;        shift 1 ;;

@@ -4,8 +4,8 @@ ls_name_value \- for browsing names and corresponding values in sysfs
 .SH SYNOPSIS
 .B ls_name_value
 [\fI\-\-all\fR] [\fI\-\-dir\fR] [\fI\-\-empty\fR] [\fI\-\-help\fR]
-[\fI\-\-nosym\fR] [\fI\-\-otherfs\fR] [\fI\-\-show\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] [\fINAME\fR ...]
+[\fI\-\-nosym\fR] [\fI\-\-num=NUM\fR] [\fI\-\-otherfs\fR] [\fI\-\-show\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fINAME\fR ...]
 .SH DESCRIPTION
 .\" Add any additional description here
 This bash shell script is designed to give an overview of the (file)names
@@ -58,7 +58,7 @@ following Unix practice, by default when filenames in a directory are listed,
 those starting with '.' are hidden (i.e. not listed). When this option
 is given, filenames starting with '.' are included. The pseudo
 filenames '.' and '..' are excluded making the filenames shown similar to
-the output of 'ls -A'.
+the output of 'ls \-A'.
 .TP
 \fB\-d\fR, \fB\-\-dir\fR
 When give once, if any files in the \fINAME\fR list are directories, then
@@ -87,6 +87,13 @@ print out the usage message then exit.
 in sysfs most symbolic links (symlinks) point to other directories rather
 than regular files. Sometimes following symlinks and expanding the directory
 adds too much noise so this option prunes out symlinks to directories.
+.TP 
+\fB\-n\fR, \fB\-\-num\fR=\fINUM\fR 
+\fINUM\fR is the maximum number of bytes in the values shown. \fINUM\fR is
+required to be greater than zero. 256 bytes is the default for \fINUM\fR.
+.br
+This option does not apply to the destination path shown for symbolic
+links or the directory name when descending into that directory.
 .TP
 \fB\-o\fR, \fB\-\-otherfs\fR
 as explained in the DESCRIPTION section above, sometimes descending into
@@ -123,6 +130,28 @@ increase level or verbosity.
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 prints out the version string then exits.
+.SH EXAMPLES
+There is no command line option to exclude directories which would be useful
+when using the \fI\-\-dir\fR option. A case where this might be helpful is
+in procfs (e.g. /proc ) as descending into each running process (thread) may
+create a lot of noise and perhaps a loop as the ls_name_value script itself
+is creating (and removing) lots of processes (threads) as it scans. Processes
+in that directory will match a grep regex like "^[0\-9]" which means starting
+with a digit.
+    $ cd /proc
+    $ ls_name_value \-n 32 \-d  $( ls \-A | grep -v "^[0\-9]" )
+.br
+The '\-v' option on grep inverts a selection (e.g. "give me the lines that
+do not match ..."). The above invocation shows up to 32 bytes of the contents
+of regular files in /proc and descends into all directories that do
+.B not
+start with a digit (i.e. information about every running process). For the
+directories that it does descend into, it will show up to 32 bytes of the
+contents of regular files it finds, indented by four spaces. There still
+is a directory called "thread\-self" that is a symbolic link to a process
+directory that is scanned. The \fI\-\-nosym\fR option would prune
+the "thread\-self" along with any other symlinks (and there are several).
+In some senses symlinks are evil.
 .SH AUTHORS
 Written by D. Gilbert
 .SH COPYRIGHT
@@ -131,4 +160,4 @@ Copyright \(co 2023 Douglas Gilbert
 This software is distributed under a BSD\-2\-Clause license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B lsscsi(this package), od(GNU coreutils), hd(util\-linux)
+.B lsscsi(this package), od(GNU coreutils), hd(util\-linux), getopt(1)
