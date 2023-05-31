@@ -80,7 +80,7 @@ fi
 - add fcoe transport indicator; add --wwn option
   * lsscsi-0.26
 * Mon May 09 2011 - dgilbert at interlog dot com
-- add sas_port and fc_remore_ports infoR; '--size' option
+- add sas_port and fc_remore_ports info; '--size' option
   * lsscsi-0.25
 * Thu Dec 23 2010 - dgilbert at interlog dot com
 - FC transport syntax change

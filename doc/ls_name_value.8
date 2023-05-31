@@ -152,6 +152,14 @@ is a directory called "thread\-self" that is a symbolic link to a process
 directory that is scanned. The \fI\-\-nosym\fR option would prune
 the "thread\-self" along with any other symlinks (and there are several).
 In some senses symlinks are evil.
+.SH NOTES
+This utility's functionality overlaps somewhat with the systool utility.
+systool knows the high level structure of sysfs and offers a better overview.
+However if information is deeply nested (e.g. /sys/class/typec/ for USB PD)
+then this utility gives better "drilling down" facilities. For example the
+USB PD source capabilities of an AC adapter powering a laptop may be found
+at /sys/class/typec/port1-partner/usb_power_delivery/source-capabilities/*
+which can be better viewed with this utility.
 .SH AUTHORS
 Written by D. Gilbert
 .SH COPYRIGHT
@@ -161,3 +169,4 @@ This software is distributed under a BSD\-2\-Clause license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
 .B lsscsi(this package), od(GNU coreutils), hd(util\-linux), getopt(1)
+.B systool(sysfsutils)

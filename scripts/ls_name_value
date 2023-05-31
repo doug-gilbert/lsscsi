@@ -7,7 +7,7 @@
 # followed by their ASCII contents (i.e. their values) as appropriate.
 # It targets sysfs (/sys ) in Linux but may be useful in other contexts.
 
-version_str="1.09 20230528"
+version_str="1.11 20230531"
 
 all=0
 dir=0
@@ -53,6 +53,7 @@ get_root_perm()
 {
   local s
 
+  # 'stat -c ...' is a Linux extension. For FreeBSD use '-f'
   s=$(stat -c '%a' "$1")
   if [ -n "$s" ] ; then
     echo "${s:0:1}"
@@ -189,6 +190,7 @@ done
 
 # If one arguent given and it's a directory, cd to it and swallow
 if [ $# -eq 1 ] && [ -d "$1" ] && [ -x "$1" ] ; then
+  # 'stat -c ...' is a Linux extension. For FreeBSD use '-f'
   first_st_dev=$( stat -c %d "$1" )
   if ! cd "$1" ; then
     echo "cd to $1 failed from $( pwd -P) "

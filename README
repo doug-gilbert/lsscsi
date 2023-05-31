@@ -1,11 +1,44 @@
-Installation instructions are in the INSTALL file.
 
 For a description of this utility see:
   https://sg.danny.cz/scsi/lsscsi.html
 or
   https://doug-gilbert.github.io/scsi/lsscsi.html
 
+Here is a summary:
+
+lsscsi
+------
+The lsscsi utility lists information about SCSI devices in Linux. Using SCSI
+terminology, lsscsi lists SCSI logical units (or SCSI targets when the
+'--transport' option is given). The default action is to produce one line of
+output for each SCSI device currently attached to the system. In version 0.30
+of this utility, support was added to list NVMe namespaces (under SCSI
+devices(LUs)) and NVMe controllers (under SCSI hosts).
+
+Note that ATA/SATA devices and USB Mass Storage (and UAPS) devices use the
+SCSI subsystem in Linux thus also appear in lsscsi output.
+
+By default its output is plain text (ASCII). With the --json option it can
+produce JSON output instead.
+
+lsscsi overlaps with the lsblk utility but concentrates on the devices
+themselves. Also lsscsi lists storage related devices such as enclosures
+and tape drives.
+
 The "man" page (lsscsi.8) in this package may also be useful.
+
+ls_name_value
+-------------
+The ls_name_value script (bash rather than C binary) is designed to show
+filenames and their corresponding ASCII contents (values) up to two
+directory levels deep. It produces plain text output. 
+It is designed for data-mining in the sysfs pseudo file system but may
+also be useful with other pseudo file systems (e.g. devfs and procfs).
+
+
+Building package
+================
+Installation instructions are in the INSTALL file.
 
 Various options can be given to the ./configure script. Those
 specific to this package are:
@@ -46,4 +79,4 @@ Note that the final 'make install' will usually require root permissions
 and will place binaries in the /usr/local/bin directory.
 
 Douglas Gilbert
-30th April 2023
+30th May 2023
