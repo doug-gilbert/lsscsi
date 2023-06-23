@@ -1,17 +1,27 @@
-.TH LS_NAME_VALUE "8" "May 2023" "lsscsi\-0.33" LSSCSI
+.TH LS_NAME_VALUE "8" "June 2023" "lsscsi\-0.33" LSSCSI
 .SH NAME
 ls_name_value \- for browsing names and corresponding values in sysfs
 .SH SYNOPSIS
 .B ls_name_value
 [\fI\-\-all\fR] [\fI\-\-dir\fR] [\fI\-\-empty\fR] [\fI\-\-help\fR]
 [\fI\-\-nosym\fR] [\fI\-\-num=NUM\fR] [\fI\-\-otherfs\fR] [\fI\-\-show\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fINAME\fR ...]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-write\fR] [\fINAME\fR ...]
 .SH DESCRIPTION
 .\" Add any additional description here
 This bash shell script is designed to give an overview of the (file)names
 and their corresponding values in the sysfs pseudo file system found in
 Linux. Only printable ASCII is shown for each value, on the same line
-following the name and a colon. Let that be called a "name:value pair".
+following the (file)name and a colon. That will be referred to as
+a "name:value pair" in the following.
+.PP
+If no \fINAME\fR is given then all regular files in the current directory
+have their name:value pair displayed. Hidden regular files (i.e. those
+starting with ".") are not shown. If one or more \fINAME\fRs are given
+then their corresponding name:value pairs are displayed. An exception is if
+only one \fINAME\fR is given and that is a directory (or a symlink to a
+directory) then that directory is entered and all regular files in that
+directory have their name:value pair displayed.
+.PP
 A simple example follows where "power_role" is a regular file:
     $ ls_name_value /sys/class/typec/port1/power_role
     power_role : source [sink]
@@ -22,11 +32,11 @@ of accurate renderings of the associated values. Other tools may be used
 to get better renderings of particular values, for example the
 .B od
 and
-.B hd
+.B hd (hexdump)
 Unix commands if the value contains binary data.
 .PP
 This script may also be suitable for other pseudo file systems, but not
-if they pause a Unix read(2) waiting for an event to happen. The tracefs
+if they pause a Unix read(2) waiting for an event to occur. The tracefs
 pseudo file system has waiting read(2)s and this is an issue since an
 instance of tracefs is often mounted under sysfs (e.g. /sys/kernel/trace ).
 Due to this issue, every time this script tries to descend into a
@@ -35,21 +45,22 @@ If not, it does not descend and outputs a "<different filesystem>" message.
 An example that shows this action is:
     $ ls_name_value \-d /dev /sys
     >> descend to: /dev/:
+        acpi_thermal_rel : <char device>
         ....
     >> not descending to: /sys/: <different filesystem>
 .br
-This occurs because /dev is contained in an instance of devfs while /sys
-is contained in an instance of sysfs.
+This occurs because /dev is contained in an instance of the devfs file
+system  while /sys is contained in an instance of sysfs.
 .PP
-The name shown in each "name:value pair" is its basename it it is given with
-an absolute or relative path. The value shown will only contain printable
-ASCII characters, truncated at 256 bytes. If any characters read from that
-name have the top bit set (in a character/byte) then the whole value is
+The name shown in each "name:value pair" is its basename if \fINAME\fR is
+given with an absolute or relative path. The value shown will only contain
+printable ASCII characters, truncated to 256 bytes. If any character (byte)
+read from a regular filename has its top bit set then the whole value is
 replaced with "<contains non\-ASCII chars>". If the name has write
-permissions set for the accessing user then the whole value is replaced
-by "<writable>" (even if read permissions are also set). If the value in
-the name cannot be read (and the name is a regular file) then the whole
-value is replaced by "<cannot access>".
+permissions set for the accessing user and no read permissions set then the
+whole value is replaced by "<write_only>". If the value in the
+name cannot be read (and the name is a regular file) then the whole value
+is replaced by "<cannot access>".
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -87,8 +98,8 @@ print out the usage message then exit.
 in sysfs most symbolic links (symlinks) point to other directories rather
 than regular files. Sometimes following symlinks and expanding the directory
 adds too much noise so this option prunes out symlinks to directories.
-.TP 
-\fB\-n\fR, \fB\-\-num\fR=\fINUM\fR 
+.TP
+\fB\-n\fR, \fB\-\-num\fR=\fINUM\fR
 \fINUM\fR is the maximum number of bytes in the values shown. \fINUM\fR is
 required to be greater than zero. 256 bytes is the default for \fINUM\fR.
 .br
@@ -130,6 +141,11 @@ increase level or verbosity.
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 prints out the version string then exits.
+.TP
+\fB\-w\fR, \fB\-\-write\fR
+the separator between the <name> and <value> is normally ":". If this option
+is given and the filename <name> has both read and write permissions for
+the current user then the separator is changed to "+".
 .SH EXAMPLES
 There is no command line option to exclude directories which would be useful
 when using the \fI\-\-dir\fR option. A case where this might be helpful is

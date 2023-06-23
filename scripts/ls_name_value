@@ -7,7 +7,7 @@
 # followed by their ASCII contents (i.e. their values) as appropriate.
 # It targets sysfs (/sys ) in Linux but may be useful in other contexts.
 
-version_str="1.11 20230531"
+version_str="1.12 20230603"
 
 all=0
 dir=0
@@ -19,19 +19,20 @@ show=0
 is_root=0     # 0 for true; 1 for false (sorry C)
 first_st_dev=0
 verbose=0
+writ_ind=0
 
 # The following are for the getopt(1) command from util-linux which
 # follows the function definitions, about 100 lines down.
 script_name=$(basename "$0")
-short="adehn:NosvV"
-long="all,dir,empty,help,num:,nosym,otherfs,show,verbose,version"
+short="adehn:NosvVw"
+long="all,dir,empty,help,num:,nosym,otherfs,show,verbose,version,write"
 
 
 usage()
 {
   echo "Usage: ls_name_value [-a] [-d] [-e] [-h] [-N] [-n NUM] [-o] [-s] "
-  echo "                     [-v] [-V] [<name>*]"
-  echo "  where:  -a, --all         include hidden filename (start with '.')"
+  echo "                     [-v] [-V] [-w] [<name>*]"
+  echo "  where:  -a, --all         include hidden filename (starting with '.')"
   echo "          -d, --dir         descend if <name> is directory"
   echo "                            descends 1 level; -dd descends 2 levels"
   echo "          -e, --empty       output <value> as '<empty>' rather than blank"
@@ -42,11 +43,15 @@ usage()
   echo "          -s, --show        show directories, symlinks and specials"
   echo "          -v, --verbose     increase verbosity of output"
   echo "          -V, --version     print version string then exit"
+  echo "          -w, --write       separator changed from : to + if writable"
   echo ""
-  echo "Prints '<name> : <value>' where <name> is a regular filename or a"
-  echo "filename in a given directory name. <value> is the ASCII contents of"
-  echo "each filename. The <value> may be truncated. Designed for viewing sysfs"
-  echo "(under /sys directory) in Linux."
+  echo "Prints lines of the form '<name> : <value>' where <name> is a regular"
+  echo "filename. The <value> is the contents of <name>, up to 256 bytes of "
+  echo "printable ASCII. If one or more <name>s are given on the command line "
+  echo "then they are used. If there are no names on the command line, then the "
+  echo "regular files in the current directory are used. If one <name> is given "
+  echo "and it is a directory then it is entered and the files in that directory "
+  echo "are used. Designed for viewing sysfs in Linux (e.g. under /sys )."
 }
 
 get_root_perm()
@@ -67,28 +72,35 @@ get_root_perm()
 one_name_value()
 {
   local grp
+  local name
   local value
   local pad
+  local separ
 
   if [ $# -gt 1 ] ; then
     pad=$2
   else
     pad=""
   fi
+  if [ "${1:0:1}" = "/" ] || [ "${1:0:1}" = "." ] ; then
+    name="${pad}$( basename "$1" ) "
+  else
+    name="${pad}${1} "
+  fi
+  separ=":"
 
   if [ -f "${1}" ] ; then
     if [ ${is_root} -ne 0 ] ; then    # false, so non-root
       if [ -r "${1}" ] ; then
+        if [ "${writ_ind}" -gt 0 ] && [ -w "${1}" ] ; then
+          separ="+"
+        fi
+        echo -n "${name}${separ} "
         value=$( head -c "${num_val}" "${1}" 2> /dev/null | tr -d '\0' )
         if [ $empty -eq 0 ] || [ -n "${value}" ] ; then
           value=$( echo  "${value}" | tr '\n' " " )
         else
           value="<empty>"
-        fi
-        if [ "${1:0:1}" = "/" ] || [ "${1:0:1}" = "." ] ; then
-          echo -n "${pad}$( basename "$1" ) : "
-        else
-          echo -n "${pad}${1} : "
         fi
         if [[ ${value} = *[![:ascii:]]* ]]; then
           echo "<contains non-ASCII chars>"
@@ -96,23 +108,22 @@ one_name_value()
           echo "${value//[![:print:]]/}"
         fi
       elif [ -w "${1}" ] ; then
-        echo "${pad}${1} : <writable>"
+        echo "${pad}${1} : <write_only>"
       else
         echo "${pad}${1} : <cannot access>"
       fi
     else        # run by root
       grp=$( get_root_perm "${1}" )
       if [ "${grp}" -ge 4 ] ; then
+        if [ "${writ_ind}" -gt 0 ] && [ "${grp}" -ge 6 ] ; then
+          separ="+"
+        fi
+        echo -n "${name}${separ} "
         value=$( head -c "${num_val}" "${1}" 2> /dev/null | tr -d '\0' )
         if [ $empty -eq 0 ] || [ -n "${value}" ] ; then
           value=$( echo  "${value}" | tr '\n' " " )
         else
           value="<empty>"
-        fi
-        if [ "${1:0:1}" = "/" ] || [ "${1:0:1}" = "." ] ; then
-          echo -n "${pad}$( basename "$1" ) : "
-        else
-          echo -n "${pad}${1} : "
         fi
         if [[ ${value} = *[![:ascii:]]* ]]; then
           echo "<contains non-ASCII chars>"
@@ -120,7 +131,7 @@ one_name_value()
           echo "${value//[![:print:]]/}"
         fi
       elif [ "${grp}" -ge 2 ] ; then
-        echo "${pad}${1} : <writable>"
+        echo "${pad}${1} : <write_only>"
       else
         echo "${pad}${1} : <cannot access>"
       fi
@@ -178,13 +189,14 @@ while :; do
                   exit 1
                 fi
                 shift 2 ;;
-    -N | --nosym      ) (( nosym=nosym+1 )) ;      shift 1 ;;
-    -o | --otherfs    ) (( otherfs=otherfs+1 )) ;  shift 1 ;;
-    -s | --show       ) (( show=show+1 )) ;        shift 1 ;;
-    -v | --verbose    ) (( verbose=verbose+1 )) ;  shift 1 ;;
-    -V | --version    ) echo "${version_str}" ;    exit 0 ;;
-    --                ) shift;                     break ;;
-    *                 ) echo "Error parsing $1";   exit 1 ;;
+    -N | --nosym      ) (( nosym=nosym+1 )) ;       shift 1 ;;
+    -o | --otherfs    ) (( otherfs=otherfs+1 )) ;   shift 1 ;;
+    -s | --show       ) (( show=show+1 )) ;         shift 1 ;;
+    -v | --verbose    ) (( verbose=verbose+1 )) ;   shift 1 ;;
+    -V | --version    ) echo "${version_str}" ;     exit 0 ;;
+    -w | --write      ) (( writ_ind=writ_ind+1 )) ; shift 1 ;;
+    --                ) shift;                      break ;;
+    *                 ) echo "Error parsing $1";    exit 1 ;;
   esac
 done
 
@@ -256,7 +268,7 @@ for (( k=0; k<tLen; k++ )) ; do
       a_st_dev=${first_st_dev}
     fi
     if [ "${first_st_dev}" -eq "${a_st_dev}" ] ; then
-      echo ">> descend to: ${name1}/:"
+      echo ">> descend to: ${name1}/"
       cur=$( pwd )
       if ! cd "${name1}" ; then
         echo "cd to ${name1} failed from $( pwd -P) "
@@ -295,7 +307,7 @@ for (( k=0; k<tLen; k++ )) ; do
             b_st_dev=${first_st_dev}
           fi
           if [ "${first_st_dev}" -eq "${b_st_dev}" ] ; then
-            echo "    >> descend to: ${name2}/:"
+            echo "    >> descend to: ${name2}/"
             cur2=$( pwd )
             if ! cd "${name2}" ; then
               echo "cd to ${name2} failed from $( pwd -P) "
@@ -324,7 +336,7 @@ for (( k=0; k<tLen; k++ )) ; do
             fi
             echo ""
           else
-            echo "    >> not descending to: ${name2}/: <different filesystem>"
+            echo "    >> not descending to: ${name2}/ : <different filesystem>"
           fi
         else
           one_name_value "${name2}" "    "
@@ -337,7 +349,7 @@ for (( k=0; k<tLen; k++ )) ; do
       fi
       echo ""
     else
-      echo ">> not descending to: ${name1}/: <different filesystem>"
+      echo ">> not descending to: ${name1}/ : <different filesystem>"
     fi
   else
     one_name_value "${name1}"

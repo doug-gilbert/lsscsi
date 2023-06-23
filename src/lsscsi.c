@@ -47,7 +47,30 @@
 #include "sg_json.h"
 
 /* Package release number is first number, whole string is version */
-static const char * release_str = "0.33  2023/05/31 [svn: r190]";
+static const char * release_str = "0.33  2023/06/22 [svn: r191]";
+
+/*
+ * Some jargon:
+ *    relative path: a path the does not start with '/'
+ *    absolute path: a path that does start with '/'
+ *    canonical path: an absolute path that contains no symlinks and
+ *                    no specials (i.e. "." and "..")
+ *    symlink: a symbolic link that often breaks the otherwise hierarchial
+ *             nature of a file system, so they are evil
+ *    symlink target: the destination of the symlink: a file, more often
+ *                    a directory, may not even exist
+ *    dangling or hanging symlink: one whose target does not exist
+ *    link name of symlink: where the symlink actually resides, accessed
+ *                          by the readlink(2) system call.
+ *
+ * Each file (including directories) has a unique canonical path. When a
+ * directories's canonical path is required this utility uses the
+ * following technique:
+ *     1) change directory to the location [e.g. with if_directory_chdir() )
+ *     2) if step 1) succeeds , call the getcwd(2) system call
+ * If step 2) succeeds we have the canonical path. Either step could fail,
+ * one example is an absolute path containing a dangling symlnk.
+ */
 
 #define FT_OTHER 0
 #define FT_BLOCK 1
@@ -67,6 +90,7 @@ static const char * release_str = "0.33  2023/05/31 [svn: r190]";
 #define TRANSPORT_FCOE 10
 #define TRANSPORT_SRP 11
 #define TRANSPORT_PCIE 12       /* most likely NVMe */
+#define TRANSPORT_PSEUDO_0 99   /* scsi_debug driver */
 
 #define NVME_HOST_NUM 0x7fff    /* 32767, high to avoid SCSI host numbers */
 
@@ -345,7 +369,7 @@ struct disk_wwn_node_list {
 static struct disk_wwn_node_list * disk_wwn_node_listhead = NULL;
 
 struct item_t {
-        char name[LMAX_NAME];
+        char name[LMAX_DEVPATH];
         int ft;
         int d_type;
 };
@@ -373,67 +397,85 @@ static int iscsi_tsession_num;
 static char errpath[LMAX_PATH];
 
 
-static const char * usage_message1 =
-"Usage: lsscsi   [--brief] [--classic] [--controllers] [--device] "
-            "[--generic]\n"
-            "\t\t[--help] [--hosts] [--json[=JO]] [--js-file=JFN] "
-            "[--kname]\n"
-            "\t\t[--list] [--long] [--long-unit] [--lunhex] [--no-nvme] "
-            "[--pdt]\n"
-            "\t\t[--protection] [--prot-mode] [--scsi_id] [--size] "
-            "[--sz-lbs]\n"
-            "\t\t[--sysfsroot=PATH] [--transport] [--unit] [--verbose]\n"
-            "\t\t[--version] [--wwn]  [<h:c:t:l>]\n"
-"  where:\n"
-"    --brief|-b        tuple and device name only\n"
-"    --classic|-c      alternate output similar to 'cat /proc/scsi/scsi'\n"
-"    --controllers|-C   synonym for --hosts since NVMe controllers treated\n"
-"                       like SCSI hosts\n"
-"    --device|-d       show device node's major + minor numbers\n"
-"    --generic|-g      show scsi generic device name\n"
-"    --help|-h         this usage information\n"
-"    --hosts|-H        lists scsi hosts rather than scsi devices\n"
-"    --json[=JO]|-j[=JO]    output in JSON instead of plain text. "
-"Use\n"
-"                           --json=? or '-j=?' for JSON help\n"
-"    --js-file=JFN|-J JFN    JFN is a filename to which JSON output is\n"
-"                            written (def: stdout); truncates then writes\n"
-"    --kname|-k        show kernel name instead of device node name\n"
-"    --list|-L         additional information output one\n"
-"                      attribute=value per line\n"
-"    --long|-l         additional information output\n"
-"    --long-unit|-U    print LU name in full, use twice to prefix with\n"
-"                      '.naa', 'eui.', 'uuid.' or 't10.'\n"
-"    --lunhex|-x       show LUN part of tuple as hex number in T10 "
-"format;\n";
+static const char * const usage_message1 =
+        "Usage: lsscsi  [--brief] [--classic] [--controllers] [--device] "
+        "[--generic]\n"
+        "               [--help] [--hosts] [--json[=JO]] [--js-file=JFN] "
+        "[--kname]\n"
+        "               [--list] [--long] [--long-unit] [--lunhex] "
+        "[--no-nvme] [--pdt]\n"
+        "               [--protection] [--prot-mode] [--scsi_id] [--size] "
+        "[--sz-lbs]\n"
+        "               [--sysfsroot=PATH] [--transport] [--unit] "
+        "[--verbose]\n"
+        "               [--version] [--wwn]  [<h:c:t:l>]\n"
+        "  where:\n"
+        "    --brief|-b        tuple and device name only\n"
+        "    --classic|-c      alternate output similar to 'cat "
+        "/proc/scsi/scsi'\n"
+        "    --controllers|-C   synonym for --hosts since NVMe controllers "
+        "treated\n"
+        "                       like SCSI hosts\n"
+        "    --device|-d       show device node's major + minor numbers\n"
+        "    --generic|-g      show scsi generic device name\n"
+        "    --help|-h         this usage information\n"
+        "    --hosts|-H        lists scsi hosts rather than scsi devices\n"
+        "    --json[=JO]|-j[=JO]    output in JSON instead of plain text. "
+            "Use\n"
+        "                           --json=? or '-j=?' for JSON help\n"
+        "    --js-file=JFN|-J JFN    JFN is a filename to which JSON output "
+        "is\n"
+        "                            written (def: stdout); truncates then "
+        "writes\n"
+        "    --kname|-k        show kernel name instead of device node name\n"
+        "    --list|-L         additional information output one\n"
+        "                      attribute=value per line\n"
+        "    --long|-l         additional information output\n"
+        "    --long-unit|-U    print LU name in full, use twice to prefix "
+        "with\n"
+            "                      '.naa', 'eui.', 'uuid.' or 't10.'\n"
+        "    --lunhex|-x       show LUN part of tuple as hex number in T10 "
+        "format;\n";
 
-static const char * usage_message2 =
-"                      use twice to get full 16 digit hexadecimal LUN\n"
-"    --no-nvme|-N      exclude NVMe devices from output\n"
-"    --pdt|-D          show the peripheral device type in hex\n"
-"    --protection|-p   show target and initiator protection information\n"
-"    --protmode|-P     show negotiated protection information mode\n"
-"    --scsi_id|-i      show udev derived /dev/disk/by-id/scsi* entry\n"
-"    --size|-s         show disk size, (once for decimal (e.g. 3 GB),\n"
-"                      twice for power of two (e.g. 2.7 GiB),\n"
-"                      thrice for number of blocks))\n"
-"    --sysfsroot=PATH|-y PATH    set sysfs mount point to PATH (def: /sys)\n"
-"    --sz-lbs|-S       show size as a number of logical blocks; if used "
-"twice\n"
-"                      adds comma followed by logical block size in bytes\n"
-"    --transport|-t    transport information for target or, if '--hosts'\n"
-"                      given, for initiator\n"
-"    --unit|-u         logical unit (LU) name (aka WWN for ATA/SATA)\n"
-"    --verbose|-v      output path names where data is found\n"
-"    --version|-V      output version string and exit\n"
-"    --wwn|-w          output WWN for disks (from /dev/disk/by-id/*)\n"
-"    <h:c:t:l>         filter output list (def: '*:*:*:*' (all)). Meaning:\n"
-"                      <host_num:controller:target:lun> or for NVMe:\n"
-"                      <'N':ctl_num:cntlid:namespace_id>\n\n"
-"List SCSI devices or hosts, followed by NVMe namespaces or controllers.\n"
-"Many storage devices (e.g. SATA disks and USB attached storage) use SCSI\n"
-"command sets and hence are also listed by this utility. Hyphenated long\n"
-"option names can also take underscore (and vice versa).\n";
+static const char * const usage_message2 =
+        "                      use twice to get full 16 digit hexadecimal "
+        "LUN\n"
+        "    --no-nvme|-N      exclude NVMe devices from output\n"
+        "    --pdt|-D          show the peripheral device type in hex\n"
+        "    --protection|-p   show target and initiator protection "
+        "information\n"
+        "    --protmode|-P     show negotiated protection information mode\n"
+        "    --scsi_id|-i      show udev derived /dev/disk/by-id/scsi* "
+        "entry\n"
+        "    --size|-s         show disk size, (once for decimal (e.g. "
+        "3 GB),\n"
+        "                      twice for power of two (e.g. 2.7 GiB),\n"
+        "                      thrice for number of blocks))\n"
+        "    --sysfsroot=PATH|-y PATH    set sysfs mount point to PATH (def: "
+            "/sys)\n"
+        "    --sz-lbs|-S       show size as a number of logical blocks; if "
+        "used twice\n"
+        "                      adds comma followed by logical block size in "
+        "bytes\n"
+        "    --transport|-t    transport information for target or, if "
+        "'--hosts'\n"
+        "                      given, for initiator\n"
+        "    --unit|-u         logical unit (LU) name (aka WWN for "
+        "ATA/SATA)\n"
+        "    --verbose|-v      output path names where data is found\n"
+        "    --version|-V      output version string and exit\n"
+        "    --wwn|-w          output WWN for disks (from "
+        "/dev/disk/by-id/*)\n"
+        "    <h:c:t:l>         filter output list (def: '*:*:*:*' (all)). "
+        "Meaning:\n"
+        "                      <host_num:controller:target:lun> or for "
+        "NVMe:\n"
+        "                      <'N':ctl_num:cntlid:namespace_id>\n\n"
+            "List SCSI devices or hosts, followed by NVMe namespaces or "
+        "controllers.\nMany storage devices (e.g. SATA disks and USB "
+        "attached storage) use SCSI\ncommand sets and hence are also listed "
+        "by this utility. Hyphenated long\noption names can also take "
+        "underscore (and vice versa).\n";
 
 
 #if (HAVE_NVME && (! IGNORE_NVME))
@@ -473,16 +515,17 @@ trim_lead_trail(char * s, bool trim_leading, bool trim_trailing)
 static void
 trunc_pad2n(char * str, int n, bool trailing__on_trunc)
 {
-    int slen = strlen(str);
+        int slen = strlen(str);
 
-    if (slen < n) {
-        memset(str + slen, ' ', n - slen);
-        str[n] = '\0';
-    } else if (slen > n) {
-        str[n] = '\0';
-        if ((n > 0) && trailing__on_trunc && (! isspace((uint8_t)str[n - 1])))
-                str[n - 1] = '_';
-    }
+        if (slen < n) {
+                memset(str + slen, ' ', n - slen);
+                str[n] = '\0';
+        } else if (slen > n) {
+                str[n] = '\0';
+                if ((n > 0) && trailing__on_trunc &&
+                    (! isspace((uint8_t)str[n - 1])))
+                        str[n - 1] = '_';
+        }
 }
 
 static const char * bad_arg = "Bad_argument";
@@ -1073,7 +1116,7 @@ non_sg_scan(const char * dir_name, const struct lsscsi_opts * op)
         num = scandir(dir_name, &namelist, non_sg_dir_scan_select, NULL);
         if (num < 0) {
                 if (op->verbose > 0) {
-                        snprintf(errpath, LMAX_PATH, "%s: scandir: %s",
+                        sg_scnpr(errpath, LMAX_PATH, "%s: scandir: %s",
                                  __func__, dir_name);
                         perror(errpath);
                 }
@@ -1269,7 +1312,8 @@ fini:
 }
 
 
-/* If 'dir_name'/'base_name' is a directory chdir to it. If that is successful
+/* If 'dir_name'/'base_name' is a directory chdir to it. 'base_name' may be
+ * NULL in which case 'dir_name' is used instead. If that is successful
    return true, else false */
 static bool
 if_directory_chdir(const char * dir_name, const char * base_name)
@@ -1277,7 +1321,10 @@ if_directory_chdir(const char * dir_name, const char * base_name)
         char b[LMAX_PATH];
         struct stat a_stat;
 
-        snprintf(b, sizeof(b), "%s/%s", dir_name, base_name);
+        if (base_name)
+            snprintf(b, sizeof(b), "%s/%s", dir_name, base_name);
+        else
+            snprintf(b, sizeof(b), "%s", dir_name);
         if (stat(b, &a_stat) < 0)
                 return false;
         if (S_ISDIR(a_stat.st_mode)) {
@@ -2195,7 +2242,7 @@ get_srp_dgid(const int h, char *b, int b_len)
  * transport_id, place a string in 'b' and return true. Otherwise return
  * false. */
 static bool
-transport_init(const char * devname, int b_len, char * b)
+transport_h_init(const char * devname, int b_len, char * b)
 {
         int off;
         char * cp;
@@ -2421,7 +2468,7 @@ transport_init_longer(const char * path_name, struct lsscsi_opts * op,
         case TRANSPORT_FCOE:
                 sgj_haj_vs(jsp, jop, 2, trans_s, SEP_EQ_NO_SP,
                            (transport_id == TRANSPORT_FC) ? "fc:" : "fcoe:");
-                snprintf(b, blen, "%s/%s/%s/%s", path_name, dvc_s, fc_h_s,
+                sg_scnpr(b, blen, "%s/%s/%s/%s", path_name, dvc_s, fc_h_s,
                          cp);
                 if (stat(b, &a_stat) < 0) {
                         if (op->verbose > 2)
@@ -2535,7 +2582,7 @@ transport_init_longer(const char * path_name, struct lsscsi_opts * op,
                         static const char * rdec_s =
                                         "running_disparity_error_count";
 
-                        snprintf(b, blen, "%s%s%s", path_name, "/device/",
+                        sg_scnpr(b, blen, "%s%s%s", path_name, "/device/",
                                  pln);
                         if ((phynum = sas_low_phy_scan(b, &phylist)) < 1) {
                                 sgj_pr_hr(jsp, "  %s: phy list not "
@@ -2618,7 +2665,7 @@ transport_init_longer(const char * path_name, struct lsscsi_opts * op,
                 sgj_haj_vs(jsp, jop, 2, trans_s, SEP_EQ_NO_SP, "sas");
                 sgj_haj_vs(jsp, jop, 2, subtrans_s, SEP_EQ_NO_SP,
                            "sas_class");
-                snprintf(b, blen, "%s%s", path_name, "/device/sas/ha");
+                sg_scnpr(b, blen, "%s%s", path_name, "/device/sas/ha");
                 if (get_value(b, dev_n_s, value, vlen))
                         sgj_haj_vs(jsp, jop, 2, dev_n_s, SEP_EQ_NO_SP, value);
                 if (get_value(b, ha_n_s, value, vlen))
@@ -2676,6 +2723,9 @@ transport_init_longer(const char * path_name, struct lsscsi_opts * op,
         case TRANSPORT_PCIE:
                 sgj_haj_vs(jsp, jop, 2, trans_s, SEP_EQ_NO_SP, pcie_s);
                 break;
+        case TRANSPORT_PSEUDO_0:
+                sgj_haj_vs(jsp, jop, 2, trans_s, SEP_EQ_NO_SP, "pseudo_0");
+                break;
         default:
                 if (op->verbose > 1)
                         pr2serr("No %s information\n", trans_s);
@@ -2687,11 +2737,11 @@ transport_init_longer(const char * path_name, struct lsscsi_opts * op,
  * with 'devname'. If found set transport_id, place string in 'b' and return
  * true. Otherwise return false. */
 static bool
-transport_tport(const char * devname, const struct lsscsi_opts * op,
+transport_sdev_tport(const char * devname, const struct lsscsi_opts * op,
                 int b_len, char * b)
 {
         bool ata_dev;
-        int n, off, bufflen, wdlen;
+        int n, off;
         char * cp;
         char buff[LMAX_DEVPATH];
         char wd[LMAX_PATH];
@@ -2699,12 +2749,12 @@ transport_tport(const char * devname, const struct lsscsi_opts * op,
         char tpgt[LMAX_NAME];
         struct addr_hctl hctl;
         struct stat a_stat;
+        static const int bufflen = sizeof(buff);
+        static const int wdlen = sizeof(wd);
 
         if (! parse_colon_list(devname, &hctl))
                 return false;
 
-        bufflen = sizeof(buff);
-        wdlen = sizeof(wd);
         /* check for SAS host */
         snprintf(buff, bufflen, "%s%shost%d", sysfsroot, sas_host_s, hctl.h);
         if ((stat(buff, &a_stat) >= 0) && stat_is_dir_or_symlink(&a_stat)) {
@@ -2865,6 +2915,20 @@ transport_tport(const char * devname, const struct lsscsi_opts * op,
                         sg_scn3pr(b, b_len, off, "%s",
                                   get_lu_name(devname, wd, wdlen, false));
                         return true;
+                }
+        }
+
+        /* Check for scsi_debug driver which is owned by device: "pseudo_0" */
+        snprintf(buff, bufflen, "%s%shost%d", sysfsroot, scsi_host_s, hctl.h);
+        if ((stat(buff, &a_stat) >= 0) && stat_is_dir_or_symlink(&a_stat)) {
+                if (if_directory_chdir(buff, NULL)) {
+                        if (NULL == getcwd(wd, wdlen))
+                                return false;
+                        if (strstr(wd, "pseudo_0")) {
+                                transport_id = TRANSPORT_PSEUDO_0;
+                                snprintf(b, b_len, "pseudo_0");
+                                return true;
+                        }
                 }
         }
         return false;
@@ -3179,6 +3243,12 @@ transport_tport_longer(const char * devname, struct lsscsi_opts * op,
                 break;
         case TRANSPORT_SATA:
                 sgj_haj_vs(jsp, jop, 2, trans_s, SEP_EQ_NO_SP, "sata");
+                cp = get_lu_name(devname, b2, b2len, false);
+                if (strlen(cp) > 0)
+                        sgj_haj_vs(jsp, jop, 2, wwn_s, SEP_EQ_NO_SP, cp);
+                break;
+        case TRANSPORT_PSEUDO_0:
+                sgj_haj_vs(jsp, jop, 2, trans_s, SEP_EQ_NO_SP, "pseudo_0");
                 cp = get_lu_name(devname, b2, b2len, false);
                 if (strlen(cp) > 0)
                         sgj_haj_vs(jsp, jop, 2, wwn_s, SEP_EQ_NO_SP, cp);
@@ -3757,7 +3827,7 @@ one_sdev_entry(const char * dir_name, const char * devname,
         sgj_state * jsp = &op->json_st;
         sgj_opaque_p jo2p = NULL;
         const char * cp = NULL;
-        char buff[LMAX_DEVPATH];
+        char buff[LMAX_PATH];
         char extra[LMAX_DEVPATH];
         char value[LMAX_NAME];
         char wd[LMAX_PATH];
@@ -3856,7 +3926,7 @@ one_sdev_entry(const char * dir_name, const char * devname,
         if (op->wwn)
                 get_wwn = true;
         if (op->transport_info) {
-                if (transport_tport(devname, op, vlen, value))
+                if (transport_sdev_tport(devname, op, vlen, value))
                         q += sg_scn3pr(b, blen, q, "%-30s  ", value);
                 else
                         q += sg_scn3pr(b, blen, q,
@@ -3913,7 +3983,7 @@ one_sdev_entry(const char * dir_name, const char * devname,
 
         if (1 == non_sg_scan(buff, op)) {       /* expect 1 or 0 */
                 if (DT_DIR == non_sg.d_type) {
-                        snprintf(wd, sizeof(wd), "%s/%s", buff, non_sg.name);
+                        sg_scnpr(wd, sizeof(wd), "%s/%s", buff, non_sg.name);
                         if (1 == scan_for_first(wd, op))
                                 my_strcopy(extra, aa_first.name,
                                            sizeof(extra));
@@ -4383,7 +4453,7 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
                 /* found a <nvme_ctl_abs>/ng* 'nvme-generic' device */
                 const char * ngp = aa_ng.name;
 
-                snprintf(dev_node, devnlen, "%s/%s", nvme_ctl_abs, ngp);
+                sg_scnpr(dev_node, devnlen, "%s/%s", nvme_ctl_abs, ngp);
                 // if (get2_value(nvme_ctl_abs, ngp, dv_s, e, elen)) {
                 if (op->kname) {
                         snprintf(value, vlen, "%s/%.32s", dev_dir_s, ngp);
@@ -5102,7 +5172,7 @@ one_shost_entry(const char * dir_name, const char * devname,
         int n, q;
         unsigned int host_id;
         sgj_state * jsp = &op->json_st;
-        char b[LMAX_DEVPATH];
+        char b[LMAX_PATH];
         char value[LMAX_NAME];
         char wd[LMAX_PATH];
         char o[144];
@@ -5144,9 +5214,9 @@ one_shost_entry(const char * dir_name, const char * devname,
         } else
                 q += sg_scn3pr(o, olen, q, "  proc_name=????  ");
         if (op->transport_info) {
-                if (! transport_init(devname, olen - q, o + q)) {
+                if (! transport_h_init(devname, olen - q, o + q)) {
                         if (op->verbose > 3)
-                                pr2serr("%s: transport_init() failed\n",
+                                pr2serr("%s: transport_h_init() failed\n",
                                         __func__);
                 }
                 if (jsp->pr_as_json && (strlen(o + q) > 1))
