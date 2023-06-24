@@ -47,7 +47,7 @@
 #include "sg_json.h"
 
 /* Package release number is first number, whole string is version */
-static const char * release_str = "0.33  2023/06/22 [svn: r191]";
+static const char * release_str = "0.33  2023/06/23 [svn: r192]";
 
 /*
  * Some jargon:
@@ -3820,6 +3820,7 @@ one_sdev_entry(const char * dir_name, const char * devname,
 {
         bool get_wwn = false;
         bool as_json;
+        bool json_transport_req = false;
         int n;
         int dec_pdt = 0;        /* decoded PDT; called 'type' in sysfs */
         int q = 0;
@@ -3926,9 +3927,15 @@ one_sdev_entry(const char * dir_name, const char * devname,
         if (op->wwn)
                 get_wwn = true;
         if (op->transport_info) {
-                if (transport_sdev_tport(devname, op, vlen, value))
+                /* This code replaces the vendor/product/revision string on
+                 * the single line output with abridged transport info.
+                 * However this doesn't help when JSON output is active, set
+                 * flag so longer_sdev_entry() is called later. */
+                if (transport_sdev_tport(devname, op, vlen, value)) {
                         q += sg_scn3pr(b, blen, q, "%-30s  ", value);
-                else
+                        if (as_json)
+                                json_transport_req = true;
+                } else
                         q += sg_scn3pr(b, blen, q,
                                        "                                ");
         } else if (op->unit) {
@@ -4191,7 +4198,7 @@ one_sdev_entry(const char * dir_name, const char * devname,
 
 fini_line:
         sgj_pr_hr(jsp, "%s\n", b);
-        if (op->long_opt > 0)
+        if ((op->long_opt > 0) || json_transport_req)
                 longer_sdev_entry(buff, devname, op, jop);
         if (op->verbose > 0) {
                 q = sg_scn3pr(b, blen, 0, "  dir: %s  [", buff);

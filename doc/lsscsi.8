@@ -462,6 +462,13 @@ is a separate SCSI host for each USB (SCSI) target. A USB SCSI target may
 contain multiple logical units. Thus the same "usb: <device_name>" string
 appears for a USB SCSI host and all logical units that belong to the USB
 SCSI target associated with that USB SCSI host.
+.PP
+The scsi_debug module/driver in the Linux kernel simulates one or more SCSI
+hosts attached to one or more SCSI devices. Strictly speaking the scsi_debug
+driver does not have an associated SCSI transport. However sysfs does
+associate the driver with the "pseudo_0" device (i.e. /sys/devices/pseudo_0)
+so "pseudo_0" is used as the SCSI transport name. This helps the lsscsi
+output to be more consistent when several SCSI transports are present.
 .SH LUNS
 For historical reasons and as used by several other Unix based Operating
 Systems, Linux uses a tuple of integers to describe (a path to) a SCSI
