@@ -1,4 +1,4 @@
-.TH LS_NAME_VALUE "8" "June 2023" "lsscsi\-0.33" LSSCSI
+.TH LS_NAME_VALUE "8" "July 2023" "lsscsi\-0.33" LSSCSI
 .SH NAME
 ls_name_value \- for browsing names and corresponding values in sysfs
 .SH SYNOPSIS
@@ -168,6 +168,20 @@ is a directory called "thread\-self" that is a symbolic link to a process
 directory that is scanned. The \fI\-\-nosym\fR option would prune
 the "thread\-self" along with any other symlinks (and there are several).
 In some senses symlinks are evil.
+.PP
+To list the contents of all files called 'connect_type' in sysfs, the
+following could be done:
+    $ find /sys \-name connect_type \-print0 | xargs -0 ls_name_value
+.br
+The output will be one line per match. The 'cat' utility could be used but
+ls_name_value guards against long files and files containing binary that
+could trash the console output. If there are a lot of matching files then
+the maximum size of a command line may become an issue. If so:
+   $ find /sys \-name connect_type \-exec ls_name_value {} \\;
+.br
+should do the trick. If the filename contained spaces then the second version
+would have problems. It doesn't in the case of 'connect_type' but sysfs does
+contain a few filenames with spaces: "/sys/bus/pnp/drivers/i8042 aux" .
 .SH NOTES
 This utility's functionality overlaps somewhat with the systool utility.
 systool knows the high level structure of sysfs and offers a better overview.
@@ -185,4 +199,4 @@ This software is distributed under a BSD\-2\-Clause license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
 .B lsscsi(this package), od(GNU coreutils), hd(util\-linux), getopt(1)
-.B systool(sysfsutils)
+.B systool(sysfsutils), udevadm(systemd)

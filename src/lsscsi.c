@@ -47,7 +47,7 @@
 #include "sg_json.h"
 
 /* Package release number is first number, whole string is version */
-static const char * release_str = "0.33  2023/06/23 [svn: r192]";
+static const char * release_str = "0.33  2023/09/22 [svn: r193]";
 
 /*
  * Some jargon:
@@ -68,8 +68,7 @@ static const char * release_str = "0.33  2023/06/23 [svn: r192]";
  * following technique:
  *     1) change directory to the location [e.g. with if_directory_chdir() )
  *     2) if step 1) succeeds , call the getcwd(2) system call
- * If step 2) succeeds we have the canonical path. Either step could fail,
- * one example is an absolute path containing a dangling symlnk.
+ * If both steps succeed then we have the canonical path.
  */
 
 #define FT_OTHER 0
@@ -114,7 +113,7 @@ static const char * release_str = "0.33  2023/06/23 [svn: r192]";
 
 static int transport_id = TRANSPORT_UNKNOWN;
 
-static const char * sysfsroot = "/sys"; /* can be replaced by '-y <dir>' */
+static char sysfsroot[80] = "/sys"; /* can be overridden */
 
 /* Almost all static, const string names end with _s or _sn (snake) in
  * order to make code a bit easier to read. Many are used repeatedly so
@@ -320,6 +319,7 @@ static struct option long_options[] = {
         {"sz-lbs", no_argument, 0, 'S'},
         {"sz_lbs", no_argument, 0, 'S'},  /* convenience, not documented */
         {"sysfsroot", required_argument, 0, 'y'},
+        {"sysroot", required_argument, 0, 'Y'},
         {"transport", no_argument, 0, 't'},
         {"unit", no_argument, 0, 'u'},
         {"long_unit", no_argument, 0, 'U'},
@@ -406,9 +406,9 @@ static const char * const usage_message1 =
         "[--no-nvme] [--pdt]\n"
         "               [--protection] [--prot-mode] [--scsi_id] [--size] "
         "[--sz-lbs]\n"
-        "               [--sysfsroot=PATH] [--transport] [--unit] "
-        "[--verbose]\n"
-        "               [--version] [--wwn]  [<h:c:t:l>]\n"
+        "               [--sysfsroot=PATH] [--sysroot=AR_PT] [--transport] "
+        "[--unit]\n"
+        "               [--verbose] [--version] [--wwn]  [<h:c:t:l>]\n"
         "  where:\n"
         "    --brief|-b        tuple and device name only\n"
         "    --classic|-c      alternate output similar to 'cat "
@@ -453,6 +453,12 @@ static const char * const usage_message2 =
         "                      thrice for number of blocks))\n"
         "    --sysfsroot=PATH|-y PATH    set sysfs mount point to PATH (def: "
             "/sys)\n"
+        "    --sysroot=AR_PT|-Y AR_PT    set alternate root path (def: / ). "
+        "In\n"
+        "                                practice it is the parent directory "
+        "of\n"
+        "                                PATH. If given lsscsi will access "
+        "AR_PT/sys\n"
         "    --sz-lbs|-S       show size as a number of logical blocks; if "
         "used twice\n"
         "                      adds comma followed by logical block size in "
@@ -5625,6 +5631,8 @@ main(int argc, char **argv)
         int c;
         int res = 0;
         const char * cp;
+        const char * l_sysfsroot = NULL;
+        const char * l_sysroot = NULL;
         sgj_state * jsp;
         sgj_opaque_p jop = NULL;
         struct lsscsi_opts * op;
@@ -5638,7 +5646,7 @@ main(int argc, char **argv)
                 int option_index = 0;
 
                 c = getopt_long(argc, argv,
-                                "^bcCdDghHij::J:klLNpPsStuUvVwxy:",
+                                "^bcCdDghHij::J:klLNpPsStuUvVwxy:Y:",
                                 long_options, &option_index);
                 if (c == -1)
                         break;
@@ -5751,8 +5759,11 @@ main(int argc, char **argv)
                 case 'x':
                         ++op->lunhex;
                         break;
-                case 'y':       /* sysfsroot <dir> */
-                        sysfsroot = optarg;
+                case 'y':       /* --sysfsroot=PATH */
+                        l_sysfsroot = optarg;
+                        break;
+                case 'Y':       /* --sysroot=AR_PT */
+                        l_sysroot = optarg;
                         break;
                 case '?':
                         usage();
@@ -5855,6 +5866,36 @@ main(int argc, char **argv)
                 pr2serr("use '--transport' or '--unit' but not both\n");
                 return 1;
         }
+        if (l_sysfsroot || l_sysroot) {
+                /* don't handle relative paths including those starting
+                 * with dot, What do other ls* utilities do? */
+                static const int sysfsroot_sz = sizeof(sysfsroot);
+
+                if (l_sysfsroot && l_sysroot) {
+                        pr2serr("--sysfsroot and --sysroot= options "
+                                "contradict, choose one\n");
+                        return 1;
+                }
+                /* take care of trailing <null> char */
+                memset(sysfsroot, 0, sysfsroot_sz);
+                if (l_sysfsroot)
+                        strncpy(sysfsroot, l_sysfsroot, sysfsroot_sz - 1);
+                else {
+                        int n;
+                        static const char * sysfs_dir = "/sys";
+
+                        strncpy(sysfsroot, l_sysroot, sysfsroot_sz - 1);
+                        n = strlen(sysfsroot);
+                        if ((n + 6) >= sysfsroot_sz) {
+                                pr2serr("--sysroot= argument is too long\n");
+                                return 1;
+                        }
+                        if ((n > 1) && ('/' == sysfsroot[n - 1]))
+                            --n;
+                        memcpy(sysfsroot + n, sysfs_dir, 4);
+                }
+        }
+
         if (op->transport_info &&
             ((1 == op->long_opt) || (2 == op->long_opt))) {
                 pr2serr("please use '--list' (rather than '--long') with "

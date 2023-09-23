@@ -1,4 +1,4 @@
-.TH LSSCSI "8" "June 2023" "lsscsi\-0.33" LSSCSI
+.TH LSSCSI "8" "September 2023" "lsscsi\-0.33" LSSCSI
 .SH NAME
 lsscsi \- list SCSI devices (or hosts), list NVMe devices
 .SH SYNOPSIS
@@ -9,9 +9,9 @@ lsscsi \- list SCSI devices (or hosts), list NVMe devices
 [\fI\-\-list\fR] [\fI\-\-long\fR] [\fI\-\-long\-unit\fR] [\fI\-\-lunhex\fR]
 [\fI\-\-no\-nvme\fR] [\fI\-\-pdt\fR] [\fI\-\-protection\fR]
 [\fI\-\-protmode\fR] [\fI\-\-scsi_id\fR] [\fI\-\-size\fR]
-[\fI\-\-sysfsroot=PATH\fR] [\fI\-\-sz\-lbs] [\fI\-\-transport\fR]
-[\fI\-\-unit\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-wwn\fR]
-[\fIH:C:T:L\fR]
+[\fI\-\-sysfsroot=PATH\fR] [\fI\-\-sysroot=AR_PT\fR] [\fI\-\-sz\-lbs]
+[\fI\-\-transport\fR] [\fI\-\-unit\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] [\fI\-\-wwn\fR] [\fIH:C:T:L\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 Uses information in sysfs (Linux kernel series 2.6 and later) to list SCSI
@@ -274,8 +274,40 @@ To unclutter the single line per device mode the \fI\-\-brief\fR option
 combined with this option should help.
 .TP
 \fB\-y\fR, \fB\-\-sysfsroot\fR=\fIPATH\fR
-assumes sysfs is mounted at PATH instead of the default '/sys' . If this
-option is given PATH should be an absolute path (i.e. start with '/').
+assumes sysfs is mounted at \fIPATH\fR instead of the default '/sys' . If
+this option is given \fIPATH\fR should be an absolute path (i.e. start
+with '/').
+.br
+May be useful when another machine has its whole root file system
+network\-mounted on this machine. Then the other machine can have its
+SCSI devices enumerated with "\-\-sysfsroot=/mnt/other_machine/sys" .
+.br
+Also clone_pseudo_fs may be used to take a snapshot of a machine's /sys
+directory at some time of interest (or /sys from another machine) then
+have its SCSI devices (and other attributes) replayed with an option
+like this: "\-\-sysfsroot=/tmp/sas" .
+.br
+This option is closely related to the '\-\-sysroot=' option found in lsblk
+and lscpu (amongst others). Those utilities assume the "sys" part of the
+path given as their argument (and lsblk expects to find "proc" there as
+well). procfs may also be cloned with clone_pseudo_fs but lsblk relies on
+the symlink proc/self which points to the PID of clone_pseudo_fs instance
+when it ran, and that is not valid when in "replay" mode. lsblk is still
+helpful in replay mode, even without a "valid" procfs, as only
+the "mountpoint" column is lost.
+.TP
+\fB\-Y\fR, \fB\-\-sysroot\fR=\fIAR_PT\fR
+\fIAR_PT\fR is an alternate root path. The default root path is '/' and
+this utility accesses '/sys' for data. If this option is given, say with
+\fIAR_PT\fR being '/tmp' then this utility will access '/tmp/sys' for its
+data. So this option is similar to the \fI\-\-sysfsroot=PATH\fR option,
+with \fIAR_PT\fR being the parent directory of \fIPATH\fR.
+.br
+This option was added for compatibility with other 'ls*' utilities that
+have a \-\-sysroot option. Having such an option allows a 'ls*' utility to
+decode data from another machine, or a snapshot of the current machine at
+an early time. This could be useful if one of those 'ls*' utilities was
+misbehaving (e.g. failing to list hardware that was present).
 .TP
 \fB\-S\fR, \fB\-\-sz\-lbs\fR
 Print disk capacity as a number of logical blocks (which is the same
@@ -509,7 +541,7 @@ environment variable LSSCSI_LUNHEX_OPT is checked. If LSSCSI_LUNHEX_OPT is
 present then its associated value becomes the number of times the
 \fI\-\-lunhex\fR is set internally. So, for
 example, 'LSSCSI_LUNHEX_OPT=2  lsscsi' and 'lsscsi \-xx' are equivalent.
-.SH ORDER OF SCSI IDENTIFIERS
+.SH "ORDER OF SCSI IDENTIFIERS"
 This section only applies to the \fI\-\-scsi_id\fR option and only for
 disk like devices (e.g. not tapes nor enclosures). There are potentially
 several SCSI identifiers and from revision 164 they are checked in the
@@ -542,7 +574,7 @@ NAA identifier.
 .PP
 Plus there the \fI\-\-unit\fR and the \fI\-\-long\-unit\fR options that may
 be helpful in uniquely identifying storage devices.
-.SH SYSFS VPD PAGES
+.SH "SYSFS VPD PAGES"
 Most of the numerical identifiers (and iSCSI url type strings) come from the
 SCSI INQUIRY command's Device Identification VPD (vital product data) page.
 It is one of many VPD pages. These VPD pages are essentially constant (they
@@ -640,6 +672,26 @@ a built\-in part of the core nvme driver.
 When a system has been sensibly configured and working properly, this
 utility should be able to hide the details in the above paragraphs.
 However when things go wrong, the above information may be useful.
+.SH LS_NAME_VALUE
+The ls_name_value utility is a general purpose tool for listing name=value
+pairs, especially from pseudo file systems like sysfs in Linux. In this case
+the "name" is the filename of a regular file and the corresponding "value"
+is the contents of that file. Only the first 256 characters of the value are
+output, and only if all its characters are (7 bit) ASCII characters. This
+guards against large files (not supposed to be in sysfs but ...) and files
+containing binary. This utility can scan up to two levels of directories
+from its starting point downward. A hierarchial file system (forgetting
+about symlinks) can be viewed as an inverted tree with its root '/' at the
+top and regular files as its leaves, at the bottom of the inverted tree.
+.PP
+How does this relate to the lsscsi utility? The lsscsi utility scans sysfs
+which is typically mounted under /sys to obtain the information it presents.
+Over time sysfs has changed, with many new attributes being added. In rare
+cases some attributes have been removed (e.g. because the hardware that needs
+them has not been sold for 15 to 20 years). So in maintaining lsscsi it is
+useful to periodically check the directories lsscsi scans in sysfs for
+changes. And this is what the ls_name_value utility (a bash script) was
+written to help with. The ls_name_value utility has its own manpage.
 .SH AUTHOR
 Written by Doug Gilbert
 .SH "REPORTING BUGS"
@@ -651,7 +703,9 @@ This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
 .B lsscsi_json(8)
-.B lspci
+.B ls_name_value(8)
+.B lscpu
 .B lsusb
 .B lsblk
 .B sg_inq, sg_vpd (both in sg3_utils package),
+.B clone_pseudo_fs(clone_pseudo_fs)
