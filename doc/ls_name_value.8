@@ -155,7 +155,7 @@ is creating (and removing) lots of processes (threads) as it scans. Processes
 in that directory will match a grep regex like "^[0\-9]" which means starting
 with a digit.
     $ cd /proc
-    $ ls_name_value \-n 32 \-d  $( ls \-A | grep -v "^[0\-9]" )
+    $ ls_name_value \-n 32 \-d  $( ls \-A | grep \-v "^[0\-9]" )
 .br
 The '\-v' option on grep inverts a selection (e.g. "give me the lines that
 do not match ..."). The above invocation shows up to 32 bytes of the contents
@@ -171,7 +171,7 @@ In some senses symlinks are evil.
 .PP
 To list the contents of all files called 'connect_type' in sysfs, the
 following could be done:
-    $ find /sys \-name connect_type \-print0 | xargs -0 ls_name_value
+    $ find /sys \-name connect_type \-print0 | xargs \-0 ls_name_value
 .br
 The output will be one line per match. The 'cat' utility could be used but
 ls_name_value guards against long files and files containing binary that
@@ -188,7 +188,7 @@ systool knows the high level structure of sysfs and offers a better overview.
 However if information is deeply nested (e.g. /sys/class/typec/ for USB PD)
 then this utility gives better "drilling down" facilities. For example the
 USB PD source capabilities of an AC adapter powering a laptop may be found
-at /sys/class/typec/port1-partner/usb_power_delivery/source-capabilities/*
+at /sys/class/typec/port1\-partner/usb_power_delivery/source\-capabilities/*
 which can be better viewed with this utility.
 .SH AUTHORS
 Written by D. Gilbert

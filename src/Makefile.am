@@ -8,8 +8,10 @@ bin_PROGRAMS = lsscsi
 
 if DEBUG
 # This is active if --enable-debug given to ./configure
-DBG_CFLAGS = -Wextra -Wmisleading-indentation -Wduplicated-cond -Wlogical-op -Wnull-dereference -Wshadow -Wunused -Wsizeof-array-argument -Wduplicated-branches -Wjump-misses-init
-DBG_CXXFLAGS = -Wextra -Wmisleading-indentation -Wduplicated-cond -Wlogical-op -Wnull-dereference -Wshadow -Wunused -Wsizeof-array-argument -Wduplicated-branches
+DBG_CFLAGS = -Wextra -Wmisleading-indentation -Wduplicated-cond -Wlogical-op -Wnull-dereference -Wshadow \
+	-Wunused -Wsizeof-array-argument -Wduplicated-branches -Wjump-misses-init -Wparentheses
+DBG_CXXFLAGS = -Wextra -Wmisleading-indentation -Wduplicated-cond -Wlogical-op -Wnull-dereference -Wshadow \
+	-Wunused -Wsizeof-array-argument -Wduplicated-branches -Wparentheses
 DBG_CPPFLAGS = -DDEBUG
 else
 DBG_CFLAGS =

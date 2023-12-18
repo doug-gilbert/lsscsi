@@ -1,4 +1,4 @@
-.TH LSSCSI "8" "September 2023" "lsscsi\-0.33" LSSCSI
+.TH LSSCSI "8" "December 2023" "lsscsi\-0.33" LSSCSI
 .SH NAME
 lsscsi \- list SCSI devices (or hosts), list NVMe devices
 .SH SYNOPSIS
@@ -14,10 +14,14 @@ lsscsi \- list SCSI devices (or hosts), list NVMe devices
 [\fI\-\-version\fR] [\fI\-\-wwn\fR] [\fIH:C:T:L\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
-Uses information in sysfs (Linux kernel series 2.6 and later) to list SCSI
-devices (or hosts) currently attached to the system. Many non\-SCSI storage
-devices (but not all) used the SCSI subsystem in Linux. In lsscsi version
-0.30 support was added to list NVMe devices and controllers.
+Uses information in mainly found in sysfs to list SCSI devices (or hosts)
+currently attached to the system. Many non\-SCSI storage devices (but not
+all) used the SCSI subsystem in Linux. In lsscsi version/release 0.30
+support was added to list NVMe devices and controllers.
+.PP
+Only parts of sysfs that don't require root permissions, are accessed. Thus
+normal users, without root permissions, can use this utility. The devfs
+pseudo file system (normally found under '/dev' ) is also accessed.
 .PP
 The term "device" is wonderfully vague with one possible definition being
 the "thing" at the other end of the wire (from the CPU or host computer).
@@ -282,10 +286,14 @@ May be useful when another machine has its whole root file system
 network\-mounted on this machine. Then the other machine can have its
 SCSI devices enumerated with "\-\-sysfsroot=/mnt/other_machine/sys" .
 .br
-Also clone_pseudo_fs may be used to take a snapshot of a machine's /sys
-directory at some time of interest (or /sys from another machine) then
-have its SCSI devices (and other attributes) replayed with an option
-like this: "\-\-sysfsroot=/tmp/sas" .
+The clone_pseudo_fs utility may be used to take a snapshot of a
+machine's /sys directory at some time of interest (or /sys from another
+machine) then have its SCSI devices (and other attributes) replayed with
+an option like this: "\-\-sysfsroot=/tmp/sas" .
+.br
+Since this utility also depends on devfs, this option may not be sufficient
+as it only redirects sysfs access. A solution to this issue is to use the
+\fI\-\-sysroot=AR_PT\fR option instead.
 .br
 This option is closely related to the '\-\-sysroot=' option found in lsblk
 and lscpu (amongst others). Those utilities assume the "sys" part of the
@@ -298,10 +306,13 @@ the "mountpoint" column is lost.
 .TP
 \fB\-Y\fR, \fB\-\-sysroot\fR=\fIAR_PT\fR
 \fIAR_PT\fR is an alternate root path. The default root path is '/' and
-this utility accesses '/sys' for data. If this option is given, say with
-\fIAR_PT\fR being '/tmp' then this utility will access '/tmp/sys' for its
-data. So this option is similar to the \fI\-\-sysfsroot=PATH\fR option,
-with \fIAR_PT\fR being the parent directory of \fIPATH\fR.
+this utility will therefore access '/sys' and '/dev' for information used
+to build its output. If this option is given, say with \fIAR_PT\fR
+being '/tmp' then this utility will access '/tmp/sys' and '/tmp/dev' for
+its data. So this option is more powerful than the \fI\-\-sysfsroot=PATH\fR
+option. Both this option and \fI\-\-sysfsroot=PATH\fR option should not be
+invoked together, but if they were then \fIAR_PT\fR must be the parent
+directory of \fIPATH\fR.
 .br
 This option was added for compatibility with other 'ls*' utilities that
 have a \-\-sysroot option. Having such an option allows a 'ls*' utility to
@@ -633,15 +644,15 @@ either "block" or "char" devices. They also have a "major" and "minor"
 numbers and a file name (e.g. "sdb"). The following partial listing should
 clarify how these are shown by the ls command in Linux:
 .PP
-  /dev$ ls -l n*
-  crw------- 1 root root 247,   0 Apr 24 16:56 ng0n1
-  crw-rw-rw- 1 root root   1,   3 Apr 24 16:56 null
-  crw------- 1 root root 248,   0 Apr 29 15:25 nvme0
-  brw-rw---- 1 root disk 259,   0 Apr 24 16:56 nvme0n1
-  brw-rw---- 1 root disk 259,   1 Apr 24 16:56 nvme0n1p1
-  brw-rw---- 1 root disk 259,   2 Apr 24 16:56 nvme0n1p2
+  /dev$ ls \-l n*
+  crw\-\-\-\-\-\-\- 1 root root 247,   0 Apr 24 16:56 ng0n1
+  crw\-rw\-rw\- 1 root root   1,   3 Apr 24 16:56 null
+  crw\-\-\-\-\-\-\- 1 root root 248,   0 Apr 29 15:25 nvme0
+  brw\-rw\-\-\-\- 1 root disk 259,   0 Apr 24 16:56 nvme0n1
+  brw\-rw\-\-\-\- 1 root disk 259,   1 Apr 24 16:56 nvme0n1p1
+  brw\-rw\-\-\-\- 1 root disk 259,   2 Apr 24 16:56 nvme0n1p2
 .PP
-The permissions string (e.g. "crw-rw-rw-") starts with a "c" for a char
+The permissions string (e.g. "crw\-rw\-rw\-") starts with a "c" for a char
 device and "b" for a block device. The two numbers separated by comma (and
 a few whitespace) are the major and minor numbers respectively. As a general
 rule the major number identifies the Linux driver which will handle all
@@ -653,11 +664,11 @@ allocated dynamically (i.e. at bootup) and the mapping between the driver
 name and its major number can be found in the output of "/proc/devices".
 .PP
 Why explain this? The reason is that all SCSI (and ATA) device nodes in
-Linux have fixed (i.e. well-known) device major numbers. However NVMe,
+Linux have fixed (i.e. well\-known) device major numbers. However NVMe,
 which is much newer, has dynamically allocated major numbers. So when a
 utility like lsscsi is dealing with NVMe devices and controllers, often
 an extra step is required: looking at /proc/devices to determine the
-mapping between a driver anme and its major number.
+mapping between a driver name and its major number.
 .PP
 Also the device node name (and udev can change these to override the
 kernel's initial settings) may not always suggest the corresponding
@@ -665,8 +676,8 @@ driver name. For the SCSI generic driver, just remove the trailing
 number (e.g. device node: /dev/sg37, driver: sg); for SCSI disks the
 first two letters are the driver name (e.g. device node: /dev/sdabc,
 driver: sd) and for NVMe generic devices the "driver" name
-is "nvme-generic" (e.g. device node: /dev/ng2n1, driver: nvme-generic).
-Trying to find the nvme-generic driver itself is difficult as it is
+is "nvme\-generic" (e.g. device node: /dev/ng2n1, driver: nvme\-generic).
+Trying to find the nvme\-generic driver itself is difficult as it is
 a built\-in part of the core nvme driver.
 .PP
 When a system has been sensibly configured and working properly, this

@@ -1,11 +1,14 @@
 Linux utility for listing SCSI devices.
 
-Changelog for pre-release lsscsi-0.33 [20230922] [svn: r193]
-  - experimental: add --json[=JO] and --js-file=JFN for
-    JSON output; changed short form syntax to -j[=JO]
+Changelog for pre-release lsscsi-0.33 [20231217] [svn: r194]
+  - add --json[=JO] and --js-file=JFN for JSON output
+    - changed short form syntax to -j[=JO]
+  - add experimental cmake support and keep autotools
   - add ls_name_value sysfs overview script
   - add --sysroot=AR_PT option for compatibilty with lsblk,
     lsmem and lscpu
+  - start to work on 'missing NVME device nodes' issue
+    [https://github.com/doug-gilbert/lsscsi/issues/4]
   - change '-w' output to step over designator type prefix
     (e.g. '3' for NAA)
   - add '-ww' to mean: really use

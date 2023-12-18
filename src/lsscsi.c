@@ -47,7 +47,7 @@
 #include "sg_json.h"
 
 /* Package release number is first number, whole string is version */
-static const char * release_str = "0.33  2023/09/22 [svn: r193]";
+static const char * release_str = "0.33  2023/12/17 [svn: r194]";
 
 /*
  * Some jargon:
@@ -113,7 +113,8 @@ static const char * release_str = "0.33  2023/09/22 [svn: r193]";
 
 static int transport_id = TRANSPORT_UNKNOWN;
 
-static char sysfsroot[80] = "/sys"; /* can be overridden */
+static char sysfsroot[256] = "/sys"; /* overwritten if -y PATH or -Y given */
+static char devfsroot[100] = "/dev"; /* overwritten when -Y AR_PT given */
 
 /* Almost all static, const string names end with _s or _sn (snake) in
  * order to make code a bit easier to read. Many are used repeatedly so
@@ -131,7 +132,7 @@ static const char * fc_rem_pts_s = "fc_remote_ports";
 static const char * iscsi_h_s = "/class/iscsi_host/";
 static const char * iscsi_sess_s = "/class/iscsi_session/";
 static const char * srp_h_s = "/class/srp_host/";
-static const char * dev_dir_s = "/dev";
+// static const char * dev_pse_dir_s = "/dev";
 static const char * dev_disk_byid_dir = "/dev/disk/by-id";
 static const char * pdt_sn = "peripheral_device_type";
 static const char * mmnbl_s = "module may not be loaded";
@@ -1444,7 +1445,7 @@ collect_dev_nodes(void)
         cur_list->next = NULL;
         cur_list->count = 0;
 
-        dirp = opendir(dev_dir_s);
+        dirp = opendir(devfsroot);
         if (dirp == NULL)
                 return;
 
@@ -1453,8 +1454,8 @@ collect_dev_nodes(void)
                 if (dep == NULL)
                         break;
 
-                snprintf(device_path, sizeof(device_path), "%s/%s",
-                         dev_dir_s, dep->d_name);
+                snprintf(device_path, sizeof(device_path), "%.80s/%s",
+                         devfsroot, dep->d_name);
                 /* device_path[LMAX_PATH] = '\0'; */
 
                 /* lstat() does not follow symlinks, stat() does */
@@ -1563,7 +1564,6 @@ get_dev_node(const char * wd, char * node, enum dev_type d_typ)
                         match_found = true;
                 }
         }
-
 fini:
         return match_found;
 }
@@ -2196,7 +2196,7 @@ get_local_srp_gid(const int h, char *b, int b_len)
                 return;
         if (!get_value(buff, "local_ib_device", value, sizeof(value)))
                 return;
-        snprintf(buff, sizeof(buff), "%s/class/infiniband/%s/ports/%d/gids",
+        snprintf(buff, sizeof(buff), "%.80s/class/infiniband/%s/ports/%d/gids",
                  sysfsroot, value, port);
         if (!get_value(buff, "0", value, sizeof(value)))
                 return;
@@ -3713,7 +3713,7 @@ one_classic_sdev_entry(const char * dir_name, const char * devname,
                         else {
                                 if (op->kname)
                                         snprintf(dev_node, sizeof(dev_node),
-                                                 "%s/%s", dev_dir_s,
+                                                 "%.80s/%s", devfsroot,
                                                  basename(wd));
                                 else if (! get_dev_node(wd, dev_node,
                                                         CHR_DEV))
@@ -4034,8 +4034,8 @@ one_sdev_entry(const char * dir_name, const char * devname,
                         cp = NULL;
                         if (op->kname) {
                                 cp = "kernel_device_node";
-                                snprintf(dev_node, dev_node_sz, "%s/%s",
-                                         dev_dir_s, basename(wd));
+                                snprintf(dev_node, dev_node_sz, "%.80s/%s",
+                                         devfsroot, basename(wd));
                         } else {
                                 if (get_dev_node(wd, dev_node, d_typ))
                                         cp = "primary_device_node";
@@ -4092,7 +4092,7 @@ one_sdev_entry(const char * dir_name, const char * devname,
                                 if (op->kname) {
                                         cp = "sg_kernel_node";
                                         snprintf(dev_node, dev_node_sz,
-                                                 "%s/%s", dev_dir_s,
+                                                 "%.80s/%s", devfsroot,
                                                  basename(wd));
                                 } else {
                                         if (get_dev_node(wd, dev_node,
@@ -4258,13 +4258,37 @@ sdev_dir_scan_select(const struct dirent * s)
 
 #if (HAVE_NVME && (! IGNORE_NVME))
 
+static bool
+get_major_minor(const char * fname, int * majp, int * minp,
+                enum dev_type * d_typp)
+{
+        struct stat a_stat;
+
+        if (stat(fname, &a_stat) >= 0) {
+                if (S_ISBLK(a_stat.st_mode))
+                        *d_typp = BLK_DEV;
+                else if (S_ISCHR(a_stat.st_mode))
+                        *d_typp = CHR_DEV;
+                else
+                        return false;
+                *majp = major(a_stat.st_rdev);
+                *minp = minor(a_stat.st_rdev);
+                return true;
+        }
+        return false;
+}
+
 /* List one NVMe namespace (NS) on a line. */
 static void
 one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
                struct lsscsi_opts * op, sgj_opaque_p jop)
 {
         bool as_json;
-        int m;
+        bool has_alt_ns_rel = false;
+        enum dev_type alt_d_typ;
+        int m, n;
+        int alt_maj = 0;
+        int alt_min = 0;
         int q = 0;
         int cdev_minor = 0;
         int cntlid = 0;
@@ -4274,6 +4298,7 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
         uint32_t nsid = 0;
         char * cp;
         const char * ccp;
+        const char * cposp;
         sgj_state * jsp = &op->json_st;
         sgj_opaque_p jo2p = NULL;
         char buff[LMAX_DEVPATH];
@@ -4286,6 +4311,8 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
         char bb[80];
         char d[80];
         char e[80];
+        char alt_ns_rel[196];
+        char alt_ns_ng[120];
         const int bufflen = sizeof(buff);
         const int vlen = sizeof(value);
         struct addr_hctl hctl;
@@ -4298,6 +4325,42 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
 
         as_json = jsp->pr_as_json;
         b[0] = '\0';
+        cposp = strrchr(nvme_ns_rel, 'c');
+        if (cposp && (isdigit(*(cposp + 1)))) {
+                if ((nvme_ns_rel != cposp) && (isdigit(*(cposp - 1)))) {
+                        const char * c2p = strrchr(nvme_ns_rel, 'n');
+
+                        if (c2p && (c2p > (cposp + 1))) {
+                                strcpy(alt_ns_rel, devfsroot);
+                                m = cposp - nvme_ns_rel;
+                                memcpy(value, nvme_ns_rel, m);
+                                strcpy(value + m , c2p);
+                                snprintf(alt_ns_rel, sizeof(alt_ns_rel),
+                                         "%s/%.80s", devfsroot, value);
+                                if (get_major_minor(alt_ns_rel, &alt_maj,
+                                                    &alt_min, &alt_d_typ))
+                                        has_alt_ns_rel = true;
+                        }
+                }
+        }
+        if (has_alt_ns_rel) {
+                bool bypass = false;
+
+                bb[0] = 'n';
+                bb[1] = 'g';
+                for (m = 0, n = 2; value[m]; ++m) {
+                        if (! bypass) {
+                                if (isdigit(value[m]))
+                                        bypass = true;
+                                else
+                                        continue;
+                        }
+                        bb[n++] = value[m];
+                }
+                bb[n] = '\0';
+                snprintf(alt_ns_ng, sizeof(alt_ns_ng), "%.80s/%.20s",
+                         devfsroot, bb);
+        }
         sg_scn3pr(buff, bufflen, 0, "%s/%s", nvme_ctl_abs, nvme_ns_rel);
         if ((0 == strncmp(nvme_ns_rel, "nvme", 4)) &&
             (1 == sscanf(nvme_ns_rel + 4, "%d", &cdev_minor)))
@@ -4416,8 +4479,6 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
                         q += sg_scn3pr(b, blen, q, "%-*s?  ", model_len,
                                        wwid_s);
         } else if (! op->brief) {
-                int n;
-
                 if (! get_value(nvme_ctl_abs, model_s, ctl_model,
                                 sizeof(ctl_model)))
                         snprintf(ctl_model, sizeof(ctl_model), "-    ");
@@ -4443,33 +4504,45 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
         }
 
         if (op->kname) {
-                snprintf(dev_node, devnlen, "%s/%s", dev_dir_s, nvme_ns_rel);
+                snprintf(dev_node, devnlen, "%s/%s", devfsroot, nvme_ns_rel);
                 if (as_json)
                         sgj_js_nv_s(jsp, jop, ker_node_s, dev_node);
+        } else if (has_alt_ns_rel) {
+                strcpy(dev_node, alt_ns_rel);
+                if (as_json)
+                        sgj_js_nv_s(jsp, jop, dev_node_s, dev_node);
         } else if (get_dev_node(buff, dev_node, BLK_DEV)) {
                 if (as_json)
                         sgj_js_nv_s(jsp, jop, dev_node_s, dev_node);
 
-        } else
+        } else {
                 snprintf(dev_node, devnlen, "-       ");
+        }
 
         q += sg_scn3pr(b, blen, q, "%-9s", dev_node);
         if (op->dev_maj_min) {
-                if (get_value(buff, dv_s, value, vlen)) {
+                if (has_alt_ns_rel) {
+                        snprintf(value, vlen, "%d:%d", alt_maj, alt_min);
+                        q += sg_scn3pr(b, blen, q, " [%s]", value);
+                        if (as_json)
+                                sgj_js_nv_s(jsp, jop, dv_s, value);
+                } else if (get_value(buff, dv_s, value, vlen)) {
                         q += sg_scn3pr(b, blen, q, " [%s]", value);
                         if (as_json)
                                 sgj_js_nv_s(jsp, jop, dv_s, value);
                 } else
                         q += sg_scn3pr(b, blen, q, " [dev?]");
         }
-        if (op->generic && (1 == ng_scan(nvme_ctl_abs))) {
+        if (op->generic && has_alt_ns_rel)
+                q += sg_scn3pr(b, blen, q, "  %-9s", alt_ns_ng);
+        else if (op->generic && (1 == ng_scan(nvme_ctl_abs))) {
                 /* found a <nvme_ctl_abs>/ng* 'nvme-generic' device */
                 const char * ngp = aa_ng.name;
 
                 sg_scnpr(dev_node, devnlen, "%s/%s", nvme_ctl_abs, ngp);
                 // if (get2_value(nvme_ctl_abs, ngp, dv_s, e, elen)) {
                 if (op->kname) {
-                        snprintf(value, vlen, "%s/%.32s", dev_dir_s, ngp);
+                        snprintf(value, vlen, "%.80s/%.32s", devfsroot, ngp);
                         if (as_json)
                                 sgj_js_nv_s(jsp, jop, "ng_kernel_node",
                                             value);
@@ -4671,7 +4744,7 @@ one_nhost_entry(const char * dir_name, const char * nvme_ctl_rel,
                         sgj_js_nv_s(jsp, jop, addr_s, value);
         }
         if (op->kname) {
-                snprintf(value, vlen, "%s/%s", dev_dir_s, nvme_ctl_rel);
+                snprintf(value, vlen, "%.80s/%s", devfsroot, nvme_ctl_rel);
                 if (as_json)
                         sgj_js_nv_s(jsp, jop, ker_node_s, value);
         } else if (get_dev_node(buff, value, CHR_DEV)) {
@@ -5869,31 +5942,73 @@ main(int argc, char **argv)
         if (l_sysfsroot || l_sysroot) {
                 /* don't handle relative paths including those starting
                  * with dot, What do other ls* utilities do? */
+                int l_fsroot_sz = 0;
+                int l_root_sz = 0;
                 static const int sysfsroot_sz = sizeof(sysfsroot);
+                static const int devfsroot_sz = sizeof(devfsroot);
+                static const char * expect_str_s =
+                                "expects string starting with '/'";
 
-                if (l_sysfsroot && l_sysroot) {
-                        pr2serr("--sysfsroot and --sysroot= options "
-                                "contradict, choose one\n");
-                        return 1;
-                }
-                /* take care of trailing <null> char */
-                memset(sysfsroot, 0, sysfsroot_sz);
-                if (l_sysfsroot)
-                        strncpy(sysfsroot, l_sysfsroot, sysfsroot_sz - 1);
-                else {
-                        int n;
-                        static const char * sysfs_dir = "/sys";
-
-                        strncpy(sysfsroot, l_sysroot, sysfsroot_sz - 1);
-                        n = strlen(sysfsroot);
-                        if ((n + 6) >= sysfsroot_sz) {
-                                pr2serr("--sysroot= argument is too long\n");
+                if (l_sysfsroot) {
+                        l_fsroot_sz = strlen(l_sysfsroot);
+                        if ((0 == l_fsroot_sz) ||
+                            ('/' != l_sysfsroot[0])) {
+                                pr2serr("--sysfsroot %s\n", expect_str_s);
                                 return 1;
                         }
+                        if (l_fsroot_sz >= (sysfsroot_sz - 6)) {
+                                pr2serr("--sysfsroot= argument too long\n");
+                                return 1;
+                        }
+                }
+                if (l_sysroot) {
+                        l_root_sz = strlen(l_sysroot);
+                        if ((0 == l_root_sz) || ('/' != l_sysroot[0])) {
+                                pr2serr("--sysroot %s\n", expect_str_s);
+                                return 1;
+                        }
+                        if (l_root_sz >= (devfsroot_sz - 6)) {
+                                pr2serr("--sysroot= argument too long\n");
+                                return 1;
+                        }
+                }
+
+                if (l_sysfsroot && l_sysroot) {
+                        int m = l_fsroot_sz - l_root_sz;
+
+                        if ((m == 4) &&
+                            (! memcmp(l_sysroot, l_sysfsroot, l_root_sz)) &&
+                            (! memcmp("/sys", l_sysfsroot + l_root_sz, 4)))
+                                l_sysfsroot = NULL;
+                        else {
+                                pr2serr("--sysfsroot and --sysroot= options "
+                                        "contradict, choose one\n");
+                                return 1;
+                        }
+                }
+                if (l_sysfsroot) {
+                        if (l_fsroot_sz > 1)
+                                strncpy(sysfsroot, l_sysfsroot, l_fsroot_sz);
+                } else if (l_root_sz > 1) {
+                        int n = l_root_sz;
+                        static const char * sysfs_dir = "/sys";
+                        static const char * devfs_dir = "/dev";
+
+                        strncpy(sysfsroot, l_sysroot, sysfsroot_sz - 1);
                         if ((n > 1) && ('/' == sysfsroot[n - 1]))
                             --n;
                         memcpy(sysfsroot + n, sysfs_dir, 4);
+                        n = l_root_sz;
+                        strncpy(devfsroot, l_sysroot, devfsroot_sz - 1);
+                        if ((n > 1) && ('/' == devfsroot[n - 1]))
+                            --n;
+                        memcpy(devfsroot + n, devfs_dir, 4);
+                        if (op->verbose > 1)
+                                pr2serr("Alternate devfs root: %s\n",
+                                        devfsroot);
                 }
+                if (op->verbose > 1)
+                        pr2serr("Alternate sysfs root: %s\n", sysfsroot);
         }
 
         if (op->transport_info &&
