@@ -2351,8 +2351,10 @@ transport_h_init(const char * devname, int b_len, char * b)
                 /* resolve SCSI host device */
                 snprintf(buff, bufflen, "%s%s%s%s", sysfsroot, scsi_host_s,
                          devname, "/device");
-                if (readlink(buff, buff2, sizeof(buff2)) <= 0)
+                ssize_t len = readlink(buff, buff2, sizeof(buff2)-1);
+                if (len <= 0)
                         break;
+                buff2[len] = '\0'; // NULL termination after readlink()
 
                 /* check if the SCSI host has a FireWire host as ancestor */
                 if (!(t = strstr(buff2, "/fw-host")))
@@ -2369,7 +2371,7 @@ transport_h_init(const char * devname, int b_len, char * b)
                 if (strlen(buff) + strlen(buff2) + strlen("host_id/guid") + 2
                     > bufflen)
                         break;
-                my_strcopy(buff + strlen(buff), buff2, bufflen);
+                my_strcopy(buff + strlen(buff), buff2, bufflen - strlen(buff));
 
                 /* read the FireWire host's EUI-64 */
                 if (!get_value(buff, "host_id/guid", buff2, sizeof(buff2)) ||
