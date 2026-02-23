@@ -4045,7 +4045,20 @@ one_sdev_entry(const char * dir_name, const char * devname,
                                         snprintf(dev_node, dev_node_sz,
                                                  "-       ");
                         }
-                        q += sg_scn3pr(b, blen, q, "%-9s", dev_node);
+                        /* Conditionally format the output for dev_node depending
+                           on whether we are using default output or additional
+                           fields (via command line arguments).
+
+                           Keeping the fixed field size for every other case
+                           except the default output where there would now not
+                           be a trailing space at the end of each device line.
+                         */
+                        const char *dev_fmt = (op->dev_maj_min || op->scsi_id ||
+                                               op->protection || op->protmode ||
+                                               op->ssize)
+                                               ? "%-9s" : "%s";
+
+                        q += sg_scn3pr(b, blen, q, dev_fmt, dev_node);
                         if (cp && as_json)
                                 sgj_js_nv_s(jsp, jop, cp, dev_node);
 
@@ -4104,7 +4117,23 @@ one_sdev_entry(const char * dir_name, const char * devname,
                                                 snprintf(dev_node,
                                                          dev_node_sz, "-");
                                 }
-                                q += sg_scn3pr(b, blen, q, "  %-9s",
+                                /* Conditionally format the output for dev_node
+                                   depending on whether we are using default
+                                   output or additional fields (via command line
+                                   arguments).
+
+                                   Keeping the fixed field size for every other
+                                   case except the default output where there
+                                   would now not be a trailing space at the end
+                                   of each device line.
+                                 */
+                                const char *sg_fmt = (op->dev_maj_min ||
+                                                      op->protection ||
+                                                      op->protmode ||
+                                                      op->ssize)
+                                                      ? "  %-9s" : "  %s";
+
+                                q += sg_scn3pr(b, blen, q, sg_fmt,
                                                dev_node);
                                 if (cp && as_json)
                                         sgj_js_nv_s(jsp, jop, cp, dev_node);
@@ -4521,7 +4550,19 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
                 snprintf(dev_node, devnlen, "-       ");
         }
 
-        q += sg_scn3pr(b, blen, q, "%-9s", dev_node);
+        /* Conditionally format the output for dev_node depending on whether
+           we are using default output or additional fields (via command line
+           arguments).
+
+           Keeping the fixed field size for every other case except the default
+           output where there would now not be a trailing space at the end of
+           each device line.
+         */
+        const char *nvme_fmt = (op->dev_maj_min || op->generic ||
+                                op->protmode || op->ssize)
+                                ? "%-9s" : "%s";
+
+        q += sg_scn3pr(b, blen, q, nvme_fmt, dev_node);
         if (op->dev_maj_min) {
                 if (has_alt_ns_rel) {
                         snprintf(value, vlen, "%d:%d", alt_maj, alt_min);
