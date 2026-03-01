@@ -3105,7 +3105,7 @@ transport_tport_longer(const char * devname, struct lsscsi_opts * op,
                 sgj_haj_vs(jsp, jop, 2, trans_s, SEP_EQ_NO_SP, "sas");
                 n = sg_scn3pr(b2, b2len, 0, "%s/%s/%s", sysfsroot, cl_s,
                               sasdev_s);
-                sg_scn3pr(b2, b2len, n, "%s", sas_hold_end_device);
+                sg_scn3pr(b2, b2len, n, "/%s/", sas_hold_end_device);
                 if (get_value(b2, bid_s, value, vlen))
                         sgj_haj_vs(jsp, jop, 2, bid_s, SEP_EQ_NO_SP, value);
                 if (get_value(b2, eid_s, value, vlen))
@@ -3133,7 +3133,7 @@ transport_tport_longer(const char * devname, struct lsscsi_opts * op,
                 n = 0;
                 n += sg_scn3pr(b2, b2len, n, "%s", sysfsroot);
                 n += sg_scn3pr(b2, b2len, n, "%s", "/class/sas_end_device/");
-                sg_scn3pr(b2, b2len, n, "%s", sas_hold_end_device);
+                sg_scn3pr(b2, b2len, n, "%s/", sas_hold_end_device);
                 print_enclosure_device(devname, b2, op);
                 if (get_value(b2, irt_s, value, vlen))
                         sgj_haj_vs(jsp, jop, 2, irt_s, SEP_EQ_NO_SP, value);
