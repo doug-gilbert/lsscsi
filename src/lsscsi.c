@@ -2475,7 +2475,7 @@ transport_init_longer(const char * path_name, struct lsscsi_opts * op,
         case TRANSPORT_FC:
         case TRANSPORT_FCOE:
                 sgj_haj_vs(jsp, jop, 2, trans_s, SEP_EQ_NO_SP,
-                           (transport_id == TRANSPORT_FC) ? "fc:" : "fcoe:");
+                           (transport_id == TRANSPORT_FC) ? "fc" : "fcoe");
                 sg_scnpr(b, blen, "%s/%s/%s/%s", path_name, dvc_s, fc_h_s,
                          cp);
                 if (stat(b, &a_stat) < 0) {
@@ -3036,7 +3036,7 @@ transport_tport_longer(const char * devname, struct lsscsi_opts * op,
         case TRANSPORT_FC:
         case TRANSPORT_FCOE:
                 sgj_haj_vs(jsp, jop, 2, trans_s, SEP_EQ_NO_SP,
-                           transport_id == TRANSPORT_FC ? "fc:" : "fcoe:");
+                           transport_id == TRANSPORT_FC ? "fc" : "fcoe");
                 if (! if_directory_chdir(path_name, dvc_s))
                         return;
                 if (NULL == getcwd(wd, wdlen))
