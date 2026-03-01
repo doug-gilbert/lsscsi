@@ -13,8 +13,19 @@ if ( NVME_PRESENT )
   add_definitions ( -DHAVE_NVME )
 endif ( NVME_PRESENT )
 
-file ( GLOB sourcefiles "src/*.c" )
-file ( GLOB headerfiles "src/*.h" )
+set ( sourcefiles
+	src/lsscsi.c
+	src/sg_json_builder.c
+	src/sg_json.c
+	src/sg_pr2serr.c
+)
+
+set ( headerfiles
+	src/sg_json.h
+	src/sg_json_builder.h
+	src/sg_pr2serr.h
+	src/sg_unaligned.h
+)
 
 add_executable (lsscsi ${sourcefiles} ${headerfiles} )
 

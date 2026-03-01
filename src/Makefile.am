@@ -48,4 +48,6 @@ lsscsi_SOURCES =	lsscsi.c \
 			sg_unaligned.h
 
 distclean-local:
-	rm -rf .deps
+	rm -rf \
+	  .deps \
+	  Makefile.in
