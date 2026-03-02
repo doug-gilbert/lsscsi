@@ -1,9 +1,10 @@
-To build:
+To build (using autotools):
+---------------------------
  $ ./autogen.sh
  $ ./configure
  $ make
 
-To install call:
+To install (using autools) call:
  $ make install
 This will most likely need superuser privilege. The executable is placed
 in the /usr/local/bin directory while the man page is placed in the
@@ -11,7 +12,7 @@ in the /usr/local/bin directory while the man page is placed in the
 the PREFIX variable in the Makefile. To install executable in the /usr/bin
 directory use './configure --prefix=/usr ' instead.
 
-To uninstall the executable and man page call:
+To uninstall (using autotools) the executable and man pages call:
  $ make uninstall
 
 To clean out object and executable files from the working directory call:
@@ -21,6 +22,23 @@ To clean out prior to making a tarball (so ./configure needs to be run
 on the target system):
  $ make distclean
 
+To build using cmake
+--------------------
+This is experimental: expect some rough edges.
+ $ cd {top_level_directory_of_lscsi_package}
+ $ cmake  .
+ $ cmake  --build .
+
+To install requires root permissions. The following places the executable
+in the /usr/bin directory and the man pages in the /usr/share/man/man8
+directory
+ $ sudo cmake  --install . --prefix=/usr
+
+To clear out (most of) the cmake build artefacts:
+ $ ./cmake_del_artifacts.sh
+
+Prebuild packages may also be available
+---------------------------------------
 Rpms are also available. A lsscsi.spec file is included in the tarball
 to facilitate building rpms. One way of doing this on a RedHat system
 is to place the tarball of the form 'lsscsi-%{version}.tar.gz' in the
@@ -44,4 +62,4 @@ There is a build_debian.sh script in the tarball's top level directory
 that does the above.
 
 Douglas Gilbert
-30th April 2023
+1st March 2026

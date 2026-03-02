@@ -1,6 +1,13 @@
 Linux utility for listing SCSI devices.
 
-Changelog for pre-release lsscsi-0.33 [20231221] [svn: r195]
+Changelog for pre-release lsscsi-0.33 [20260301] [svn: r200]
+  - fix Transport type FC and FCOE output inconsistencies
+    [github #9]
+  - Change default output trailing space after each device
+    entry [github #8]
+  - fixes for SBP (Firewire) host in transport_h_init()
+    [github #7]
+  - fix path construction for SAS end device [github #5]
   - add --json[=JO] and --js-file=JFN for JSON output
     - changed short form syntax to -j[=JO]
   - add experimental cmake support and keep autotools

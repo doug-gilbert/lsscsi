@@ -37,12 +37,12 @@ else ( BUILD_SHARED_LIBS )
     target_link_libraries(lsscsi -static)
 endif ( BUILD_SHARED_LIBS )
 
-install(TARGETS lsscsi RUNTIME DESTINATION bin)
+install(TARGETS lsscsi RUNTIME DESTINATION {CMAKE_INSTALL_PREFIX}/bin)
 
 include(GNUInstallDirs)
-file(ARCHIVE_CREATE OUTPUT lsscsi.8.gz PATHS doc/lsscsi.8 FORMAT raw COMPRESSION GZip)
+file(ARCHIVE_CREATE OUTPUT lsscsi.8.gz PATHS ${CMAKE_SOURCE_DIR}/doc/lsscsi.8 FORMAT raw COMPRESSION GZip)
 install(FILES lsscsi.8.gz DESTINATION "${CMAKE_INSTALL_MANDIR}/man8")
-file(ARCHIVE_CREATE OUTPUT lsscsi_json.8.gz PATHS doc/lsscsi_json.8 FORMAT raw COMPRESSION GZip)
+file(ARCHIVE_CREATE OUTPUT lsscsi_json.8.gz PATHS ${CMAKE_SOURCE_DIR}/doc/lsscsi_json.8 FORMAT raw COMPRESSION GZip)
 install(FILES lsscsi_json.8.gz DESTINATION "${CMAKE_INSTALL_MANDIR}/man8")
 
 

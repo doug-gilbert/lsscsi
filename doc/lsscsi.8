@@ -1,4 +1,4 @@
-.TH LSSCSI "8" "December 2023" "lsscsi\-0.33" LSSCSI
+.TH LSSCSI "8" "March 2026" "lsscsi\-0.33" LSSCSI
 .SH NAME
 lsscsi \- list SCSI devices (or hosts), list NVMe devices
 .SH SYNOPSIS
@@ -615,7 +615,8 @@ A target is the (far) endpoint of the transport protocol in use, while
 the initiator is the near end of that transport.
 .SH EXAMPLES
 Information about this utility including examples can also be found at:
-https://sg.danny.cz/scsi/lsscsi.html .
+https://sg.danny.cz/scsi/lsscsi.html or
+https://doug-gilbert.github.io/scsi/lsscsi.html .
 .SH NOTES
 Information for this command is derived from the sysfs file system,
 which is assumed to be mounted at /sys unless specified otherwise
@@ -691,7 +692,7 @@ is the contents of that file. Only the first 256 characters of the value are
 output, and only if all its characters are (7 bit) ASCII characters. This
 guards against large files (not supposed to be in sysfs but ...) and files
 containing binary. This utility can scan up to two levels of directories
-from its starting point downward. A hierarchial file system (forgetting
+from its starting point downward. A hierarchical file system (forgetting
 about symlinks) can be viewed as an inverted tree with its root '/' at the
 top and regular files as its leaves, at the bottom of the inverted tree.
 .PP
@@ -708,7 +709,7 @@ Written by Doug Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2003\-2023 Douglas Gilbert
+Copyright \(co 2003\-2026 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
