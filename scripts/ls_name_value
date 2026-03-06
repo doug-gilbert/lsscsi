@@ -1,13 +1,14 @@
 #!/bin/bash
 
-# Copyright (c) 2023 Douglas Gilbert.
+# Copyright (c) 2023-2026 Douglas Gilbert.
+#
 # SPDX-License-Identifier: BSD-2-Clause
-
+#
 # This script is designed to print out pseudo file system file names
 # followed by their ASCII contents (i.e. their values) as appropriate.
 # It targets sysfs (/sys ) in Linux but may be useful in other contexts.
 
-version_str="1.12 20230603"
+version_str="1.13 20260305"
 
 all=0
 dir=0
