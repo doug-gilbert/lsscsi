@@ -1,6 +1,6 @@
 Linux utility for listing SCSI devices.
 
-Changelog for pre-release lsscsi-0.33 [20260305] [svn: r201]
+Changelog for pre-release lsscsi-0.33 [20260301] [svn: r200]
   - fix Transport type FC and FCOE output inconsistencies
     [github #9]
   - Change default output trailing space after each device

@@ -4,9 +4,10 @@
  * support was added to additionally list NVMe devices and controllers.
  *
  *  Copyright (C) 2003-2026 D. Gilbert
- *
- * SPDX-License-Identifier: GPL-2.0-or-later
- *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2, or (at your option)
+ *  any later version.
  */
 
 #define _XOPEN_SOURCE 600
@@ -46,7 +47,7 @@
 #include "sg_json.h"
 
 /* Package release number is first number, whole string is version */
-static const char * release_str = "0.33  2026/03/05 [svn: r201]";
+static const char * release_str = "0.33  2026/03/01 [svn: r200]";
 
 /*
  * Some jargon:
