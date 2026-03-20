@@ -4049,13 +4049,17 @@ one_sdev_entry(const char * dir_name, const char * devname,
                            on whether we are using default output or additional
                            fields (via command line arguments).
 
+                           A further condition when printing dev_maj_min (-d)
+                           where we would like to keep a consistent single space
+                           before major:minor regardless of block dev name length.
+
                            Keeping the fixed field size for every other case
                            except the default output where there would now not
                            be a trailing space at the end of each device line.
                          */
-                        const char *dev_fmt = (op->dev_maj_min || op->scsi_id ||
-                                               op->protection || op->protmode ||
-                                               op->ssize)
+                        const char *dev_fmt = (!op->dev_maj_min &&
+                                               (op->scsi_id || op->protection ||
+                                                op->protmode || op->ssize))
                                                ? "%-9s" : "%s";
 
                         q += sg_scn3pr(b, blen, q, dev_fmt, dev_node);
@@ -4064,14 +4068,14 @@ one_sdev_entry(const char * dir_name, const char * devname,
 
                         if (op->dev_maj_min) {
                                 if (get_value(wd, dv_s, value, vlen)) {
-                                        q += sg_scn3pr(b, blen, q, "[%s]",
+                                        q += sg_scn3pr(b, blen, q, " [%s]",
                                                        value);
                                         if (as_json)
                                                 sgj_js_nv_s(jsp, jop,
                                                             "major_minor",
                                                             value);
                                 } else
-                                        q += sg_scn3pr(b, blen, q, "[dev?]");
+                                        q += sg_scn3pr(b, blen, q, " [dev?]");
                         }
 
                         if (op->scsi_id) {
@@ -4122,15 +4126,20 @@ one_sdev_entry(const char * dir_name, const char * devname,
                                    output or additional fields (via command line
                                    arguments).
 
+                                   A further condition when printing dev_maj_min
+                                   (-d) where we would like to keep a consistent 
+                                   single space before major:minor regardless of
+                                   block dev name length.
+
                                    Keeping the fixed field size for every other
                                    case except the default output where there
                                    would now not be a trailing space at the end
                                    of each device line.
                                  */
-                                const char *sg_fmt = (op->dev_maj_min ||
-                                                      op->protection ||
-                                                      op->protmode ||
-                                                      op->ssize)
+                                const char *sg_fmt = (!op->dev_maj_min &&
+                                                      (op->protection ||
+                                                       op->protmode ||
+                                                       op->ssize))
                                                       ? "  %-9s" : "  %s";
 
                                 q += sg_scn3pr(b, blen, q, sg_fmt,
@@ -4141,14 +4150,14 @@ one_sdev_entry(const char * dir_name, const char * devname,
                                         if (get_value(wd, dv_s, value,
                                                       vlen)) {
                                                 q += sg_scn3pr(b, blen, q,
-                                                               "[%s]", value);
+                                                               " [%s]", value);
                                                 if (as_json)
                                                         sgj_js_nv_s(jsp, jop,
                                                             "sg_major_minor",
                                                                     value);
                                         } else
                                                 q += sg_scn3pr(b, blen, q,
-                                                               "[dev?]");
+                                                               " [dev?]");
                                 }
                         }
                 } else
