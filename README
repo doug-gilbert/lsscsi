@@ -25,15 +25,17 @@ lsscsi overlaps with the lsblk utility but concentrates on the devices
 themselves. Also lsscsi lists storage related devices such as enclosures
 and tape drives.
 
-The "man" page (lsscsi.8) in this package may also be useful.
+The "man" pages (lsscsi.8 and lsscsi_json.8) in this package may also be
+useful.
 
 ls_name_value
 -------------
-The ls_name_value script (bash rather than C binary) is designed to show
-filenames and their corresponding ASCII contents (values) up to two
-directory levels deep. It produces plain text output. 
-It is designed for data-mining in the sysfs pseudo file system but may
-also be useful with other pseudo file systems (e.g. devfs and procfs).
+The ls_name_value script (a bash script rather than C binary) is designed
+to show filenames and their corresponding ASCII contents (values) up to two
+directory levels deep on Unix machines (e.g. in Linux). It produces plain
+text output. It is designed for data-mining in the Linux sysfs pseudo file
+system but may also be useful with other pseudo file systems (e.g.
+devfs and procfs).
 
 
 Building package
@@ -78,5 +80,8 @@ or
 Note that the final 'make install' will usually require root permissions
 and will place binaries in the /usr/local/bin directory.
 
+There is also an experimental cmake based build, see the INSTALL file for
+further instructions.
+
 Douglas Gilbert
-30th May 2023
+5th March 2026

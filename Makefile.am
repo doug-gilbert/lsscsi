@@ -10,6 +10,8 @@ distclean-local:
 	  compile \
 	  configure \
 	  config.guess \
+	  config.guess.cdbs-orig \
+	  config.sub.cdbs-orig \
 	  config.sub \
 	  config.h.in \
 	  config.h \

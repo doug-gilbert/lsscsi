@@ -4,10 +4,9 @@
  * support was added to additionally list NVMe devices and controllers.
  *
  *  Copyright (C) 2003-2026 D. Gilbert
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  */
 
 #define _XOPEN_SOURCE 600
@@ -47,7 +46,7 @@
 #include "sg_json.h"
 
 /* Package release number is first number, whole string is version */
-static const char * release_str = "0.33  2026/03/01 [svn: r200]";
+static const char * release_str = "0.33  2026/04/01 [svn: r204]";
 
 /*
  * Some jargon:
@@ -1814,7 +1813,8 @@ out:
  * Note: The caller must free the returned buffer with free().
  */
 static char *
-get_disk_scsi_id(const char *dev_node, bool wo_prefix)
+get_disk_scsi_id(const char *dev_node, bool no_prefix, int recurse_count,
+                 int verbose)
 {
         char *scsi_id = NULL;
         DIR *dir;
@@ -1824,7 +1824,7 @@ get_disk_scsi_id(const char *dev_node, bool wo_prefix)
 
         scsi_id = lookup_dev(dev_disk_byid_dir, "scsi-", "328S10", dev_node);
         if (scsi_id) {
-                if (wo_prefix) {
+                if (no_prefix) {
                         size_t len = strlen(scsi_id);
 
                         if (len > 1) {
@@ -1843,16 +1843,27 @@ get_disk_scsi_id(const char *dev_node, bool wo_prefix)
                 goto out;
         snprintf(sys_block, sizeof(sys_block), "%s/class/block/%s/holders",
                  sysfsroot, dev_node + 5);
+        if (recurse_count > 0) {
+                if (verbose > 1)
+                        pr2serr("%s: too much recursion on %s\n", __func__,
+                        sys_block);
+                goto out;
+        }
         dir = opendir(sys_block);
         if (!dir)
                 goto out;
         while ((entry = readdir(dir)) != NULL) {
                 snprintf(holder, sizeof(holder), "/dev/%s", entry->d_name);
-                scsi_id = get_disk_scsi_id(holder, wo_prefix); /* recurse */
+                /* recurse */
+                scsi_id = get_disk_scsi_id(holder, no_prefix,
+                                          recurse_count + 1, verbose);
                 if (scsi_id)
                         break;
         }
         closedir(dir);
+        if (verbose > 1)
+                pr2serr("%s: no match on %s in %s\n", __func__,
+                        dev_node, dev_disk_byid_dir);
 out:
         return scsi_id;
 }
@@ -4082,7 +4093,9 @@ one_sdev_entry(const char * dir_name, const char * devname,
                                 char *scsi_id;
 
                                 scsi_id = get_disk_scsi_id(dev_node,
-                                                           op->scsi_id_twice);
+                                                           op->scsi_id_twice,
+                                                   0 /* recurse_count */,
+                                                           op->verbose);
                                 q += sg_scn3pr(b, blen, q, "  %s",
                                                scsi_id ? scsi_id : "-");
                                 if (scsi_id && as_json)
