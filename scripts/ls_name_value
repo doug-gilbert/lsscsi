@@ -8,7 +8,7 @@
 # followed by their ASCII contents (i.e. their values) as appropriate.
 # It targets sysfs (/sys ) in Linux but may be useful in other contexts.
 
-version_str="1.13 20260305"
+version_str="1.15 20260411"
 
 all=0
 dir=0
@@ -34,35 +34,43 @@ usage()
   echo "Usage: ls_name_value [-a] [-d] [-e] [-h] [-N] [-n NUM] [-o] [-s] "
   echo "                     [-v] [-V] [-w] [<name>*]"
   echo "  where:  -a, --all         include hidden filename (starting with '.')"
-  echo "          -d, --dir         descend if <name> is directory"
-  echo "                            descends 1 level; -dd descends 2 levels"
+  echo "          -d, --dir         enter directories (descends 1 level)"
+  echo "                            if given twice (-dd) descends 2 levels"
   echo "          -e, --empty       output <value> as '<empty>' rather than blank"
   echo "          -h, --help        print usage message"
   echo "          -N, --nosym       do not descend symlinks to directories"
   echo "          -n, --num=NUM     max bytes in value (def: 256)"
-  echo "          -o, --otherfs     not descending to other fs is default, override"
+  echo "          -o, --otherfs     not entering an other fs is default, override"
   echo "          -s, --show        show directories, symlinks and specials"
   echo "          -v, --verbose     increase verbosity of output"
   echo "          -V, --version     print version string then exit"
   echo "          -w, --write       separator changed from : to + if writable"
   echo ""
   echo "Prints lines of the form '<name> : <value>' where <name> is a regular"
-  echo "filename. The <value> is the contents of <name>, up to 256 bytes of "
-  echo "printable ASCII. If one or more <name>s are given on the command line "
-  echo "then they are used. If there are no names on the command line, then the "
-  echo "regular files in the current directory are used. If one <name> is given "
-  echo "and it is a directory then it is entered and the files in that directory "
-  echo "are used. Designed for viewing sysfs in Linux (e.g. under /sys )."
+  echo "filename. The <value> is the contents of <name>, up to 256 bytes of"
+  echo "printable (7 bit) ASCII. If <value> cannot be read in 2 seconds, then"
+  echo "<timeout> is printed instead. If one or more <name>s are given on the"
+  echo "command line then they are used. If there are no names on the command"
+  echo "line, then echo the regular files in the current directory are used."
+  echo "If one <name> is given and it is a directory then it is entered and the"
+  echo "files in that directory are used."
+  echo "Primarily designed for viewing sysfs in Linux (e.g. under /sys )."
 }
 
+# Returns owner permission of ${1} as single (octal) digit. Therefore it returns
+# a value of 0 to 7. 0 for no permissions, 7 for read, write and execute (4+2+1)
 get_root_perm()
 {
   local s
 
-  # 'stat -c ...' is a Linux extension. For FreeBSD use '-f'
-  s=$(stat -c '%a' "$1")
-  if [ -n "$s" ] ; then
-    echo "${s:0:1}"
+  if [ -e "$1" ] ; then
+    # 'stat -c ...' is a Linux extension. For FreeBSD use '-f'
+    s=$(stat -c '%a' "$1" 2> /dev/null )
+    if [ -n "$s" ] ; then
+      echo "${s:0:1}"	   # 1 octal digit (0 to 7)
+    else
+      echo "0"
+    fi
   else
     echo "0"
   fi
@@ -77,6 +85,9 @@ one_name_value()
   local value
   local pad
   local separ
+  local fin_line
+  local set_name
+  local err
 
   if [ $# -gt 1 ] ; then
     pad=$2
@@ -90,73 +101,137 @@ one_name_value()
   fi
   separ=":"
 
-  if [ -f "${1}" ] ; then
-    if [ ${is_root} -ne 0 ] ; then    # false, so non-root
-      if [ -r "${1}" ] ; then
-        if [ "${writ_ind}" -gt 0 ] && [ -w "${1}" ] ; then
-          separ="+"
-        fi
-        echo -n "${name}${separ} "
-        value=$( head -c "${num_val}" "${1}" 2> /dev/null | tr -d '\0' )
-        if [ $empty -eq 0 ] || [ -n "${value}" ] ; then
+  if [ -f "${1}" ] ; then    # if exists and regular file (or symlink to regular)
+    if [ "${is_root}" -ne 0 ] ; then    # false, so non-root
+      if [ "${writ_ind}" -gt 0 ] && [ -w "${1}" ] ; then
+        separ="+"
+      fi
+      echo -n "${name}"
+      if [ -h "${1}" ] ; then
+        echo -n "---> "
+        readlink -n "${1}"
+        echo -n " ${separ} "
+      else
+        echo -n "${separ} "
+      fi
+      if [ -r "${1}" ] ; then # is readable
+        # following head command will timeout after 2 seconds. Relies on
+        # 'set -o pipefail' so $? carried out is that of first failure.
+        value=$( timeout 2 head -c "${num_val}" "${1}" 2> /dev/null | tr -d '\0' )
+        err=$?
+        if [ "${err}" -ne 0 ] ; then
+          # 124 is exit code from 'timeout' command when timeout reached
+          if [ "${err}" -eq 124 ] ; then
+            value="<timeout>"
+          else
+            value="<error [${err}]>"
+          fi
+        elif [ "$empty" -eq 0 ] || [ -n "${value}" ] ; then
           value=$( echo  "${value}" | tr '\n' " " )
         else
           value="<empty>"
         fi
-        if [[ ${value} = *[![:ascii:]]* ]]; then
+        if [[ "${value}" = *[![:ascii:]]* ]]; then
           echo "<contains non-ASCII chars>"
         else
           echo "${value//[![:print:]]/}"
         fi
       elif [ -w "${1}" ] ; then
-        echo "${pad}${1} : <write_only>"
+        echo "<write_only>"
       else
-        echo "${pad}${1} : <cannot access>"
+        echo "<cannot access>"
       fi
-    else        # run by root
+    else        # run by root below, still regular file
       grp=$( get_root_perm "${1}" )
-      if [ "${grp}" -ge 4 ] ; then
+      if [ "${grp}" -ge 4 ] ; then      # at least read permissions
         if [ "${writ_ind}" -gt 0 ] && [ "${grp}" -ge 6 ] ; then
           separ="+"
         fi
-        echo -n "${name}${separ} "
-        value=$( head -c "${num_val}" "${1}" 2> /dev/null | tr -d '\0' )
-        if [ $empty -eq 0 ] || [ -n "${value}" ] ; then
+        echo -n "${name}"
+        if [ -h "${1}" ] ; then
+          echo -n "---> "
+          readlink -n "${1}"
+          echo -n " ${separ} "
+        else
+          echo -n "${separ} "
+        fi
+        # timeout head after 2 seconds, otherwise remove any nulls from read data
+        value=$( timeout 2 head -c "${num_val}" "${1}" 2> /dev/null | tr -d '\0' )
+        err=$?
+        if [ "${err}" -ne 0 ] ; then
+          if [ "${err}" -eq 124 ] ; then
+            value="<timeout>"
+          else
+            value="<error [${err}]>"
+          fi
+        elif [ "$empty" -eq 0 ] || [ -n "${value}" ] ; then
           value=$( echo  "${value}" | tr '\n' " " )
         else
           value="<empty>"
         fi
-        if [[ ${value} = *[![:ascii:]]* ]]; then
+        if [[ "${value}" = *[![:ascii:]]* ]]; then
           echo "<contains non-ASCII chars>"
         else
           echo "${value//[![:print:]]/}"
         fi
-      elif [ "${grp}" -ge 2 ] ; then
-        echo "${pad}${1} : <write_only>"
+      elif [ "${grp}" -ge 2 ] ; then   # at least write perms
+        echo "${name} : <write_only>"
       else
-        echo "${pad}${1} : <cannot access>"
+        echo "${name} : <cannot access>"
       fi
     fi
-  elif [ $show -gt 0 ] ; then
-    if [ -h "${1}" ] ; then
-      echo -n "${pad}${1} : ---> "
-      readlink "${1}"
-    elif [ -d "${1}" ] ; then
-      if [ $verbose -gt 0 ] ; then
-        echo "${pad}${1} : --> [directory]"
+  else      # doesn't exist or irregular
+    if [ -e "${1}" ] ; then       # exists so must be irregular
+      if [ "$show" -gt 0 ] ; then   # irregular file (maybe symlink to ...)
+        fin_line=0
+        set_name=0
+        if [ -h "${1}" ] ; then
+          echo -n "${name}"
+          set_name=1
+          if [ -d "${1}" ] ; then
+            echo -n "---> ["
+            readlink -n "${1}"
+            echo "]"
+            fin_line=1
+          else
+            echo -n "---> "
+            readlink -n "${1}"
+            echo -n " :"
+          fi
+        else
+          if [ -d "${1}" ] ; then
+            echo "${pad}[${1}]"
+            fin_line=1
+          fi
+        fi
+        if [ "${fin_line}" -eq 0 ] ; then  # not a directory (nor symlink to one)
+          if [ "${set_name}" -eq 0 ] ; then
+            echo -n "${name}:"
+          fi
+          if [ -c "${1}" ] ; then
+            echo " <char device>"
+          elif [ -b "${1}" ] ; then
+            echo " <block device>"
+          elif [ -p "${1}" ] ; then
+            echo " <named pipe>"
+          elif [ -S "${1}" ] ; then
+            echo " <socket>"
+          else
+            echo " <unknown>"
+          fi
+        fi
+      fi    # end of --show not given
+    else    # doesn't exist: either dangling symlink or gone missing
+      echo -n "${name}"
+      if [ -h "${1}" ] ; then
+        echo -n "---> "
+        readlink -n "${1}"
+        echo " : <target missing>"
       else
-        echo "${pad}${1} : -->"
+        echo " : <missing>"
       fi
-    elif [ -c "${1}" ] ; then
-      echo "${pad}${1} : <char device>"
-    elif [ -b "${1}" ] ; then
-      echo "${pad}${1} : <block device>"
-    elif [ -p "${1}" ] ; then
-      echo "${pad}${1} : <named pipe>"
-    elif [ -S "${1}" ] ; then
-      echo "${pad}${1} : <socket>"
     fi
-  fi
+  fi    # if irregular file and --show not given then bypass
 }
 
 
@@ -165,7 +240,7 @@ if (( EUID != 0 )); then
 fi
 
 # Reference: /usr/share/doc/util-linux/examples/getopt-example.bash
-if ! TEMP=$(getopt -o $short --long $long --name "$script_name" -- "$@") ; then
+if ! TEMP=$(getopt -o "${short}" --long "${long}" --name "$script_name" -- "$@") ; then
 
 # if [ $? -ne 0 ]; then
   echo 'Terminating...' >&2
@@ -201,10 +276,10 @@ while :; do
   esac
 done
 
-# If one arguent given and it's a directory, cd to it and swallow
-if [ $# -eq 1 ] && [ -d "$1" ] && [ -x "$1" ] ; then
+# If one argument given and it's a directory, cd to it and swallow
+if [ $# -eq 1 ] && [ -e "$1" ] && [ -d "$1" ] && [ -x "$1" ] ; then
   # 'stat -c ...' is a Linux extension. For FreeBSD use '-f'
-  first_st_dev=$( stat -c %d "$1" )
+  first_st_dev=$( stat -c %d "$1" 2> /dev/null )
   if ! cd "$1" ; then
     echo "cd to $1 failed from $( pwd -P) "
     exit 1
@@ -212,10 +287,10 @@ if [ $# -eq 1 ] && [ -d "$1" ] && [ -x "$1" ] ; then
   shift
 fi
 
-if [ $verbose -gt 0 ] ; then
+if [ "${verbose}" -gt 0 ] ; then
   echo -n "> current working directory: "
   pwd
-  if [ $verbose -gt 1 ] ; then
+  if [ "${verbose}" -gt 1 ] ; then
     echo -n "> physical working directory: "
     pwd -P
   fi
@@ -225,6 +300,12 @@ fi
 SAVEIFS=$IFS
 IFS=$'\n'
 
+## shopt -s dotglob and shopt -u dotglob no longer needed after switching
+## from "echo *" to ls when reading the current directory.
+
+# Piped commands, specifically head to read a value will exit on first error
+# (rather than last command executed) when pipe is used between commands
+set -o pipefail
 
 n=$#
 if [ $# -gt 0 ] ; then
@@ -234,97 +315,95 @@ if [ $# -gt 0 ] ; then
     shift
   done
 else
-  # place filenames in current directory into a bash array
-  if [ $all -gt 0 ] ; then
-    shopt -s dotglob
-  fi
-  # "shellcheck" says to use mapfile instead of following structure
-  fileArray=($( echo -n "*" ))
-  if [ $all -gt 0 ] ; then
-    shopt -u dotglob
+  # Place filenames of current directory in fileArray (a bash array)
+  if [ "${all}" -gt 0 ] ; then
+    mapfile -d '' -t fileArray < <(ls -A --zero)
+  else
+    mapfile -d '' -t fileArray < <(ls --zero)
   fi
 fi
 
 tLen=${#fileArray[@]}
 for (( k=0; k<tLen; k++ )) ; do
   name1="${fileArray[$k]}"
-  if [ $verbose -gt 3 ] ; then
+  if [ "${verbose}" -gt 3 ] ; then
     echo ">> fileArray[$k]: ${name1}"
   fi
   if [ "${first_st_dev}" -eq 0 ] ; then
-      first_st_dev=$( stat -c %d "${name1}" )
+    if [ -e "${name1}" ] ; then
+      first_st_dev=$( stat -c %d "${name1}" 2> /dev/null )
+    fi
   fi
   if [ -h "${name1}" ] ; then
     symlnk1=0
-    [ ${nosym} -gt 0 ]
+    [ "${nosym}" -gt 0 ]
     nosym_active1=$?
   else
     symlnk1=1
     nosym_active1=1
   fi
-  if [ ${dir} -gt 0 ] && [ -d "${name1}" ] && [ -x "${name1}" ] && [ ${nosym_active1} -ne 0 ] ; then
-    if [ ${otherfs} -eq 0 ] ; then
-      a_st_dev=$( stat -c %d "${name1}" )
+  if [ "${dir}" -gt 0 ] && [ -d "${name1}" ] && [ -x "${name1}" ] && [ "${nosym_active1}" -ne 0 ] ; then
+    if [ "${otherfs}" -eq 0 ] ; then
+      if [ -e "${name1}" ] ; then
+        a_st_dev=$( stat -c %d "${name1}" 2> /dev/null )
+      fi
     else
       a_st_dev=${first_st_dev}
     fi
     if [ "${first_st_dev}" -eq "${a_st_dev}" ] ; then
-      echo ">> descend to: ${name1}/"
+      echo ">> enter directory: ${name1}"
       cur=$( pwd )
       if ! cd "${name1}" ; then
         echo "cd to ${name1} failed from $( pwd -P) "
         IFS=$SAVEIFS
         exit 1
       fi
-      if [ ${verbose} -gt 2 ] && [ ${symlnk1} -eq 0 ] ; then
+      if [ "${verbose}" -gt 2 ] && [ "${symlnk1}" -eq 0 ] ; then
         echo -n "  > physical working directory: "
         pwd -P
       fi
-      # place filenames in current directory into a bash array
-      if [ $all -gt 0 ] ; then
-        shopt -s dotglob
-      fi
-      fileArray2=($( echo -n "*" ))
-      if [ $all -gt 0 ] ; then
-        shopt -u dotglob
+      # Place filenames of current directory in fileArray2
+      if [ "${all}" -gt 0 ] ; then
+        mapfile -d '' -t fileArray2 < <(ls -A --zero)
+      else
+        mapfile -d '' -t fileArray2 < <(ls --zero)
       fi
       t2Len=${#fileArray2[@]}
       for (( j=0; j<t2Len; j++ )) ; do
         name2="${fileArray2[$j]}"
         if [ -h "${name2}" ] ; then
           symlnk2=0
-          [ ${nosym} -gt 0 ]
+          [ "${nosym}" -gt 0 ]
           nosym_active2=$?
         else
           symlnk2=1
           nosym_active2=1
         fi
-        [ ${nosym} -gt 0 ] && [ -h "${name2}" ]
+        [ "${nosym}" -gt 0 ] && [ -h "${name2}" ]
         nosym_active2=$?
-        if [ ${dir} -gt 1 ] && [ -d "${name2}" ] && [ -x "${name2}" ] && [ ${nosym_active2} -ne 0 ] ; then
-          if [ ${otherfs} -eq 0 ] ; then
-            b_st_dev=$( stat -c %d "${name2}" )
+        if [ "${dir}" -gt 1 ] && [ -d "${name2}" ] && [ -x "${name2}" ] && [ "${nosym_active2}" -ne 0 ] ; then
+          if [ "${otherfs}" -eq 0 ] ; then
+            b_st_dev=$( stat -c %d "${name2}" 2> /dev/null )
           else
             b_st_dev=${first_st_dev}
           fi
           if [ "${first_st_dev}" -eq "${b_st_dev}" ] ; then
-            echo "    >> descend to: ${name2}/"
+            echo "    >> enter directory: ${name2}"
             cur2=$( pwd )
             if ! cd "${name2}" ; then
               echo "cd to ${name2} failed from $( pwd -P) "
               IFS=$SAVEIFS
               exit 1
             fi
-            if [ ${verbose} -gt 2 ] && [ ${symlnk2} -eq 0 ] ; then
+            if [ "${verbose}" -gt 2 ] && [ "${symlnk2}" -eq 0 ] ; then
               echo -n "      > physical working directory: "
               pwd -P
             fi
-            if [ $all -gt 0 ] ; then
-              shopt -s dotglob
-            fi
-            fileArray3=($( echo -n "*" ))
-            if [ $all -gt 0 ] ; then
-              shopt -u dotglob
+            # Place filenames of current directory in fileArray3
+            if [ "${all}" -gt 0 ] ; then
+              mapfile -d '' -t fileArray3 < <(ls -A --zero)
+            else
+              mapfile -d '' -t fileArray3 < <(ls --zero)
             fi
             t3Len=${#fileArray3[@]}
             for (( m=0; m<t3Len; m++ )) ; do
@@ -335,9 +414,14 @@ for (( k=0; k<tLen; k++ )) ; do
               IFS=$SAVEIFS
               exit 1
             fi
-            echo ""
+            # echo ""
           else
-            echo "    >> not descending to: ${name2}/ : <different filesystem>"
+            echo -n "    >> not entering directory: ${name2} : <different filesystem"
+            if [ "${verbose}" -gt 0 ] ; then
+              echo " [st_dev=${b_st_dev}]>"
+            else
+              echo ">"
+            fi
           fi
         else
           one_name_value "${name2}" "    "
@@ -348,12 +432,17 @@ for (( k=0; k<tLen; k++ )) ; do
         IFS=$SAVEIFS
         exit 1
       fi
-      echo ""
+      # echo ""
     else
-      echo ">> not descending to: ${name1}/ : <different filesystem>"
+      echo -n ">> not entering directory: ${name1} : <different filesystem"
+      if [ "${verbose}" -gt 0 ] ; then
+        echo " [st_dev=${a_st_dev}]>"
+      else
+        echo ">"
+      fi
     fi
   else
     one_name_value "${name1}"
   fi
-done
+done      # end of loop over command line arguments or files in current directory
 IFS=$SAVEIFS

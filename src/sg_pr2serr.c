@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Douglas Gilbert.
+ * Copyright (c) 2022-2026 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -63,7 +63,7 @@ sg_scnpr(char * cp, int cp_max_len, const char * fmt, ...)
 
 #ifdef DEBUG
     if (cp_max_len < 2) {
-        /* stack nacktrace would be good here ... */
+        /* stack backtrace would be good here ... */
         pr2ws("%s: buffer would overrun, 'fmt' string: %s\n", __func__, fmt);
         return 0;
     }
@@ -90,7 +90,7 @@ sg_scn3pr(char * fcp, int fcp_len, int off, const char * fmt, ...)
 
 #ifdef DEBUG
     if (cp_max_len < 2) {
-        /* stack nacktrace would be good here ... */
+        /* stack backtrace would be good here ... */
         pr2ws("%s: buffer would overrun, 'fmt' string: %s\n", __func__, fmt);
         return 0;
     }
@@ -101,5 +101,10 @@ sg_scn3pr(char * fcp, int fcp_len, int off, const char * fmt, ...)
     va_start(args, fmt);
     n = vsnprintf(fcp + off, fcp_len - off, fmt, args);
     va_end(args);
+#ifdef DEBUG
+    if (n >= cp_max_len)        /* make noise when truncation */
+        pr2ws("%s: truncated [n=%d]: %s; 'fmt' string: %s\n", __func__, n,
+              fcp, fmt);
+#endif
     return (n < cp_max_len) ? n : (cp_max_len - 1);
 }

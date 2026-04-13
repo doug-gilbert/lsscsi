@@ -1,7 +1,10 @@
-/* This is a utility program for listing storage devices and hosts (HBAs)
+/*
+ * This is a utility program for listing storage devices and hosts (HBAs)
  * that use the SCSI subsystems in the Linux operating system. It is
- * applicable to kernel versions 2.6.1 and greater. In lsscsi version 0.30
+ * applicable to kernel versions 2.6.1 and later. In lsscsi version 0.30
  * support was added to additionally list NVMe devices and controllers.
+ * By default the output is in plain text; alternatively the output can
+ * be in JSON.
  *
  *  Copyright (C) 2003-2026 D. Gilbert
  *
@@ -22,7 +25,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <unistd.h>
-#include <getopt.h>
+#include <getopt.h>     /* Beware: this is not really a standard header */
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <dirent.h>
@@ -46,7 +49,7 @@
 #include "sg_json.h"
 
 /* Package release number is first number, whole string is version */
-static const char * release_str = "0.33  2026/04/01 [svn: r204]";
+static const char * release_str = "0.33  2026/04/13 [svn: r205]";
 
 /*
  * Some jargon:
@@ -4056,20 +4059,22 @@ one_sdev_entry(const char * dir_name, const char * devname,
                                         snprintf(dev_node, dev_node_sz,
                                                  "-       ");
                         }
-                        /* Conditionally format the output for dev_node depending
-                           on whether we are using default output or additional
-                           fields (via command line arguments).
+                        /* Conditionally format the output for dev_node
+                           depending on whether we are using default output
+                           or additional fields (via command line arguments).
 
                            A further condition when printing dev_maj_min (-d)
-                           where we would like to keep a consistent single space
-                           before major:minor regardless of block dev name length.
+                           where we would like to keep a consistent single
+                           space before major:minor regardless of block dev
+                           name length.
 
                            Keeping the fixed field size for every other case
                            except the default output where there would now not
                            be a trailing space at the end of each device line.
                          */
                         const char *dev_fmt = (!op->dev_maj_min &&
-                                               (op->scsi_id || op->protection ||
+                                               (op->scsi_id ||
+                                                op->protection ||
                                                 op->protmode || op->ssize))
                                                ? "%-9s" : "%s";
 
@@ -4134,20 +4139,21 @@ one_sdev_entry(const char * dir_name, const char * devname,
                                                 snprintf(dev_node,
                                                          dev_node_sz, "-");
                                 }
-                                /* Conditionally format the output for dev_node
-                                   depending on whether we are using default
-                                   output or additional fields (via command line
-                                   arguments).
+                                /* Conditionally format the output for
+                                   dev_node depending on whether we are using
+                                   default output or additional fields (via
+                                   command line arguments).
 
-                                   A further condition when printing dev_maj_min
-                                   (-d) where we would like to keep a consistent 
-                                   single space before major:minor regardless of
-                                   block dev name length.
+                                   A further condition when printing
+                                   dev_maj_min (-d) where we would like to
+                                   keep a consistent single space before
+                                   major:minor regardless of block dev name
+                                   length.
 
-                                   Keeping the fixed field size for every other
-                                   case except the default output where there
-                                   would now not be a trailing space at the end
-                                   of each device line.
+                                   Keeping the fixed field size for every
+                                   other case except the default output where
+                                   there would now not be a trailing space at
+                                   the end of each device line.
                                  */
                                 const char *sg_fmt = (!op->dev_maj_min &&
                                                       (op->protection ||

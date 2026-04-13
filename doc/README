@@ -5,6 +5,12 @@ or
 
 It includes many examples and a Download section.
 
+Syntax checking
+===============
+Use 'mandoc -W style {man_page} > /dev/null'
+
+The: 'cannot parse date, using it verbatim: TH February 2019' warning
+is ignored.
 
 Doug Gilbert
-5th March 2026
+12th March 2026

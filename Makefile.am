@@ -1,6 +1,8 @@
 SUBDIRS =	src doc scripts
 
-EXTRA_DIST=autogen.sh
+EXTRA_DIST= \
+	  autogen.sh \
+	  bootstrap
 
 distclean-local:
 	rm -rf \
