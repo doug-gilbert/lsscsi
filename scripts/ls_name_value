@@ -6,55 +6,78 @@
 #
 # This script is designed to print out pseudo file system file names
 # followed by their ASCII contents (i.e. their values) as appropriate.
-# It targets sysfs (/sys ) in Linux but may be useful in other contexts.
+# The file contents are not precise and modified to be printable on
+# a single line. This utility targets sysfs (/sys ) in Linux but may
+# be useful in other contexts and on other Unix like OSes.
+#
+# It is just too hard and too slow to process all the desired detection
+# and representation of the contents of each regular file. For example
+# the timeout(1) command takes 100 milliseconds even when the file can
+# be read immediately. When scanning sysfs that is over 80% of the cases.
+# The solution was the rely on a utility written in C whose source is in
+#    ../src/ls_name_value_rd.c
+# That is called for every filename that might have displayable contents
+# (e.g. a directory name should _not_ be passed to that C utility).
 
-version_str="1.15 20260411"
+version_str="1.18 20260418"
 
 all=0
 dir=0
 empty=0
+ee_opt=0
 nosym=0
-num_val=256   # may not be the best default
+num_val=80   # may not be the best default
 otherfs=0
 show=0
 is_root=0     # 0 for true; 1 for false (sorry C)
 first_st_dev=0
+physical=0
+utf8=0
+utf8_opt=0
 verbose=0
+vv_opt=0
 writ_ind=0
+content_reader="ls_name_value_rd"    # C program in lsscsi package
 
 # The following are for the getopt(1) command from util-linux which
 # follows the function definitions, about 100 lines down.
 script_name=$(basename "$0")
-short="adehn:NosvVw"
-long="all,dir,empty,help,num:,nosym,otherfs,show,verbose,version,write"
+short="adehn:NopsuvVw"
+long="all,dir,empty,help,num:,nosym,otherfs,physical,show,utf8,verbose,version,write"
 
 
 usage()
 {
-  echo "Usage: ls_name_value [-a] [-d] [-e] [-h] [-N] [-n NUM] [-o] [-s] "
-  echo "                     [-v] [-V] [-w] [<name>*]"
-  echo "  where:  -a, --all         include hidden filename (starting with '.')"
+  echo -n  "Usage: ls_name_value [-a] [-d] [-e] [-h] [-N] [-n NUM] "
+  echo "[-o] [-p] [-s]"
+  echo "                     [-u] [-v] [-V] [-w] [<name>*]"
+  echo -n "  where:  -a, --all         include hidden filenames (starting "
+  echo "with '.')"
   echo "          -d, --dir         enter directories (descends 1 level)"
   echo "                            if given twice (-dd) descends 2 levels"
   echo "          -e, --empty       output <value> as '<empty>' rather than blank"
   echo "          -h, --help        print usage message"
   echo "          -N, --nosym       do not descend symlinks to directories"
-  echo "          -n, --num=NUM     max bytes in value (def: 256)"
+  echo "          -n, --num=NUM     max bytes in value (def: 80)"
   echo "          -o, --otherfs     not entering an other fs is default, override"
+  echo -n "          -p, --physical    when entering a directory show "
+  echo "physical address"
+  echo "                            on next line (with 'pwd -P')"
   echo "          -s, --show        show directories, symlinks and specials"
+  echo "          -u, --utf8        if <value> passes UTF-8 tests, output it"
   echo "          -v, --verbose     increase verbosity of output"
   echo "          -V, --version     print version string then exit"
   echo "          -w, --write       separator changed from : to + if writable"
   echo ""
   echo "Prints lines of the form '<name> : <value>' where <name> is a regular"
-  echo "filename. The <value> is the contents of <name>, up to 256 bytes of"
+  echo "filename. The <value> is the contents of <name>, up to 80 bytes of"
   echo "printable (7 bit) ASCII. If <value> cannot be read in 2 seconds, then"
   echo "<timeout> is printed instead. If one or more <name>s are given on the"
   echo "command line then they are used. If there are no names on the command"
   echo "line, then echo the regular files in the current directory are used."
   echo "If one <name> is given and it is a directory then it is entered and the"
   echo "files in that directory are used."
-  echo "Primarily designed for viewing sysfs in Linux (e.g. under /sys )."
+  echo "Primarily designed for viewing sysfs in Linux (i.e. under /sys )."
 }
 
 # Returns owner permission of ${1} as single (octal) digit. Therefore it returns
@@ -67,7 +90,7 @@ get_root_perm()
     # 'stat -c ...' is a Linux extension. For FreeBSD use '-f'
     s=$(stat -c '%a' "$1" 2> /dev/null )
     if [ -n "$s" ] ; then
-      echo "${s:0:1}"	   # 1 octal digit (0 to 7)
+      echo "${s:0:1}"      # 1 octal digit (0 to 7)
     else
       echo "0"
     fi
@@ -84,6 +107,9 @@ one_name_value()
   local name
   local value
   local pad
+  local l_ee_opt
+  local l_utf8_opt
+  local l_vv_opt
   local separ
   local fin_line
   local set_name
@@ -91,9 +117,33 @@ one_name_value()
 
   if [ $# -gt 1 ] ; then
     pad=$2
+    if [ $# -gt 2 ] ; then
+      l_ee_opt=$3
+      if [ $# -gt 3 ] ; then
+        l_vv_opt=$4
+        if [ $# -gt 4 ] ; then
+          l_utf8_opt=$5
+        else
+          l_utf8_opt=""
+        fi
+      else
+        l_vv_opt=""
+        l_utf8_opt=""
+      fi
+    else
+      l_ee_opt=""
+      l_vv_opt=""
+      l_utf8_opt=""
+    fi
   else
     pad=""
+    l_ee_opt=""
+    l_vv_opt=""
+    l_utf8_opt=""
   fi
+
+# echo "start of one_name_value: l_ee_opt=${l_ee_opt}"
+
   if [ "${1:0:1}" = "/" ] || [ "${1:0:1}" = "." ] ; then
     name="${pad}$( basename "$1" ) "
   else
@@ -114,32 +164,17 @@ one_name_value()
       else
         echo -n "${separ} "
       fi
-      if [ -r "${1}" ] ; then # is readable
-        # following head command will timeout after 2 seconds. Relies on
-        # 'set -o pipefail' so $? carried out is that of first failure.
-        value=$( timeout 2 head -c "${num_val}" "${1}" 2> /dev/null | tr -d '\0' )
-        err=$?
-        if [ "${err}" -ne 0 ] ; then
-          # 124 is exit code from 'timeout' command when timeout reached
-          if [ "${err}" -eq 124 ] ; then
-            value="<timeout>"
-          else
-            value="<error [${err}]>"
-          fi
-        elif [ "$empty" -eq 0 ] || [ -n "${value}" ] ; then
-          value=$( echo  "${value}" | tr '\n' " " )
-        else
-          value="<empty>"
-        fi
-        if [[ "${value}" = *[![:ascii:]]* ]]; then
-          echo "<contains non-ASCII chars>"
-        else
-          echo "${value//[![:print:]]/}"
-        fi
-      elif [ -w "${1}" ] ; then
-        echo "<write_only>"
+      # calls helper C function, waits up to 1 second for "hanging" files
+      # ${content_reader} must ignore empty arguments (i.e. "")
+      value=$( ${content_reader} "${1}" "${num_val}" "${l_ee_opt}" "${l_utf8_opt}" "${l_vv_opt}" )
+
+      err=$?
+      if [ "${err}" -ne 0 ] ; then
+        echo "<error [${err}]>"
+      elif [ -n "${value}" ] ; then
+        echo "${value}"
       else
-        echo "<cannot access>"
+        echo " "
       fi
     else        # run by root below, still regular file
       grp=$( get_root_perm "${1}" )
@@ -155,27 +190,20 @@ one_name_value()
         else
           echo -n "${separ} "
         fi
-        # timeout head after 2 seconds, otherwise remove any nulls from read data
-        value=$( timeout 2 head -c "${num_val}" "${1}" 2> /dev/null | tr -d '\0' )
+        # calls helper C function, waits up to 1 second for "hanging" files
+        # ${content_reader} must ignore empty arguments (i.e. "")
+        value=$( ${content_reader} "${1}" "${num_val}" "${l_ee_opt}" "${l_utf8_opt}" "${l_vv_opt}" )
+
         err=$?
         if [ "${err}" -ne 0 ] ; then
-          if [ "${err}" -eq 124 ] ; then
-            value="<timeout>"
-          else
-            value="<error [${err}]>"
-          fi
-        elif [ "$empty" -eq 0 ] || [ -n "${value}" ] ; then
-          value=$( echo  "${value}" | tr '\n' " " )
+          value="<error [${err}]>"
+        elif [ -n "${value}" ] ; then
+          echo "${value}"
         else
-          value="<empty>"
-        fi
-        if [[ "${value}" = *[![:ascii:]]* ]]; then
-          echo "<contains non-ASCII chars>"
-        else
-          echo "${value//[![:print:]]/}"
+          echo " "
         fi
       elif [ "${grp}" -ge 2 ] ; then   # at least write perms
-        echo "${name} : <write_only>"
+        echo "${name} : <write only>"
       else
         echo "${name} : <cannot access>"
       fi
@@ -267,7 +295,9 @@ while :; do
                 shift 2 ;;
     -N | --nosym      ) (( nosym=nosym+1 )) ;       shift 1 ;;
     -o | --otherfs    ) (( otherfs=otherfs+1 )) ;   shift 1 ;;
+    -p | --physical   ) (( physical=physical+1 )) ; shift 1 ;;
     -s | --show       ) (( show=show+1 )) ;         shift 1 ;;
+    -u | --utf8       ) (( utf8=utf8+1 )) ;         shift 1 ;;
     -v | --verbose    ) (( verbose=verbose+1 )) ;   shift 1 ;;
     -V | --version    ) echo "${version_str}" ;     exit 0 ;;
     -w | --write      ) (( writ_ind=writ_ind+1 )) ; shift 1 ;;
@@ -275,6 +305,19 @@ while :; do
     *                 ) echo "Error parsing $1";    exit 1 ;;
   esac
 done
+
+# In production ${content_reader} is expected to be on $PATH.
+# In development it should be found in a sibling directory.
+if ! which -s "${content_reader}" ; then
+  dev_content_reader="../src/${content_reader}"
+  if which -s "${dev_content_reader}" ; then
+    content_reader=$(pwd)/"${dev_content_reader}"
+    # echo "${content_reader}"
+  else
+    echo "Unable to find helper: ${content_reader}, exiting"
+    exit 1
+  fi
+fi
 
 # If one argument given and it's a directory, cd to it and swallow
 if [ $# -eq 1 ] && [ -e "$1" ] && [ -d "$1" ] && [ -x "$1" ] ; then
@@ -300,12 +343,32 @@ fi
 SAVEIFS=$IFS
 IFS=$'\n'
 
-## shopt -s dotglob and shopt -u dotglob no longer needed after switching
-## from "echo *" to ls when reading the current directory.
+if [ "${empty}" -eq 1 ] ; then
+  ee_opt="-e"
+elif [ "${empty}" -gt 1 ] ; then
+  ee_opt="-ee"
+else
+  ee_opt=""
+fi
 
-# Piped commands, specifically head to read a value will exit on first error
-# (rather than last command executed) when pipe is used between commands
-set -o pipefail
+if [ "${utf8}" -gt 0 ] ; then
+  utf8_opt="-u"
+else
+  utf8_opt=""
+fi
+
+if [ "${verbose}" -eq 1 ] ; then
+  vv_opt="-v"
+elif [ "${verbose}" -gt 1 ] ; then
+  vv_opt="-v"
+  n=${verbose}
+  for (( k=1 ; k<n ; k=k+1 )) ; do
+    vv_opt="${vv_opt}v"   # append a 'v'
+  done
+else
+  vv_opt=""
+fi
+
 
 n=$#
 if [ $# -gt 0 ] ; then
@@ -351,14 +414,25 @@ for (( k=0; k<tLen; k++ )) ; do
       a_st_dev=${first_st_dev}
     fi
     if [ "${first_st_dev}" -eq "${a_st_dev}" ] ; then
-      echo ">> enter directory: ${name1}"
+      echo -n ">> enter directory: "
+      if [ -h "${name1}" ] ; then
+        echo -n "${name1}"
+        echo -n " ---> [ "
+        readlink -n "${name1}"
+        echo " ]"
+      else
+        echo "[ ${name1} ]"
+      fi
       cur=$( pwd )
       if ! cd "${name1}" ; then
         echo "cd to ${name1} failed from $( pwd -P) "
         IFS=$SAVEIFS
         exit 1
       fi
-      if [ "${verbose}" -gt 2 ] && [ "${symlnk1}" -eq 0 ] ; then
+      if [ "${physical}" -gt 0 ] ; then
+        value=$( pwd -P )
+        echo "[ ${value} ]"
+      elif [ "${verbose}" -gt 2 ] && [ "${symlnk1}" -eq 0 ] ; then
         echo -n "  > physical working directory: "
         pwd -P
       fi
@@ -388,15 +462,26 @@ for (( k=0; k<tLen; k++ )) ; do
             b_st_dev=${first_st_dev}
           fi
           if [ "${first_st_dev}" -eq "${b_st_dev}" ] ; then
-            echo "    >> enter directory: ${name2}"
+            echo -n "    >> enter directory: "
+            if [ -h "${name2}" ] ; then
+              echo -n "${name2}"
+              echo -n " ---> [ "
+              readlink -n "${name2}"
+              echo " ]"
+            else
+              echo "[ ${name2} ]"
+            fi
             cur2=$( pwd )
             if ! cd "${name2}" ; then
               echo "cd to ${name2} failed from $( pwd -P) "
               IFS=$SAVEIFS
               exit 1
             fi
-            if [ "${verbose}" -gt 2 ] && [ "${symlnk2}" -eq 0 ] ; then
-              echo -n "      > physical working directory: "
+            if [ "${physical}" -gt 0 ] ; then
+              value=$( pwd -P )
+              echo "[ ${value} ]"
+            elif [ "${verbose}" -gt 2 ] && [ "${symlnk2}" -eq 0 ] ; then
+              echo -n "  > physical working directory: "
               pwd -P
             fi
             # Place filenames of current directory in fileArray3
@@ -407,7 +492,7 @@ for (( k=0; k<tLen; k++ )) ; do
             fi
             t3Len=${#fileArray3[@]}
             for (( m=0; m<t3Len; m++ )) ; do
-              one_name_value "${fileArray3[m]}" "        "
+              one_name_value "${fileArray3[m]}" "        "  "${ee_opt}" "${vv_opt}" "${utf8_opt}"
             done
             if ! cd "${cur2}" ; then
               echo "cd to ${cur2} failed from $( pwd -P) "
@@ -424,7 +509,7 @@ for (( k=0; k<tLen; k++ )) ; do
             fi
           fi
         else
-          one_name_value "${name2}" "    "
+          one_name_value "${name2}" "    " "${ee_opt}" "${vv_opt}" "${utf8_opt}"
         fi
       done
       if ! cd "${cur}" ; then
@@ -442,7 +527,7 @@ for (( k=0; k<tLen; k++ )) ; do
       fi
     fi
   else
-    one_name_value "${name1}"
+    one_name_value "${name1}" "" "${ee_opt}" "${vv_opt}" "${utf8_opt}"
   fi
 done      # end of loop over command line arguments or files in current directory
 IFS=$SAVEIFS

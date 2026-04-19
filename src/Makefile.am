@@ -1,4 +1,4 @@
-bin_PROGRAMS = lsscsi
+bin_PROGRAMS = lsscsi ls_name_value_rd
 
 # C++/clang testing
 ## CC = gcc
@@ -46,6 +46,8 @@ lsscsi_SOURCES =	lsscsi.c \
 			sg_json.h \
 			sg_json.c \
 			sg_unaligned.h
+
+ls_name_value_rd_SOURCES =	ls_name_value_rd.c
 
 distclean-local:
 	rm -rf \

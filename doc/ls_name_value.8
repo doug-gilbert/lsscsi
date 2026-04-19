@@ -4,8 +4,9 @@ ls_name_value \- for browsing names and corresponding values in sysfs
 .SH SYNOPSIS
 .B ls_name_value
 [\fI\-\-all\fR] [\fI\-\-dir\fR] [\fI\-\-empty\fR] [\fI\-\-help\fR]
-[\fI\-\-nosym\fR] [\fI\-\-num=NUM\fR] [\fI\-\-otherfs\fR] [\fI\-\-show\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-write\fR] [\fINAME\fR ...]
+[\fI\-\-nosym\fR] [\fI\-\-num=NUM\fR] [\fI\-\-otherfs\fR]
+[\fI\-\-physical\fR] [\fI\-\-show\fR] \fI\-\-utf8\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] [\fI\-\-write\fR] [\fINAME\fR ...]
 .SH DESCRIPTION
 .\" Add any additional description here
 This bash shell script is designed to give an overview of the (file)names
@@ -22,14 +23,14 @@ is given in which case "<empty>" is output. By default directory names and
 symbolic links (symlinks) are not shown. One exception is a symlink to
 a regular file which is shown like this:
     $ ls_name_value /dev/core
-      core ---> /proc/kcore : <cannot access>
+      core \-\-\-> /proc/kcore : <cannot access>
 .PP
 In this case /dev/core is a symlink to /proc/kcore (and thus /proc/kcore is
 called the symlink target). The current user doesn't have permissions to
-read that file (because it is "raw" memory) so its value (or the first 256
+read that file (because it is "raw" memory) so its value (or the first 80
 bytes of its value) is replaced by "<cannot access>". Even if root made
 the same invocation, the value most likely would be replaced by this
-string "<contains non-ASCII chars>".
+string "<contains non\-ASCII chars>".
 .PP
 If one or more \fINAME\fRs are given then their corresponding name:value
 pairs are displayed. An exception is if only one \fINAME\fR is given and
@@ -43,8 +44,8 @@ A simple example follows where "power_role" is a regular file:
 .PP
 The value part of the name:value pair is output when the name is a readable,
 regular file. Furthermore the value is output if it only contains 7 bit ASCII
-characters, if not "<contains non-ASCII chars>" is output instead. By
-default, up to 256 characters are output, that number can be changed with the
+characters, if not "<contains non\-ASCII chars>" is output instead. By
+default, up to 80 characters are output, that number can be changed with the
 \fI\-\-num=NUM\fR option. If the name has write permissions set for the
 accessing user and no read permissions set then the value is replaced
 by "<write_only>". If the name is a regular file and cannot be read from
@@ -71,7 +72,7 @@ Here is an example that shows this when two \fINAME\fRs are given on
 the command line:
     $ ls_name_value \-d /dev /sys
       >> enter directory: /dev
-          core ---> /proc/kcore : <cannot access>
+          core \-\-\-> /proc/kcore : <cannot access>
       >> not entering directory: /sys : <different filesystem>
 .br
 This occurs because /dev is contained in an instance of the devfs file
@@ -108,12 +109,22 @@ spaces.
 .br
 The is a special case when a single element \fINAME\fR list is given and that
 name is a directory (or a symlink to a directory). This script will enter
-that directory and list its name:value pairs without the need for this option.
+nix that directory and list its name:value pairs without the need for this
+option.
+.br
+The action of this option is similar to the \-maxdepth <n> option in the
+Unix find(1) command.
 .TP
 \fB\-e\fR, \fB\-\-empty\fR
-any many cases the value associated a filename is empty. By default, nothing
-will appear to the right of the colon separating the name and value. When
-this option is given, if the value is empty, the string '<empty>' is output.
+in many cases the value associated with a filename is empty. By default,
+nothing will appear to the right of the colon separating the name and value.
+When this option is given, if the value is empty, the string '<empty>' is
+output.
+.br
+Additionally, if this option is given twice, if a filename is regular,
+accessible and only contains the '\\n' character (a linefeed) then "<LF>"
+is output. Note that if this option is not given twice then that '\\n'
+control character would be replaced by a space in the output.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 print out the usage message then exit.
@@ -129,7 +140,7 @@ directories would be entered.
 .TP
 \fB\-n\fR, \fB\-\-num\fR=\fINUM\fR
 \fINUM\fR is the maximum number of bytes in the values shown. \fINUM\fR is
-required to be greater than zero. 256 bytes is the default for \fINUM\fR.
+required to be greater than zero. The default for \fINUM\fR is 80 bytes.
 .br
 This option does not apply to the destination path shown for symlinks
 or the directory name when descending into that directory.
@@ -144,42 +155,22 @@ is to prune any branch (directory) that is not in the same file system as
 the first file (which may be a directory) processed. Giving this option skips
 the file system check.
 .TP
+\fB\-p\fR, \fB\-\-physical\fR
+when this option is given, in the line following "enter directory: ..." the
+physical path of the entered directory is shown. It takes the full line with
+no indentation and is surrounded by square brackets (because it is a
+directory). The output shown is the equivalent of the 'pwd \-\-physical' (
+or 'pwd \-P'). That is an absolute path (i.e. starts at the root '/') and
+contains
+.B no
+symlinks. Every distinct file (directory, etc) has a unique physical path
+as, in the absence of symlinks, file systems are single parent hierarchies.
+.TP
 \fB\-s\fR, \fB\-\-show\fR
 usually only regular files are shown in name:value pair format. The main
-exception is a directory which this utility will "descend" into (typically
-due to the \fI\-\-dir\fR option being given). Here is an example of the
-same location with different combinations of this option and the
-\fI\-\-dir\fR option:
-this:
-    $ ls_name_value /sys/class/usb_power_delivery/
- 
-    $ ls_name_value /sys/class/usb_power_delivery/ \-s
-      pd0 ---> [../../devices/platform/USBC000:00/usb_power_delivery/pd0]
-      pd1 ---> [../../devices/platform/USBC000:00/usb_power_delivery/pd1]
- 
-    $ ls_name_value /sys/class/usb_power_delivery/ \-s \-d
-      >> enter directory: pd0
-         device ---> [../../../USBC000:00]
-         [power]
-         revision : 2.0
-         [sink-capabilities]
-         subsystem ---> [../../../../../class/usb_power_delivery]
-         uevent : DEVTYPE=usb_power_delivery
-      >> enter directory: pd1
-         device ---> [../../../USBC000:00]
-         [power]
-         ....
-.br
-The location given (/sys/class/usb_power_delivery/) is a directory that
-contains two symlinks (pd0 and pd1) and no regular files. Hence the first
-invocation finds no regular files so it list nothing. The second invocation
-add the \fI\-\-show\fR option which list the two symlinks whose targets
-are both directories. Directory names are surrounded by brackets (
-e.g. "[power]" shown in the last invocation). The last invocation adds
-the \fI\-\-dir\fR option, so the pd0 and pd1 (symlinks to) directories are
-entered and their contents are listed. Only only regular file is shown and
-that is called "revision" and its value is "2.0". Symlinks are shown with
-their name followed by "--->" and then the target path.
+exception is a directory which this utility will "descend" (or enter)
+into (typically due to the \fI\-\-dir\fR option being given). See the
+EXAMPLES section below.
 .br
 Directories that are not visited are not shown by default. Also other file
 types, sometimes called "specials" are not shown. Those specials include
@@ -199,6 +190,20 @@ brackets: <block device>, <char device>, <named pipe>, <socket>. There
 are some other file "types" such as <missing>, <write only>
 and <cannot access> for a permissions problem.
 .TP
+\fB\-u\fR, \fB\-\-utf8\fR
+when examining the contents of a file (i.e. the "value" in name:value pairs)
+once the top bit of any byte is set, then the default value output
+will be either "<contains non\-ASCII chars>" or "<might be UTF\-8>". If a
+non UTF\-8 byte is detected then the whole "value" is considered non\-ASCII.
+If a truncated UTF\-8 code point is detected (truncated due to
+\fI\-\-num=NUM\fR) then if that is the only (partial) UTF\-8 encode sequence
+then the "value" is consider non\-ASCII, otherwise it is consider UTF\-8.
+When this option is given instead of outputting "<might be UTF\-8>" then the
+UTF\-8 string itself is outpt. For the actual UTF\-8 encode sequences to be
+rendered the locale must be set appropriately. For example on the author's
+laptop 'env | grep LANG' yields "LANG=en_CA.UTF\-8" and UTF\-8 encoded
+sequences are rendered properly.
+.TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase level or verbosity.
 .TP
@@ -210,6 +215,74 @@ the separator between the <name> and <value> is normally ":". If this option
 is given and the filename <name> has both read and write permissions for
 the current user then the separator is changed to "+".
 .SH EXAMPLES
+Here is an example of the same location with different combinations of the
+\fI\-\-show\fR option and the \fI\-\-dir\fR option:
+.PP
+    $ ls_name_value /sys/class/usb_power_delivery/
+
+    $ ls_name_value /sys/class/usb_power_delivery/ \-s
+      pd0 \-\-\-> [../../devices/platform/USBC000:00/usb_power_delivery/pd0]
+      pd1 \-\-\-> [../../devices/platform/USBC000:00/usb_power_delivery/pd1]
+
+    $ ls_name_value /sys/class/usb_power_delivery/ \-d
+      >> enter directory: pd0 \-\-\-> [ ../../devices/platform/USBC000:00/usb_power_delivery/pd0 ]
+          revision : 2.0
+          uevent : DEVTYPE=usb_power_delivery
+      >> enter directory: pd1 \-\-\-> [ ../../devices/platform/USBC000:00/usb_power_delivery/pd1 ]
+          revision : 2.0
+          uevent : DEVTYPE=usb_power_delivery
+
+    $ ls_name_value /sys/class/usb_power_delivery/ \-s \-d
+      >> enter directory: pd0 \-\-\-> [ ../../devices/platform/USBC000:00/usb_power_delivery/pd0 ]
+          device \-\-\-> [../../../USBC000:00]
+          [power]
+          revision : 2.0
+          [sink\-capabilities]
+          subsystem \-\-\-> [../../../../../class/usb_power_delivery]
+          uevent : DEVTYPE=usb_power_delivery
+      >> enter directory: pd1 \-\-\-> [ ../../devices/platform/USBC000:00/usb_power_delivery/pd1 ]
+          device \-\-\-> [../../../USBC000:00]
+          [power]
+          revision : 2.0
+          ....
+
+.PP
+The location given (/sys/class/usb_power_delivery/) is a directory that
+contains two symlinks (pd0 and pd1) and no regular files. Hence the first
+invocation finds no regular files so it lists nothing. The second invocation
+add the \fI\-\-show\fR option which lists the two symlinks whose targets
+are both directories. Directory names are surrounded by brackets (
+e.g. "[power]" shown in the last invocation). The third invocation is with
+the \fI\-\-dir\fR option which enters (descends into) one level of
+directories. The names of the directories entered (actually symlinks to
+directories) are shown, together with the regular files found in those
+directories (i.e. "revision" and "uevent") together with their
+contents (after the ":").  The last invocation uses both the \fI\-\-show\fR
+and the \fI\-\-dir\fR options, so the pd0 and pd1 (symlinks to) directories
+are entered and their contents are listed. The regular files shown together
+with directories (surround by "[" and "]") and the symlink "subsystem" whose
+target is a directory (again indicated by the surrounding "[" and "]").
+Symlinks are shown with their name followed by "\-\-\->" and then the target
+path which is often but not always a directory.
+.PP
+The next example shows the effect of the \fI\-\-physical\fR option. It
+expands on the third example if the above section:
+
+    $ ls_name_value /sys/class/usb_power_delivery/ \-d \-p
+      >> enter directory: pd0 \-\-\-> [ ../../devices/platform/USBC000:00/usb_power_delivery/pd0 ]
+      [ /sys/devices/platform/USBC000:00/usb_power_delivery/pd0 ]
+          revision : 2.0
+          uevent : DEVTYPE=usb_power_delivery
+      >> enter directory: pd1 \-\-\-> [ ../../devices/platform/USBC000:00/usb_power_delivery/pd1 ]
+      [ /sys/devices/platform/USBC000:00/usb_power_delivery/pd1 ]
+          revision : 2.0
+          uevent : DEVTYPE=usb_power_delivery
+.PP
+A new line is added after the "enter directory:" line. It is the absolute,
+physical path of the directory just entered into. It has no indentation and
+is surrounded by "[" and "]" because it is a directory. A physical path
+contains no symlinks (in any of its component parts).
+.PP
 There is no command line option to exclude directories which would be useful
 when using the \fI\-\-dir\fR option. A case where this might be helpful is
 in procfs (e.g. /proc ) as descending into each running process (thread) may
@@ -269,7 +342,14 @@ utility scanning the contents of that directory, that directory might
 be deleted (e.g. by the kernel because the hardware it represents has
 just been hot unplugged). To get a more stable snapshot (or close to
 snapshot) the clone_pseudo_fs utility might be used to clone /sys into
-/tmp/sys before this utility is used to data-mine within /tmp/sys .
+/tmp/sys before this utility is used to data\-mine within /tmp/sys .
+.PP
+This utility is a bash script but it has a C program helper called
+ls_name_value_rd for processing the contents of a file. That was initially
+done in the bash script but handling all the corner cases was too complex
+and too slow. The ultimate "killer" was the timeout command that takes
+around 100 milliseconds even when the data (e.g. reading a sysfs file) is
+available immediately.
 .SH AUTHORS
 Written by D. Gilbert
 .SH COPYRIGHT

@@ -1,0 +1,98 @@
+.TH LS_NAME_VALUE_RD "8" "April 2026" "lsscsi\-0.33" LSSCSI
+.SH NAME
+ls_name_value_rd \- get an overview of the contents of a file
+.SH SYNOPSIS
+.B ls_name_value_rd
+[\fI\-\-empty\fR] [\fI\-\-help\fR] \fI\-\-utf8\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIfilename\fR [\fInum_bytes\fR]
+.SH DESCRIPTION
+.\" Add any additional description here
+This utility is a helper for the ls_name_value bash script. This utility
+may be useful in its own right as it attempts to give an overview of the
+contents of the \fIfilename\fR file. If \fIfilename\fR  is regular,
+accessible and contains only 7 bit ASCII character (or perhaps only UTF\-8
+encoded sequences) then up to the first \fInum_bytes\fR are output to
+stdout. Otherwise some description of \fIfilename\fR or its contents are
+ output, usually between "<" and ">". For example if \fIfilename\fR is
+a "character device" then "<char device>" is output.
+.PP
+The \fInum_bytes\fR command line argument is optional and is the maximum
+number of bytes to read from \fIfilename\fR. Its default value is 80 .
+.PP
+When errors are detected, sending a description back via stdout is
+preferred over more traditional techniques (e.g. sending an error message
+to stderr and setting a non\-zero exit code). For example if \fIfilename\fR
+is not found then "<not found>" is output to stdout and the exit code is
+zero.
+.PP
+Any null characters (in C: '\0') found in the contents (value) are skipped
+(suppressed) while any ASCII control characters (less than space apart from
+the null character) and the 0x7f character are replaced by a space. Note
+that all output to stdout is
+.B not
+ended with a '\\n' character.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-e\fR, \fB\-\-empty\fR
+in many cases the value (contents) associated with \fIfilename\fR is empty.
+By default, nothing will output to stdout. When this option is given, if
+the value is empty, the string '<empty>' is output to stdout.
+.br
+Additionally, if this option is given twice, if \fIfilename\fR is regular,
+accessible and only contains the '\\n' character (a linefeed) then "<LF>"
+is output to stdout. Note that if this option is not given twice then
+that '\\n' control character would be replaced by a space in the output to
+stdout.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+print out the usage message then exit.
+.TP
+\fB\-u\fR, \fB\-\-utf8\fR
+when examining the contents (value) of \fIfilename\fR file once the top bit
+of a byte being set is detected, the default value output will be
+either "<contains non\-ASCII chars>" or "<might be UTF\-8>". If a non UTF\-8
+byte is detected then the whole "value" is considered non\-ASCII. If a
+truncated UTF\-8 code point is detected (truncated due to \fInum_bytes\fR)
+then if that is the only (partial) UTF\-8 encoded sequence then the "value"
+is considered non\-ASCII, otherwise it is consider UTF\-8. When this option is
+given instead of outputting "<might be UTF\-8>" the UTF\-8 string itself
+is output to stdout. For the actual UTF\-8 encoded sequences to be rendered
+the locale must be set appropriately. For example on the author's
+laptop 'env | grep LANG' yields "LANG=en_CA.UTF\-8" and UTF\-8 encoded
+sequences are rendered properly.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase level or verbosity.
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+prints out the version string then exits.
+.SH NOTES
+The \fIfilename\fR is opened read\-only and with the O_NONBLOCK flag set.
+If the user does have permissions to open \fIfilename\fR
+then "<cannot access>" is output to stdout. If the user does have
+permission but not read\-only access but does have write\-only access
+the "<write only>" is output to stdout.
+.PP
+Due to that O_NONBLOCK setting when a following read(2) tries to read
+from \fIfilename\fR and it is not ready (but might be a bit later) then
+that read(2) yields an EAGAIN. This utility will then pause for 10
+milliseconds and try again. After 100 retries with the same
+outcome (approximately 1 second) this utility will send "<timeout>"
+to stdout and exit. Note if any characters were read before that timeout,
+and they are 7 bit ASCII, then they may precede that "<timeout>" string.
+.PP
+The utility "looks through" symbolic links (symlinks). So if \fIfilename\fR
+is to symlink to a directory then "<directory>" is output. In the way
+this utility works with the ls_name_value bash script, that script takes
+care of all the symlink handling. If a symlink is "dangling" then this
+utility outputs "<not found>" to stdout.
+.SH AUTHORS
+Written by D. Gilbert
+.SH COPYRIGHT
+Copyright \(co 2026 Douglas Gilbert
+.br
+This software is distributed under a BSD\-2\-Clause license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B ls_name_value(this package)

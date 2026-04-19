@@ -1,4 +1,4 @@
-AC_INIT(lsscsi, 0.33, dgilbert@interlog.com)
+AC_INIT([lsscsi],[0.33],[dgilbert@interlog.com])
 
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 AM_MAINTAINER_MODE
@@ -19,11 +19,11 @@ AC_CHECK_HEADERS([byteswap.h], [], [], [])
 # AC_PROG_LIBTOOL
 
 AC_ARG_ENABLE([nvme-supp],
-  AC_HELP_STRING([--disable-nvme-supp], [remove all or most NVMe code]),
+  AS_HELP_STRING([--disable-nvme-supp],[remove all or most NVMe code]),
   [AC_DEFINE_UNQUOTED(IGNORE_NVME, 1, [compile out NVMe support], )], [])
 
 AC_ARG_ENABLE([fast-lebe],
-  AC_HELP_STRING([--disable-fast-lebe], [use generic little-endian/big-endian code instead]),
+  AS_HELP_STRING([--disable-fast-lebe],[use generic little-endian/big-endian code instead]),
   [AC_DEFINE_UNQUOTED(IGNORE_FAST_LEBE, 1, [use generic little-endian/big-endian instead], )], [])
 
 AC_ARG_ENABLE([debug],
@@ -35,4 +35,5 @@ AC_ARG_ENABLE([debug],
                esac],[debug=false])
 AM_CONDITIONAL([DEBUG], [test x$debug = xtrue])
 
-AC_OUTPUT(Makefile src/Makefile doc/Makefile scripts/Makefile)
+AC_CONFIG_FILES([Makefile src/Makefile doc/Makefile scripts/Makefile])
+AC_OUTPUT
