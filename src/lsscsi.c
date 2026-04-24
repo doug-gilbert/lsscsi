@@ -1990,6 +1990,9 @@ get_disk_scsi_id(const char *dev_node, bool no_prefix, int recurse_count,
         if (!dir)
                 goto out;
         while ((entry = readdir(dir)) != NULL) {
+                if ('.' == entry->d_name[0])
+                        continue;        /* skip "." and ".." */
+
                 snprintf(holder, sizeof(holder), "/dev/%s", entry->d_name);
                 /* recurse */
                 scsi_id = get_disk_scsi_id(holder, no_prefix,
