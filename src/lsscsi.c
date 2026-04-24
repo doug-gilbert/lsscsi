@@ -1724,10 +1724,35 @@ get_disk_wwn(const char *wd, char * wwn_str, int max_wwn_str_len,
         struct disk_wwn_node_list *cur_list;
         struct disk_wwn_node_entry *cur_ent;
         char name[LMAX_PATH];
+        char sysfs_path[LMAX_PATH];
+        char sysfs_wwid[LMAX_NAME];
 
         my_strcopy(name, wd, sizeof(name));
         name[sizeof(name) - 1] = '\0';
         bn = basename(name);
+
+        /* Prefer the per-device sysfs wwid attribute (available since
+         * Linux 3.15) over /dev/disk/by-id/ symlink scan. For multipath,
+         * each path has its own sysfs entry so all paths will reliably
+         * report their WWID.
+         */
+        snprintf(sysfs_path, sizeof(sysfs_path),
+                 "%s/class/block/%s/device", sysfsroot, bn);
+        if (get_value(sysfs_path, "wwid", sysfs_wwid, sizeof(sysfs_wwid)) &&
+            sysfs_wwid[0] != '\0') {
+                /* sysfs uses "naa.<hex>" / "eui.<hex>" prefixes. Convert
+                 * to the expected "0x<hex>" form used by the rest of the
+                 * method. */
+                if (0 == strncmp(sysfs_wwid, "naa.", 4) ||
+                    0 == strncmp(sysfs_wwid, "eui.", 4)) {
+                        snprintf(wwn_str, max_wwn_str_len, "0x%.*s",
+                                 max_wwn_str_len -3, sysfs_wwid + 4);
+                        wwn_str[max_wwn_str_len -1] = '\0';
+                        return true;
+                }
+        }
+
+        /* Fall back to /dev/disk/by-id/ scan for older kernels. */
         if (disk_wwn_node_listhead == NULL) {
                 collect_disk_wwn_nodes(wwn_twice);
                 if (disk_wwn_node_listhead == NULL)
