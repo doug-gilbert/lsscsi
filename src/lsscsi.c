@@ -1902,7 +1902,63 @@ get_disk_scsi_id(const char *dev_node, bool no_prefix, int recurse_count,
         struct dirent *entry;
         char holder[LMAX_PATH + 6];
         char sys_block[LMAX_PATH];
+        char sysfs_path[LMAX_PATH];
+        char sysfs_wwid[LMAX_NAME];
 
+        /* Use the sysfs wwid as a key to locate the corresponding udev-created
+         * /dev/disk/by-id/scsi-* symlink directly, rather than scanning the
+         * directory and matching by sd_rdev. For multipath, all path share
+         * the same WWID so all find the by-id symlink and return the same
+         * identifier, fixing the inconsistency. The output value remains
+         * strictly udev-derived: sysfs is used only to know which symlink to
+         * look for, the symlink must exist in the udev-managed by-id directory
+         * before we return its name.
+         *
+         * SCSI name string is excluded: the sysfs wwid is the raw
+         * IQN whereas the by-id symlink stores a hex-encoded form.
+         *
+         * Fall through if sysfs is unavailable, if the expected symlink does
+         * not exist, or for dm-uuid-mpath-*, usb-* and SCSI name string types.
+         */
+        snprintf(sysfs_path, sizeof(sysfs_path), "%s/class/block/%s/device",
+                 sysfsroot, dev_node + 5);
+        if (get_value(sysfs_path, "wwid", sysfs_wwid, sizeof(sysfs_wwid)) &&
+            sysfs_wwid[0] != '\0') {
+                if (0 == strncmp(sysfs_wwid, "naa.", 4) ||
+                    0 == strncmp(sysfs_wwid, "eui.", 4)) {
+                        char desig = ('n' == sysfs_wwid[0]) ? '3' : '2';
+                        const char *id_str = sysfs_wwid + 4;
+                        char byid_path[LMAX_PATH];
+                        struct stat st;
+
+                        /* Build the expected by-id path and confirm the
+                         * symlink exists there before using its name.
+                         */
+                        snprintf(byid_path, sizeof(byid_path), "%s/scsi-%c%s",
+                                 dev_disk_byid_dir, desig, id_str);
+                        if (lstat(byid_path, &st) == 0 &&
+                            S_ISLNK(st.st_mode)) {
+                                if (no_prefix) {
+                                        scsi_id = strdup(id_str);
+                                } else {
+                                        size_t len = strlen(id_str) + 2;
+
+                                        scsi_id = (char *)malloc(len);
+                                        if (scsi_id) {
+                                                scsi_id[0] = desig;
+                                                my_strcopy(scsi_id +1, id_str,
+                                                           len -1);
+                                        }
+                                }
+                                if (scsi_id)
+                                        goto out;
+                        }
+                }
+        }
+
+        /* Fall back to /dev/disk/by-id/ scan for older kernels and for
+         * dm-uuid-mpath-*, usb-* and SCSI name string device types.
+         */
         scsi_id = lookup_dev(dev_disk_byid_dir, "scsi-", "328S10", dev_node);
         if (scsi_id) {
                 if (no_prefix) {
