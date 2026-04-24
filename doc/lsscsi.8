@@ -14,10 +14,11 @@ lsscsi \- list SCSI devices (or hosts), list NVMe devices
 [\fI\-\-version\fR] [\fI\-\-wwn\fR] [\fIH:C:T:L\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
-Uses information in mainly found in sysfs to list SCSI devices (or hosts)
-currently attached to the system. Many non\-SCSI storage devices (but not
-all) used the SCSI subsystem in Linux. In lsscsi version/release 0.30
-support was added to list NVMe devices and controllers.
+Uses information mainly found in sysfs to list SCSI devices (or hosts) that
+are currently attached to the system. In order to get a brief overview the
+default is to output one line per device. Many non\-SCSI storage devices (but
+not all) use the SCSI subsystem in Linux. Support for listing NVMe devices
+and controllers was added in lsscsi version/release 0.30 .
 .PP
 Only parts of sysfs that don't require root permissions, are accessed. Thus
 normal users, without root permissions, can use this utility. The devfs
@@ -618,6 +619,10 @@ Information about this utility including examples can also be found at:
 https://sg.danny.cz/scsi/lsscsi.html or
 https://doug\-gilbert.github.io/scsi/lsscsi.html .
 .SH NOTES
+An example of a type of storage device
+.B not
+listed by this utility is SD cards (with device names like "/dev/mmc*").
+.PP
 Information for this command is derived from the sysfs file system,
 which is assumed to be mounted at /sys unless specified otherwise
 by the user.

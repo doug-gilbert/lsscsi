@@ -29,10 +29,20 @@ This is experimental: expect some rough edges.
  $ cmake  .
  $ cmake  --build .
 
-To install requires root permissions. The following places the executable
-in the /usr/bin directory and the man pages in the /usr/share/man/man8
-directory
+The last cmake invocation needs root permissions. 'make clean' does
+the same thing as it does in autotools. There is no 'make distclean'
+so the above sequence leaves a lot of garbage "on the floor".
+To build static executable(s) instead of 'cmake .' use
+    cmake . -DBUILD_SHARED_LIBS=OFF
+
+The following places the executable in the /usr/bin directory and the
+man pages in the /usr/share/man/man8 directory
  $ sudo cmake  --install . --prefix=/usr
+
+Rather than the last step (i.e. 'cmake --install . ') this invocation:
+    cpack .
+
+will build a "deb" package and place it in the current directory.
 
 To clear out (most of) the cmake build artefacts:
  $ ./cmake_del_artifacts.sh

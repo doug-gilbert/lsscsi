@@ -14,12 +14,13 @@
 # and representation of the contents of each regular file. For example
 # the timeout(1) command takes 100 milliseconds even when the file can
 # be read immediately. When scanning sysfs that is over 80% of the cases.
-# The solution was the rely on a utility written in C whose source is in
+# The solution was to rely on a utility written in C whose source is in
 #    ../src/ls_name_value_rd.c
 # That is called for every filename that might have displayable contents
-# (e.g. a directory name should _not_ be passed to that C utility).
+# (e.g. a directory name should not be passed to that C utility, but if
+# it is <directory> is printed out).
 
-version_str="1.18 20260418"
+version_str="1.19 20260424"
 
 all=0
 dir=0
@@ -40,7 +41,7 @@ writ_ind=0
 content_reader="ls_name_value_rd"    # C program in lsscsi package
 
 # The following are for the getopt(1) command from util-linux which
-# follows the function definitions, about 100 lines down.
+# follows the function definitions, about 230 lines down.
 script_name=$(basename "$0")
 short="adehn:NopsuvVw"
 long="all,dir,empty,help,num:,nosym,otherfs,physical,show,utf8,verbose,version,write"
@@ -71,12 +72,12 @@ usage()
   echo ""
   echo "Prints lines of the form '<name> : <value>' where <name> is a regular"
   echo "filename. The <value> is the contents of <name>, up to 80 bytes of"
-  echo "printable (7 bit) ASCII. If <value> cannot be read in 2 seconds, then"
+  echo "printable (7 bit) ASCII. If <value> cannot be read in 1 second, then"
   echo "<timeout> is printed instead. If one or more <name>s are given on the"
   echo "command line then they are used. If there are no names on the command"
-  echo "line, then echo the regular files in the current directory are used."
-  echo "If one <name> is given and it is a directory then it is entered and the"
-  echo "files in that directory are used."
+  echo "line, then a listing of the regular files in the current directory is"
+  echo "used. If one <name> is given and it is a directory then it is entered"
+  echo "and then list the files in that directory."
   echo "Primarily designed for viewing sysfs in Linux (i.e. under /sys )."
 }
 
