@@ -49,7 +49,7 @@
 #include "sg_json.h"
 
 /* Package release number is first number, whole string is version */
-static const char * release_str = "0.33  2026/04/24 [svn: r208]";
+static const char * release_str = "0.33  2026/04/24 [svn: r209]";
 
 /*
  * Some jargon:
@@ -4580,7 +4580,7 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
 #ifdef __cplusplus
         cp = strrchr((char *)nvme_ns_rel, 'n');
 #else
-        cp = strrchr(nvme_ns_rel, 'n');
+        cp = (char *)strrchr(nvme_ns_rel, 'n');
 #endif
         if ((NULL == cp) || ('v' == *(cp + 1)) ||
             (1 != sscanf(cp + 1, "%u", &nsid))) {
@@ -4880,7 +4880,7 @@ ndev_dir_scan_select2(const struct dirent * s)
 #ifdef __cplusplus
         cp = strchr((char *)s->d_name + 4, 'n');
 #else
-        cp = strchr(s->d_name + 4, 'n');
+        cp = (char *)strchr(s->d_name + 4, 'n');
 #endif
         if (NULL == cp)
                 return 0;
