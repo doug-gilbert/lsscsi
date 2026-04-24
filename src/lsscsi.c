@@ -1570,6 +1570,27 @@ fini:
         return match_found;
 }
 
+/* Returns true if an entry with a matching disk_bname already exists in the
+ * collected WWN node list. Used by collect_disk_wwn_nodes() to enforce by
+ * designator-type priority ordering across the readdir() sequence. */
+
+static bool
+wwn_bname_in_list(const char *disk_bname)
+{
+        unsigned int k;
+        struct disk_wwn_node_list *cur_list = disk_wwn_node_listhead;
+        
+        while (cur_list) {
+                for (k = 0; k < cur_list->count; ++k) {
+                        if (0 == strcmp(cur_list->nodes[k].disk_bname,
+                                        disk_bname))
+                                return true;
+                }
+                cur_list = cur_list->next;
+        }
+        return false;
+}
+
 /* Allocate disk_wwn_node_list and collect info on every node in
  * /dev/disk/by-id/scsi-* that does not contain "part" . Returns
  * number of wwn nodes collected, 0 for already collected and
@@ -1578,6 +1599,7 @@ static int
 collect_disk_wwn_nodes(bool wwn_twice)
 {
         int k;
+        int pass;
         int num = 0;
         size_t dwnl_sz = sizeof(struct disk_wwn_node_list);
         struct disk_wwn_node_list *cur_list, *prev_list;
@@ -1605,50 +1627,81 @@ collect_disk_wwn_nodes(bool wwn_twice)
         if (wwn_twice)
                 goto wwn_really;
 
-        while (1) {
-                dep = readdir(dirp);
-                if (dep == NULL)
-                        break;
-                if (memcmp("scsi-", dep->d_name, 5))
-                        continue;       /* needs to start with "scsi-" */
-                if (strstr(dep->d_name, "part"))
-                        continue;       /* skip if contains "part" */
-                /* accepted device identification VPD page designator types */
-                if (dep->d_name[5] != '3' &&    /* NAA */
-                    dep->d_name[5] != '2' &&    /* EUI-64 based */
-                    dep->d_name[5] != '8')      /* SCSI name string (iSCSI) */
-                        continue;       /* skip for invalid identifier */
+        /* Scan /dev/disk/by-id/scsi-* in three passes, once per designator
+         * type in the priority order: NAA (3) > EUI-64 (2) > SCSI name string
+         * (8). rewinddir() is used between passes so the directory is re-read
+         * from the start each time.
+         *
+         * For each pass, wwn_bname_in_list() skips any device that already
+         * has an entry from a higher-priority pass. This ensures consistent
+         * designator type selection for each device regardless of the non-
+         * deterministic ordering readir() may produce.
+         */
+        static const char desig_priority[] = { '3', '2', '8' };
 
-                snprintf(device_path, PATH_MAX, "%s/%s", dev_disk_byid_dir,
-                         dep->d_name);
-                device_path[PATH_MAX] = '\0';
-                if (lstat(device_path, &stats))
-                        continue;       /* unlikely: error */
-                if (! S_ISLNK(stats.st_mode))
-                        continue;       /* Skip non-symlinks */
-                if ((k = readlink(device_path, symlink_path, PATH_MAX)) < 1)
-                        continue;       /* expect 1 or more chars in symlink */
-                symlink_path[k] = '\0';
-
-                /* Add to the list. */
-                if (cur_list->count >= DISK_WWN_NODE_LIST_ENTRIES) {
-                        prev_list = cur_list;
-                        cur_list = (struct disk_wwn_node_list *)
-                                                        calloc(1, dwnl_sz);
-                        if (! cur_list)
+        for (pass = 0; pass < 3; ++pass) {
+                const char desig = desig_priority[pass];
+                char bname[LMAX_NAME];
+                
+                if (!cur_list)
+                        break; /* calloc failed in prior pass */
+                rewinddir(dirp);
+                while(1) {
+                        dep = readdir(dirp);
+                        if (dep == NULL)
                                 break;
-                        prev_list->next = cur_list;
-                }
+                        if (memcmp("scsi-", dep->d_name, 5))
+                                continue;        /* needs to start with "scsi-" */
+                        if (strstr(dep->d_name, "part"))
+                                continue;        /* skip if contains "part" */
+                        if (dep->d_name[5] != desig)
+                                continue;        /* this passes designator only */
 
-                cur_ent = &cur_list->nodes[cur_list->count];
-                my_strcopy(cur_ent->wwn, "0x", 3);
-                /* step over designator type */
-                my_strcopy(cur_ent->wwn + 2, dep->d_name + 6,
-                           sizeof(cur_ent->wwn) - 2);
-                my_strcopy(cur_ent->disk_bname, basename(symlink_path),
-                           sizeof(cur_ent->disk_bname));
-                cur_list->count++;
-                ++num;
+                        snprintf(device_path, PATH_MAX, "%s/%s",
+                                 dev_disk_byid_dir, dep->d_name);
+                        device_path[PATH_MAX] = '\0';
+                        if (lstat(device_path, &stats))
+                                continue;        /* unlikely: error */
+                        if (! S_ISLNK(stats.st_mode))
+                                continue;        /* skip non-symlinks */
+                        if ((k = readlink(device_path, symlink_path,
+                                          PATH_MAX)) < 1)
+                                continue;        /* we expect 1 or more chars in symlnk */
+                        symlink_path[k] = '\0';
+                    
+                        /* basename() may modify its argument; copy result
+                         * before using it in wwn_bname_in_list() and in
+                         * my_strcopy() below. */
+                        my_strcopy(bname, basename(symlink_path),
+                                   sizeof(bname));
+                    
+                        /* Skip if a higher-priority entry already exists for
+                         * this device (e.g. NAA found on pass 0, now seeing
+                         * an EUI-64 for the same disk on pass 1). */
+                        if (wwn_bname_in_list(bname))
+                            continue;
+                    
+                        /* Add item to list. */
+                        if (cur_list->count >= DISK_WWN_NODE_LIST_ENTRIES) {
+                                prev_list = cur_list;
+                                cur_list = (struct disk_wwn_node_list *)
+                                                        calloc(1, dwnl_sz);
+
+                                if (! cur_list)
+                                        break;
+                                prev_list->next = cur_list;
+                        }
+                        
+                        cur_ent = &cur_list->nodes[cur_list->count];
+                        my_strcopy(cur_ent->wwn, "0x", 3);
+                        /* step over designator type */
+                        my_strcopy(cur_ent->wwn + 2, dep->d_name + 6,
+                                   sizeof(cur_ent->wwn) - 2);
+                        my_strcopy(cur_ent->disk_bname, bname,
+                                   sizeof(cur_ent->disk_bname));
+                        cur_list->count++;
+                        ++num;
+                }
         }
         closedir(dirp);
         return num;
