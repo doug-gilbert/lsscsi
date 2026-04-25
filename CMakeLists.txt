@@ -1,4 +1,4 @@
-cmake_minimum_required ( VERSION 3.5 )
+cmake_minimum_required ( VERSION 3.10 )
 
 project(lsscsi VERSION 0.32.9)
 # Use version number: x.y.9 to indicate pre-release of x.(y+1) 
