@@ -35,7 +35,7 @@
  * The command line is shown in the usage() and show_help() functions below.
  */
 
-static const char * version_str = "0.33  20260418 [svn: r206]";
+static const char * version_str = "0.33  20260425 [svn: r212]";
 
 static const char * my_name = "ls_name_value_rd";
 

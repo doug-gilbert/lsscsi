@@ -4,9 +4,10 @@ ls_name_value \- for browsing names and corresponding values in sysfs
 .SH SYNOPSIS
 .B ls_name_value
 [\fI\-\-all\fR] [\fI\-\-dir\fR] [\fI\-\-empty\fR] [\fI\-\-help\fR]
-[\fI\-\-nosym\fR] [\fI\-\-num=NUM\fR] [\fI\-\-otherfs\fR]
-[\fI\-\-physical\fR] [\fI\-\-show\fR] \fI\-\-utf8\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] [\fI\-\-write\fR] [\fINAME\fR ...]
+[\fI\-\-native\fR] [\fI\-\-nosym\fR] [\fI\-\-num=NUM\fR]
+[\fI\-\-otherfs\fR] [\fI\-\-physical\fR] [\fI\-\-show\fR] \fI\-\-utf8\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-write\fR] [\fI\-\-\fR]
+[\fINAME\fR ...]
 .SH DESCRIPTION
 .\" Add any additional description here
 This bash shell script is designed to give an overview of the (file)names
@@ -86,7 +87,8 @@ as the "ls" command which depends on the user's locale. More precisely
 the "\-\-zero" option is also used to handle filenames containing "strange"
 characters.
 .SH OPTIONS
-Arguments to long options are mandatory for short options as well.
+Arguments to long options are mandatory for short options as well. The
+options are arranged in alphabetical order based on the long option name.
 .TP
 \fB\-a\fR, \fB\-\-all\fR
 following Unix practice, by default when filenames in a directory are listed,
@@ -128,6 +130,19 @@ control character would be replaced by a space in the output.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 print out the usage message then exit.
+.TP
+\fB\-f\fR, \fB\-\-native\fR
+this utility uses the
+.B ls
+command when listing out name:value pairs in a directory. The ls command
+sorts the filenames in a directory based on the user's locale. Directories
+have a "native" order (probably based on the (time) order of file/directory
+creation). That order is the same as what would be seen with the 'ls \-f'
+command (hence the choice of short option). When this option is given the
+order of the files are shown within a directory is the same as 'ls \-f'.
+.br
+When multiple file names are given on the command line, that is the order
+that they will be processed by this utility, irrespective of this option.
 .TP
 \fB\-N\fR, \fB\-\-nosym\fR
 in sysfs most symlinks (symbolic links) point to other directories rather
@@ -199,7 +214,7 @@ If a truncated UTF\-8 code point is detected (truncated due to
 \fI\-\-num=NUM\fR) then if that is the only (partial) UTF\-8 encode sequence
 then the "value" is consider non\-ASCII, otherwise it is consider UTF\-8.
 When this option is given instead of outputting "<might be UTF\-8>" then the
-UTF\-8 string itself is outpt. For the actual UTF\-8 encode sequences to be
+UTF\-8 string itself is output. For the actual UTF\-8 encode sequences to be
 rendered the locale must be set appropriately. For example on the author's
 laptop 'env | grep LANG' yields "LANG=en_CA.UTF\-8" and UTF\-8 encoded
 sequences are rendered properly.
@@ -214,6 +229,17 @@ prints out the version string then exits.
 the separator between the <name> and <value> is normally ":". If this option
 is given and the filename <name> has both read and write permissions for
 the current user then the separator is changed to "+".
+.TP
+\fB\-\-\fR
+In common with many Unix commands, the '\-\-' option flags that any further
+arguments on the command line are
+.B not
+options. This becomes important if any filenames start with '\-'. Doing that
+is not a good idea, but sometimes fingers slip or programs that generate file
+names can be sloppy (or mischievious). With this utility if any given files
+or directories (to a maximum depth of 2) could start with a '\-' the adding
+the '\-\-' (end of) option(s) will be helpful. This is also the case even
+when there are no [\fINAME\fR ...] arguments on the command line.
 .SH EXAMPLES
 Here is an example of the same location with different combinations of the
 \fI\-\-show\fR option and the \fI\-\-dir\fR option:

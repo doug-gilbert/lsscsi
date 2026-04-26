@@ -1,6 +1,6 @@
 Linux utility for listing SCSI devices.
 
-Changelog for pre-release lsscsi-0.33 [20260424] [svn: r211]
+Changelog for pre-release lsscsi-0.33 [20260425] [svn: r212]
   - fix Transport type FC and FCOE output inconsistencies
     [github #9]
   - Change default output trailing space after each device
@@ -16,6 +16,9 @@ Changelog for pre-release lsscsi-0.33 [20260424] [svn: r211]
     - change the directory indication from a value of
       "-->" to its name surrounded by square brackets
     - add new helper command: ls_name_value_rd and manpage
+    - add '-f' option for native directory order listing
+    - use '--' option and other measures for filenames
+      starting with '-'
   - add --sysroot=AR_PT option for compatibilty with lsblk,
     lsmem and lscpu
   - start to work on 'missing NVME device nodes' issue

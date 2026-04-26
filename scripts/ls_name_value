@@ -20,55 +20,61 @@
 # (e.g. a directory name should not be passed to that C utility, but if
 # it is <directory> is printed out).
 
-version_str="1.19 20260424"
+version_str="1.20 20260425"
 
 all=0
 dir=0
 empty=0
-ee_opt=0
+native_order=0  # 'ls -f' used for actual (native) directory order
 nosym=0
-num_val=80   # may not be the best default
+num_val=80      # contents should fit on a line if the filename isn't too long
 otherfs=0
 show=0
-is_root=0     # 0 for true; 1 for false (sorry C)
+is_root=0       # 0 for true; 1 for false (opposite of C)
 first_st_dev=0
 physical=0
 utf8=0
-utf8_opt=0
 verbose=0
-vv_opt=0
 writ_ind=0
 content_reader="ls_name_value_rd"    # C program in lsscsi package
+ls_bin="ls"                          # want to bypass any shell aliases
+ls_args=() # this is an array holding absolute path to ls with its arguments
+lnv_rd_opts=() # this is an array holding the command line options to
+               # ls_name_value_rd
 
 # The following are for the getopt(1) command from util-linux which
 # follows the function definitions, about 230 lines down.
 script_name=$(basename "$0")
-short="adehn:NopsuvVw"
-long="all,dir,empty,help,num:,nosym,otherfs,physical,show,utf8,verbose,version,write"
+short="adefhn:NopsuvVw"
+long="all,dir,empty,help,native,num:,nosym,otherfs,physical,show,utf8,verbose,version,write"
 
 
 usage()
 {
-  echo -n  "Usage: ls_name_value [-a] [-d] [-e] [-h] [-N] [-n NUM] "
-  echo "[-o] [-p] [-s]"
-  echo "                     [-u] [-v] [-V] [-w] [<name>*]"
+  echo -n  "Usage: ls_name_value [-a] [-d] [-e] [-f] [-h] [-N] [-n NUM] "
+  echo "[-o] [-p]"
+  echo "                     [-s] [-u] [-v] [-V] [-w] [--] [<name>*]"
   echo -n "  where:  -a, --all         include hidden filenames (starting "
   echo "with '.')"
   echo "          -d, --dir         enter directories (descends 1 level)"
   echo "                            if given twice (-dd) descends 2 levels"
-  echo "          -e, --empty       output <value> as '<empty>' rather than blank"
+  echo -n "          -e, --empty       output <value> as '<empty>' rather "
+  echo "than blank"
+  echo "          -f, --native      use directory order (equiv: 'ls -f')"
   echo "          -h, --help        print usage message"
   echo "          -N, --nosym       do not descend symlinks to directories"
   echo "          -n, --num=NUM     max bytes in value (def: 80)"
-  echo "          -o, --otherfs     not entering an other fs is default, override"
+  echo -n "          -o, --otherfs     not entering an other fs is default, "
+  echo "override"
   echo -n "          -p, --physical    when entering a directory show "
-  echo "physical address"
-  echo "                            on next line (with 'pwd -P')"
+  echo "physical"
+  echo "                            address on next line (with 'pwd -P')"
   echo "          -s, --show        show directories, symlinks and specials"
   echo "          -u, --utf8        if <value> passes UTF-8 tests, output it"
   echo "          -v, --verbose     increase verbosity of output"
   echo "          -V, --version     print version string then exit"
   echo "          -w, --write       separator changed from : to + if writable"
+  echo "          --                needed if any filenames start with '-'"
   echo ""
   echo "Prints lines of the form '<name> : <value>' where <name> is a regular"
   echo "filename. The <value> is the contents of <name>, up to 80 bytes of"
@@ -81,15 +87,16 @@ usage()
   echo "Primarily designed for viewing sysfs in Linux (i.e. under /sys )."
 }
 
-# Returns owner permission of ${1} as single (octal) digit. Therefore it returns
-# a value of 0 to 7. 0 for no permissions, 7 for read, write and execute (4+2+1)
+# Returns owner permission of ${1} as single (octal) digit. Therefore it
+# returns a value of 0 to 7. 0 for no permissions, 7 for read, write and
+# execute (4+2+1)
 get_root_perm()
 {
   local s
 
   if [ -e "$1" ] ; then
     # 'stat -c ...' is a Linux extension. For FreeBSD use '-f'
-    s=$(stat -c '%a' "$1" 2> /dev/null )
+    s=$(stat -c '%a' -- "$1" 2> /dev/null )
     if [ -n "$s" ] ; then
       echo "${s:0:1}"      # 1 octal digit (0 to 7)
     else
@@ -108,9 +115,6 @@ one_name_value()
   local name
   local value
   local pad
-  local l_ee_opt
-  local l_utf8_opt
-  local l_vv_opt
   local separ
   local fin_line
   local set_name
@@ -118,32 +122,7 @@ one_name_value()
 
   if [ $# -gt 1 ] ; then
     pad=$2
-    if [ $# -gt 2 ] ; then
-      l_ee_opt=$3
-      if [ $# -gt 3 ] ; then
-        l_vv_opt=$4
-        if [ $# -gt 4 ] ; then
-          l_utf8_opt=$5
-        else
-          l_utf8_opt=""
-        fi
-      else
-        l_vv_opt=""
-        l_utf8_opt=""
-      fi
-    else
-      l_ee_opt=""
-      l_vv_opt=""
-      l_utf8_opt=""
-    fi
-  else
-    pad=""
-    l_ee_opt=""
-    l_vv_opt=""
-    l_utf8_opt=""
   fi
-
-# echo "start of one_name_value: l_ee_opt=${l_ee_opt}"
 
   if [ "${1:0:1}" = "/" ] || [ "${1:0:1}" = "." ] ; then
     name="${pad}$( basename "$1" ) "
@@ -152,7 +131,7 @@ one_name_value()
   fi
   separ=":"
 
-  if [ -f "${1}" ] ; then    # if exists and regular file (or symlink to regular)
+  if [ -f "${1}" ] ; then  # if exists + regular file (or symlink to regular)
     if [ "${is_root}" -ne 0 ] ; then    # false, so non-root
       if [ "${writ_ind}" -gt 0 ] && [ -w "${1}" ] ; then
         separ="+"
@@ -165,13 +144,19 @@ one_name_value()
       else
         echo -n "${separ} "
       fi
+
       # calls helper C function, waits up to 1 second for "hanging" files
-      # ${content_reader} must ignore empty arguments (i.e. "")
-      value=$( ${content_reader} "${1}" "${num_val}" "${l_ee_opt}" "${l_utf8_opt}" "${l_vv_opt}" )
+      if [ "${verbose}" -gt 4 ] ; then
+        echo -n "ls_name_value_rd invocation: "
+        echo -n "${content_reader} "
+        echo -n "${lnv_rd_opts[@]}"
+        echo "${1} ${num_val}"
+      fi
+      value=$( "${content_reader}" "${lnv_rd_opts[@]}" "${1}" "${num_val}" )
 
       err=$?
       if [ "${err}" -ne 0 ] ; then
-        echo "<error [${err}]>"
+        echo " <error [${err}]>"
       elif [ -n "${value}" ] ; then
         echo "${value}"
       else
@@ -192,12 +177,17 @@ one_name_value()
           echo -n "${separ} "
         fi
         # calls helper C function, waits up to 1 second for "hanging" files
-        # ${content_reader} must ignore empty arguments (i.e. "")
-        value=$( ${content_reader} "${1}" "${num_val}" "${l_ee_opt}" "${l_utf8_opt}" "${l_vv_opt}" )
+        if [ "${verbose}" -gt 4 ] ; then
+          echo -n "ls_name_value_rd invocation: "
+          echo -n "${content_reader} "
+          echo -n "${lnv_rd_opts[@]}"
+          echo "${1} ${num_val}"
+        fi
+        value=$( "${content_reader}" "${lnv_rd_opts[@]}" "${1}" "${num_val}" )
 
         err=$?
         if [ "${err}" -ne 0 ] ; then
-          value="<error [${err}]>"
+          value=" <error [${err}]>"
         elif [ -n "${value}" ] ; then
           echo "${value}"
         else
@@ -233,7 +223,7 @@ one_name_value()
             fin_line=1
           fi
         fi
-        if [ "${fin_line}" -eq 0 ] ; then  # not a directory (nor symlink to one)
+        if [ "${fin_line}" -eq 0 ] ; then # not a directory nor symlink to one
           if [ "${set_name}" -eq 0 ] ; then
             echo -n "${name}:"
           fi
@@ -263,15 +253,14 @@ one_name_value()
   fi    # if irregular file and --show not given then bypass
 }
 
-
 if (( EUID != 0 )); then
   is_root=1     # false
 fi
 
 # Reference: /usr/share/doc/util-linux/examples/getopt-example.bash
 if ! TEMP=$(getopt -o "${short}" --long "${long}" --name "$script_name" -- "$@") ; then
-
-# if [ $? -ne 0 ]; then
+  echo "If any filenames might start with '-' then invoke like this:" >&2
+  echo "    ls_name_value [<any_options>] -- [<name>*]" >&2
   echo 'Terminating...' >&2
   exit 1
 fi
@@ -283,6 +272,7 @@ while :; do
     -a | --all        ) (( all=all+1 )) ;          shift 1 ;;
     -d | --dir        ) (( dir=dir+1 )) ;          shift 1 ;;
     -e | --empty      ) (( empty=empty+1 )) ;      shift 1 ;;
+    -f | --native     ) (( native_order=native_order+1 )) ;  shift 1 ;;
     -h | --help       ) usage;                     exit 0 ;;
     -n | --num        )
                 num_val="$2"
@@ -307,24 +297,51 @@ while :; do
   esac
 done
 
+if which -s "${ls_bin}" ; then
+  ls_bin=$( which "${ls_bin}" )
+  ls_args+=( "${ls_bin}" )
+  if [ "${all}" -gt 0 ] ; then
+    if [ "${native_order}" -gt 0 ] ; then
+      ls_args+=("-f")
+      ls_args+=("-A")
+    else
+      ls_args+=("-A")
+    fi
+  elif [ "${native_order}" -gt 0 ] ; then
+    ls_args+=("-f")
+  fi
+  ls_args+=("--zero")
+  ls_args+=("--")            # need this for filenames that start with '-'
+  if [ "${verbose}" -gt 2 ] ; then
+    echo -n "ls invocation 3: "
+    echo "${ls_args[@]}"
+  fi
+else
+  echo "Unable to find ls binary, is this Unix? ; exiting"
+  exit 1
+fi
+
 # In production ${content_reader} is expected to be on $PATH.
 # In development it should be found in a sibling directory.
 if ! which -s "${content_reader}" ; then
   dev_content_reader="../src/${content_reader}"
   if which -s "${dev_content_reader}" ; then
     content_reader=$(pwd)/"${dev_content_reader}"
-    # echo "${content_reader}"
   else
     echo "Unable to find helper: ${content_reader}, exiting"
     exit 1
   fi
 fi
+if [ "${verbose}" -gt 2 ] ; then
+  echo -n "content_reader: "
+  echo "${content_reader}"
+fi
 
 # If one argument given and it's a directory, cd to it and swallow
 if [ $# -eq 1 ] && [ -e "$1" ] && [ -d "$1" ] && [ -x "$1" ] ; then
   # 'stat -c ...' is a Linux extension. For FreeBSD use '-f'
-  first_st_dev=$( stat -c %d "$1" 2> /dev/null )
-  if ! cd "$1" ; then
+  first_st_dev=$( stat -c %d -- "$1" 2> /dev/null )
+  if ! cd -- "$1" ; then
     echo "cd to $1 failed from $( pwd -P) "
     exit 1
   fi
@@ -345,31 +362,26 @@ SAVEIFS=$IFS
 IFS=$'\n'
 
 if [ "${empty}" -eq 1 ] ; then
-  ee_opt="-e"
+  lnv_rd_opts+=("-e")
 elif [ "${empty}" -gt 1 ] ; then
-  ee_opt="-ee"
-else
-  ee_opt=""
+  lnv_rd_opts+=("-ee")
 fi
 
 if [ "${utf8}" -gt 0 ] ; then
-  utf8_opt="-u"
-else
-  utf8_opt=""
+  lnv_rd_opts+=("-u")
 fi
 
 if [ "${verbose}" -eq 1 ] ; then
-  vv_opt="-v"
+  lnv_rd_opts+=("-v")
 elif [ "${verbose}" -gt 1 ] ; then
   vv_opt="-v"
   n=${verbose}
   for (( k=1 ; k<n ; k=k+1 )) ; do
     vv_opt="${vv_opt}v"   # append a 'v'
   done
-else
-  vv_opt=""
+  lnv_rd_opts+=("${vv_opt}")
 fi
-
+lnv_rd_opts+=("--")
 
 n=$#
 if [ $# -gt 0 ] ; then
@@ -380,11 +392,7 @@ if [ $# -gt 0 ] ; then
   done
 else
   # Place filenames of current directory in fileArray (a bash array)
-  if [ "${all}" -gt 0 ] ; then
-    mapfile -d '' -t fileArray < <(ls -A --zero)
-  else
-    mapfile -d '' -t fileArray < <(ls --zero)
-  fi
+  mapfile -d '' -t fileArray < <( "${ls_args[@]}" )
 fi
 
 tLen=${#fileArray[@]}
@@ -395,7 +403,7 @@ for (( k=0; k<tLen; k++ )) ; do
   fi
   if [ "${first_st_dev}" -eq 0 ] ; then
     if [ -e "${name1}" ] ; then
-      first_st_dev=$( stat -c %d "${name1}" 2> /dev/null )
+      first_st_dev=$( stat -c %d -- "${name1}" 2> /dev/null )
     fi
   fi
   if [ -h "${name1}" ] ; then
@@ -409,7 +417,7 @@ for (( k=0; k<tLen; k++ )) ; do
   if [ "${dir}" -gt 0 ] && [ -d "${name1}" ] && [ -x "${name1}" ] && [ "${nosym_active1}" -ne 0 ] ; then
     if [ "${otherfs}" -eq 0 ] ; then
       if [ -e "${name1}" ] ; then
-        a_st_dev=$( stat -c %d "${name1}" 2> /dev/null )
+        a_st_dev=$( stat -c %d -- "${name1}" 2> /dev/null )
       fi
     else
       a_st_dev=${first_st_dev}
@@ -425,7 +433,7 @@ for (( k=0; k<tLen; k++ )) ; do
         echo "[ ${name1} ]"
       fi
       cur=$( pwd )
-      if ! cd "${name1}" ; then
+      if ! cd -- "${name1}" ; then
         echo "cd to ${name1} failed from $( pwd -P) "
         IFS=$SAVEIFS
         exit 1
@@ -438,11 +446,7 @@ for (( k=0; k<tLen; k++ )) ; do
         pwd -P
       fi
       # Place filenames of current directory in fileArray2
-      if [ "${all}" -gt 0 ] ; then
-        mapfile -d '' -t fileArray2 < <(ls -A --zero)
-      else
-        mapfile -d '' -t fileArray2 < <(ls --zero)
-      fi
+      mapfile -d '' -t fileArray2 < <( "${ls_args[@]}" )
       t2Len=${#fileArray2[@]}
       for (( j=0; j<t2Len; j++ )) ; do
         name2="${fileArray2[$j]}"
@@ -458,7 +462,7 @@ for (( k=0; k<tLen; k++ )) ; do
         nosym_active2=$?
         if [ "${dir}" -gt 1 ] && [ -d "${name2}" ] && [ -x "${name2}" ] && [ "${nosym_active2}" -ne 0 ] ; then
           if [ "${otherfs}" -eq 0 ] ; then
-            b_st_dev=$( stat -c %d "${name2}" 2> /dev/null )
+            b_st_dev=$( stat -c %d -- "${name2}" 2> /dev/null )
           else
             b_st_dev=${first_st_dev}
           fi
@@ -473,7 +477,7 @@ for (( k=0; k<tLen; k++ )) ; do
               echo "[ ${name2} ]"
             fi
             cur2=$( pwd )
-            if ! cd "${name2}" ; then
+            if ! cd -- "${name2}" ; then
               echo "cd to ${name2} failed from $( pwd -P) "
               IFS=$SAVEIFS
               exit 1
@@ -486,23 +490,20 @@ for (( k=0; k<tLen; k++ )) ; do
               pwd -P
             fi
             # Place filenames of current directory in fileArray3
-            if [ "${all}" -gt 0 ] ; then
-              mapfile -d '' -t fileArray3 < <(ls -A --zero)
-            else
-              mapfile -d '' -t fileArray3 < <(ls --zero)
-            fi
+            mapfile -d '' -t fileArray3 < <( "${ls_args[@]}" )
             t3Len=${#fileArray3[@]}
             for (( m=0; m<t3Len; m++ )) ; do
-              one_name_value "${fileArray3[m]}" "        "  "${ee_opt}" "${vv_opt}" "${utf8_opt}"
+              one_name_value "${fileArray3[m]}" "        "
             done
-            if ! cd "${cur2}" ; then
+            if ! cd -- "${cur2}" ; then
               echo "cd to ${cur2} failed from $( pwd -P) "
               IFS=$SAVEIFS
               exit 1
             fi
             # echo ""
           else
-            echo -n "    >> not entering directory: ${name2} : <different filesystem"
+            echo -n "    >> not entering directory: ${name2} : "
+            echo -n "<different filesystem"
             if [ "${verbose}" -gt 0 ] ; then
               echo " [st_dev=${b_st_dev}]>"
             else
@@ -510,10 +511,10 @@ for (( k=0; k<tLen; k++ )) ; do
             fi
           fi
         else
-          one_name_value "${name2}" "    " "${ee_opt}" "${vv_opt}" "${utf8_opt}"
+          one_name_value "${name2}" "    "
         fi
       done
-      if ! cd "${cur}" ; then
+      if ! cd -- "${cur}" ; then
         echo "cd to ${cur} failed from $( pwd -P) "
         IFS=$SAVEIFS
         exit 1
@@ -528,7 +529,7 @@ for (( k=0; k<tLen; k++ )) ; do
       fi
     fi
   else
-    one_name_value "${name1}" "" "${ee_opt}" "${vv_opt}" "${utf8_opt}"
+    one_name_value "${name1}" ""
   fi
-done      # end of loop over command line arguments or files in current directory
+done   # end of loop over command line arguments or files in current directory
 IFS=$SAVEIFS
