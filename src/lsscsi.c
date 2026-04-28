@@ -1674,6 +1674,7 @@ collect_disk_wwn_nodes(bool wwn_twice)
                          * my_strcopy() below. */
                         my_strcopy(bname, basename(symlink_path),
                                    sizeof(bname));
+                    
                         /* Skip if a higher-priority entry already exists for
                          * this device (e.g. NAA found on pass 0, now seeing
                          * an EUI-64 for the same disk on pass 1). */
@@ -1690,7 +1691,7 @@ collect_disk_wwn_nodes(bool wwn_twice)
                                         break;
                                 prev_list->next = cur_list;
                         }
-
+                        
                         cur_ent = &cur_list->nodes[cur_list->count];
                         my_strcopy(cur_ent->wwn, "0x", 3);
                         /* step over designator type */
