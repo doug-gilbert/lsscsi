@@ -2,12 +2,13 @@ Source: lsscsi
 Section: admin
 Priority: optional
 Maintainer: Matt Taggart <taggart@debian.org>
-Build-Depends: cdbs (>= 0.4.15), debhelper (>= 4.0.0), autotools-dev
-Standards-Version: 3.6.2.1
+Build-Depends: debhelper (>= 10), autoconf, automake
+Standards-Version: 4.7.0
+Rules-Requires-Root: no
 
 Package: lsscsi
 Architecture: any
-Depends: ${shlibs:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: list all SCSI devices and NVMe namespaces currently on system
  Uses information provided by the sysfs pseudo file system in the Linux
  kernel 2.6 series, and later, to list SCSI devices (Logical
