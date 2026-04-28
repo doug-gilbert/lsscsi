@@ -1,6 +1,9 @@
 Linux utility for listing SCSI devices.
 
-Changelog for pre-release lsscsi-0.33 [20260427] [svn: r213]
+Changelog for pre-release lsscsi-0.33 [20260427] [svn: r214]
+  - Fix multipath WWID inconsistencies in lsscsi#11 [github]
+    - git svn may be broken in Ubuntu 26.04, applied
+      manually 
   - fix Transport type FC and FCOE output inconsistencies
     [github #9]
   - Change default output trailing space after each device
