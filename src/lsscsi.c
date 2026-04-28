@@ -49,7 +49,7 @@
 #include "sg_json.h"
 
 /* Package release number is first number, whole string is version */
-static const char * release_str = "0.33  2026/04/25 [svn: r212]";
+static const char * release_str = "0.33  2026/04/27 [svn: r213]";
 
 /*
  * Some jargon:

@@ -374,8 +374,8 @@ This utility is a bash script but it has a C program helper called
 ls_name_value_rd for processing the contents of a file. That was initially
 done in the bash script but handling all the corner cases was too complex
 and too slow. The ultimate "killer" was the timeout command that takes
-around 100 milliseconds even when the data (e.g. reading a sysfs file) is
-available immediately.
+around 100 milliseconds even when the data (e.g. reading a short sysfs
+regular file) is available immediately.
 .SH AUTHORS
 Written by D. Gilbert
 .SH COPYRIGHT
