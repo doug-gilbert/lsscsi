@@ -1579,7 +1579,7 @@ wwn_bname_in_list(const char *disk_bname)
 {
         unsigned int k;
         struct disk_wwn_node_list *cur_list = disk_wwn_node_listhead;
-
+        
         while (cur_list) {
                 for (k = 0; k < cur_list->count; ++k) {
                         if (0 == strcmp(cur_list->nodes[k].disk_bname,
@@ -1642,7 +1642,7 @@ collect_disk_wwn_nodes(bool wwn_twice)
         for (pass = 0; pass < 3; ++pass) {
                 const char desig = desig_priority[pass];
                 char bname[LMAX_NAME];
-
+                
                 if (!cur_list)
                         break; /* calloc failed in prior pass */
                 rewinddir(dirp);
@@ -1651,37 +1651,35 @@ collect_disk_wwn_nodes(bool wwn_twice)
                         if (dep == NULL)
                                 break;
                         if (memcmp("scsi-", dep->d_name, 5))
-                                continue;    /* needs to start with "scsi-" */
+                                continue;        /* needs to start with "scsi-" */
                         if (strstr(dep->d_name, "part"))
-                                continue;    /* skip if contains "part" */
+                                continue;        /* skip if contains "part" */
                         if (dep->d_name[5] != desig)
-                                continue;    /* this passes designator only */
+                                continue;        /* this passes designator only */
 
                         snprintf(device_path, PATH_MAX, "%s/%s",
                                  dev_disk_byid_dir, dep->d_name);
                         device_path[PATH_MAX] = '\0';
                         if (lstat(device_path, &stats))
-                                continue;    /* unlikely: error */
+                                continue;        /* unlikely: error */
                         if (! S_ISLNK(stats.st_mode))
-                                continue;    /* skip non-symlinks */
+                                continue;        /* skip non-symlinks */
                         if ((k = readlink(device_path, symlink_path,
                                           PATH_MAX)) < 1)
-                                continue;    /* we expect 1 or more chars in
-                                              * symlnk */
+                                continue;        /* we expect 1 or more chars in symlnk */
                         symlink_path[k] = '\0';
-
+                    
                         /* basename() may modify its argument; copy result
                          * before using it in wwn_bname_in_list() and in
                          * my_strcopy() below. */
                         my_strcopy(bname, basename(symlink_path),
                                    sizeof(bname));
-
                         /* Skip if a higher-priority entry already exists for
                          * this device (e.g. NAA found on pass 0, now seeing
                          * an EUI-64 for the same disk on pass 1). */
                         if (wwn_bname_in_list(bname))
                             continue;
-
+                    
                         /* Add item to list. */
                         if (cur_list->count >= DISK_WWN_NODE_LIST_ENTRIES) {
                                 prev_list = cur_list;
