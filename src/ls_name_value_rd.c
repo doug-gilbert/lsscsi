@@ -292,7 +292,6 @@ main(int argc, char * argv[])
             if (verbose > 0)
                 fprintf(stderr, "<fstat() bad file descriptor>");
             err = 0;
-            fd = -1;
             goto cleanup;
         } else {
             if (verbose > 0)

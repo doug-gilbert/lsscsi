@@ -297,8 +297,8 @@ while :; do
   esac
 done
 
-if which -s "${ls_bin}" ; then
-  ls_bin=$( which "${ls_bin}" )
+if command -v "${ls_bin}" > /dev/null 2>&1 ; then
+  ls_bin=$( command -v "${ls_bin}" )
   ls_args+=( "${ls_bin}" )
   if [ "${all}" -gt 0 ] ; then
     if [ "${native_order}" -gt 0 ] ; then
@@ -323,9 +323,9 @@ fi
 
 # In production ${content_reader} is expected to be on $PATH.
 # In development it should be found in a sibling directory.
-if ! which -s "${content_reader}" ; then
+if ! command -v "${content_reader}" > /dev/null 2>&1 ; then
   dev_content_reader="../src/${content_reader}"
-  if which -s "${dev_content_reader}" ; then
+  if [ -x "${dev_content_reader}" ] ; then
     content_reader=$(pwd)/"${dev_content_reader}"
   else
     echo "Unable to find helper: ${content_reader}, exiting"
