@@ -482,11 +482,17 @@ sgj_snake_named_subobject_r(sgj_state * jsp, sgj_opaque_p jop,
     if (jsp && jsp->pr_as_json && conv2sname) {
         int olen = strlen(conv2sname);
         char * sname = (char *)malloc(olen + 8);
-        int nlen = sgj_name_to_snake(conv2sname, sname, olen + 8);
+        sgj_opaque_p resp = NULL;
+        int nlen;
 
+        if (NULL == sname)
+            return NULL;
+        nlen = sgj_name_to_snake(conv2sname, sname, olen + 8);
         if (nlen > 0)
-            return json_object_push((json_value *)(jop ? jop : jsp->basep),
+            resp = json_object_push((json_value *)(jop ? jop : jsp->basep),
                                     sname, json_object_new(0));
+        free(sname);
+        return resp;
     }
     return NULL;
 }
@@ -510,11 +516,17 @@ sgj_snake_named_subarray_r(sgj_state * jsp, sgj_opaque_p jop,
     if (jsp && jsp->pr_as_json && conv2sname) {
         int olen = strlen(conv2sname);
         char * sname = (char *)malloc(olen + 8);
-        int nlen = sgj_name_to_snake(conv2sname, sname, olen + 8);
+        sgj_opaque_p resp = NULL;
+        int nlen;
 
+        if (NULL == sname)
+            return NULL;
+        nlen = sgj_name_to_snake(conv2sname, sname, olen + 8);
         if (nlen > 0)
-            return json_object_push((json_value *)(jop ? jop : jsp->basep),
+            resp = json_object_push((json_value *)(jop ? jop : jsp->basep),
                                     sname, json_array_new(0));
+        free(sname);
+        return resp;
     }
     return NULL;
 }
