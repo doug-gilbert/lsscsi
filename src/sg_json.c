@@ -348,7 +348,7 @@ sgj_js2file_estr(sgj_state * jsp, sgj_opaque_p jop, int exit_status,
             ccp = estr;
         else {
             if (0 == exit_status)
-                strncpy(d, "no errors", sizeof(d) - 1);
+                snprintf(d, sizeof(d), "no errors");
             else
                 snprintf(d, sizeof(d), "exit_status=%d", exit_status);
             ccp = d;
@@ -880,13 +880,15 @@ sgj_js_nv_ihexstr_nex(sgj_state * jsp, sgj_opaque_p jop, const char * sn_name,
                       int64_t val_i, bool hex_as_well, const char * str_name,
                       const char * val_s, const char * nex_s)
 {
-    bool as_hex = jsp->pr_hex && hex_as_well;
-    bool as_str = jsp->pr_string && val_s;
-    bool as_nex = jsp->pr_name_ex && nex_s;
-    const char * sname =  str_name ? str_name : sc_mn_s;
+    bool as_hex, as_str, as_nex;
+    const char * sname;
 
     if ((NULL == jsp) || (! jsp->pr_as_json))
         return;
+    as_hex = jsp->pr_hex && hex_as_well;
+    as_str = jsp->pr_string && val_s;
+    as_nex = jsp->pr_name_ex && nex_s;
+    sname = str_name ? str_name : sc_mn_s;
     if (! (as_hex || as_nex || as_str))
         sgj_js_nv_i(jsp, jop, sn_name, val_i);
     else {
