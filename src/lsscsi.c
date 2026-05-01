@@ -6196,8 +6196,10 @@ main(int argc, char **argv)
                         }
                 }
                 if (l_sysfsroot) {
-                        if (l_fsroot_sz > 1)
+                        if (l_fsroot_sz > 1) {
                                 strncpy(sysfsroot, l_sysfsroot, l_fsroot_sz);
+                                sysfsroot[l_fsroot_sz] = '\0';
+                        }
                 } else if (l_root_sz > 1) {
                         int n = l_root_sz;
                         static const char * sysfs_dir = "/sys";
@@ -6207,11 +6209,13 @@ main(int argc, char **argv)
                         if ((n > 1) && ('/' == sysfsroot[n - 1]))
                             --n;
                         memcpy(sysfsroot + n, sysfs_dir, 4);
+                        sysfsroot[n + 4] = '\0';
                         n = l_root_sz;
                         strncpy(devfsroot, l_sysroot, devfsroot_sz - 1);
                         if ((n > 1) && ('/' == devfsroot[n - 1]))
                             --n;
                         memcpy(devfsroot + n, devfs_dir, 4);
+                        devfsroot[n + 4] = '\0';
                         if (op->verbose > 1)
                                 pr2serr("Alternate devfs root: %s\n",
                                         devfsroot);
