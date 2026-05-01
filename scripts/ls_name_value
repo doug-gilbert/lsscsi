@@ -20,7 +20,7 @@
 # (e.g. a directory name should not be passed to that C utility, but if
 # it is <directory> is printed out).
 
-version_str="1.20 20260425"
+version_str="1.21 20260429"
 
 all=0
 dir=0
@@ -94,10 +94,10 @@ get_root_perm()
 {
   local s
 
-  if [ -e "$1" ] ; then
+  if [[ -e "$1" ]] ; then
     # 'stat -c ...' is a Linux extension. For FreeBSD use '-f'
     s=$(stat -c '%a' -- "$1" 2> /dev/null )
-    if [ -n "$s" ] ; then
+    if [[ -n "$s" ]] ; then
       echo "${s:0:1}"      # 1 octal digit (0 to 7)
     else
       echo "0"
@@ -120,24 +120,24 @@ one_name_value()
   local set_name
   local err
 
-  if [ $# -gt 1 ] ; then
+  if [[ $# -gt 1 ]] ; then
     pad=$2
   fi
 
-  if [ "${1:0:1}" = "/" ] || [ "${1:0:1}" = "." ] ; then
+  if [[ "${1:0:1}" = "/" ]] || [[ "${1:0:1}" = "." ]] ; then
     name="${pad}$( basename "$1" ) "
   else
     name="${pad}${1} "
   fi
   separ=":"
 
-  if [ -f "${1}" ] ; then  # if exists + regular file (or symlink to regular)
-    if [ "${is_root}" -ne 0 ] ; then    # false, so non-root
-      if [ "${writ_ind}" -gt 0 ] && [ -w "${1}" ] ; then
+  if [[ -f "${1}" ]] ; then  # if exists + regular file (or symlink to regular)
+    if [[ "${is_root}" -ne 0 ]] ; then    # false, so non-root
+      if [[ "${writ_ind}" -gt 0 ]] && [[ -w "${1}" ]] ; then
         separ="+"
       fi
       echo -n "${name}"
-      if [ -h "${1}" ] ; then
+      if [[ -h "${1}" ]] ; then
         echo -n "---> "
         readlink -n "${1}"
         echo -n " ${separ} "
@@ -146,7 +146,7 @@ one_name_value()
       fi
 
       # calls helper C function, waits up to 1 second for "hanging" files
-      if [ "${verbose}" -gt 4 ] ; then
+      if [[ "${verbose}" -gt 4 ]] ; then
         echo -n "ls_name_value_rd invocation: "
         echo -n "${content_reader} "
         echo -n "${lnv_rd_opts[@]}"
@@ -155,21 +155,21 @@ one_name_value()
       value=$( "${content_reader}" "${lnv_rd_opts[@]}" "${1}" "${num_val}" )
 
       err=$?
-      if [ "${err}" -ne 0 ] ; then
-        echo " <error [${err}]>"
-      elif [ -n "${value}" ] ; then
+      if [[ "${err}" -ne 0 ]] ; then
+        echo " <error [[${err}]>"
+      elif [[ -n "${value}" ]] ; then
         echo "${value}"
       else
         echo " "
       fi
     else        # run by root below, still regular file
       grp=$( get_root_perm "${1}" )
-      if [ "${grp}" -ge 4 ] ; then      # at least read permissions
-        if [ "${writ_ind}" -gt 0 ] && [ "${grp}" -ge 6 ] ; then
+      if [[ "${grp}" -ge 4 ]] ; then      # at least read permissions
+        if [[ "${writ_ind}" -gt 0 ]] && [[ "${grp}" -ge 6 ]] ; then
           separ="+"
         fi
         echo -n "${name}"
-        if [ -h "${1}" ] ; then
+        if [[ -h "${1}" ]] ; then
           echo -n "---> "
           readlink -n "${1}"
           echo -n " ${separ} "
@@ -177,7 +177,7 @@ one_name_value()
           echo -n "${separ} "
         fi
         # calls helper C function, waits up to 1 second for "hanging" files
-        if [ "${verbose}" -gt 4 ] ; then
+        if [[ "${verbose}" -gt 4 ]] ; then
           echo -n "ls_name_value_rd invocation: "
           echo -n "${content_reader} "
           echo -n "${lnv_rd_opts[@]}"
@@ -186,28 +186,28 @@ one_name_value()
         value=$( "${content_reader}" "${lnv_rd_opts[@]}" "${1}" "${num_val}" )
 
         err=$?
-        if [ "${err}" -ne 0 ] ; then
+        if [[ "${err}" -ne 0 ]] ; then
           value=" <error [${err}]>"
-        elif [ -n "${value}" ] ; then
+        elif [[ -n "${value}" ]] ; then
           echo "${value}"
         else
           echo " "
         fi
-      elif [ "${grp}" -ge 2 ] ; then   # at least write perms
+      elif [[ "${grp}" -ge 2 ]] ; then   # at least write perms
         echo "${name} : <write only>"
       else
         echo "${name} : <cannot access>"
       fi
     fi
   else      # doesn't exist or irregular
-    if [ -e "${1}" ] ; then       # exists so must be irregular
-      if [ "$show" -gt 0 ] ; then   # irregular file (maybe symlink to ...)
+    if [[ -e "${1}" ]] ; then       # exists so must be irregular
+      if [[ "$show" -gt 0 ]] ; then   # irregular file (maybe symlink to ...)
         fin_line=0
         set_name=0
-        if [ -h "${1}" ] ; then
+        if [[ -h "${1}" ]] ; then
           echo -n "${name}"
           set_name=1
-          if [ -d "${1}" ] ; then
+          if [[ -d "${1}" ]] ; then
             echo -n "---> ["
             readlink -n "${1}"
             echo "]"
@@ -218,22 +218,22 @@ one_name_value()
             echo -n " :"
           fi
         else
-          if [ -d "${1}" ] ; then
+          if [[ -d "${1}" ]] ; then
             echo "${pad}[${1}]"
             fin_line=1
           fi
         fi
-        if [ "${fin_line}" -eq 0 ] ; then # not a directory nor symlink to one
-          if [ "${set_name}" -eq 0 ] ; then
+        if [[ "${fin_line}" -eq 0 ]] ; then # not a directory nor symlink to one
+          if [[ "${set_name}" -eq 0 ]] ; then
             echo -n "${name}:"
           fi
-          if [ -c "${1}" ] ; then
+          if [[ -c "${1}" ]] ; then
             echo " <char device>"
-          elif [ -b "${1}" ] ; then
+          elif [[ -b "${1}" ]] ; then
             echo " <block device>"
-          elif [ -p "${1}" ] ; then
+          elif [[ -p "${1}" ]] ; then
             echo " <named pipe>"
-          elif [ -S "${1}" ] ; then
+          elif [[ -S "${1}" ]] ; then
             echo " <socket>"
           else
             echo " <unknown>"
@@ -242,7 +242,7 @@ one_name_value()
       fi    # end of --show not given
     else    # doesn't exist: either dangling symlink or gone missing
       echo -n "${name}"
-      if [ -h "${1}" ] ; then
+      if [[ -h "${1}" ]] ; then
         echo -n "---> "
         readlink -n "${1}"
         echo " : <target missing>"
@@ -276,10 +276,10 @@ while :; do
     -h | --help       ) usage;                     exit 0 ;;
     -n | --num        )
                 num_val="$2"
-                if ! [ "$num_val" -eq "$num_val" ] 2> /dev/null ; then
+                if ! [[ "$num_val" -eq "$num_val" ]] 2> /dev/null ; then
                   echo "--num expects an integer as its argument"
                   exit 1
-                elif [ "$num_val" -lt 1 ] ; then
+                elif [[ "$num_val" -lt 1 ]] ; then
                   echo "--num expects an integer > 0"
                   exit 1
                 fi
@@ -300,19 +300,19 @@ done
 if command -v "${ls_bin}" > /dev/null 2>&1 ; then
   ls_bin=$( command -v "${ls_bin}" )
   ls_args+=( "${ls_bin}" )
-  if [ "${all}" -gt 0 ] ; then
-    if [ "${native_order}" -gt 0 ] ; then
+  if [[ "${all}" -gt 0 ]] ; then
+    if [[ "${native_order}" -gt 0 ]] ; then
       ls_args+=("-f")
       ls_args+=("-A")
     else
       ls_args+=("-A")
     fi
-  elif [ "${native_order}" -gt 0 ] ; then
+  elif [[ "${native_order}" -gt 0 ]] ; then
     ls_args+=("-f")
   fi
   ls_args+=("--zero")
   ls_args+=("--")            # need this for filenames that start with '-'
-  if [ "${verbose}" -gt 2 ] ; then
+  if [[ "${verbose}" -gt 2 ]] ; then
     echo -n "ls invocation 3: "
     echo "${ls_args[@]}"
   fi
@@ -325,20 +325,20 @@ fi
 # In development it should be found in a sibling directory.
 if ! command -v "${content_reader}" > /dev/null 2>&1 ; then
   dev_content_reader="../src/${content_reader}"
-  if [ -x "${dev_content_reader}" ] ; then
+  if [[ -x "${dev_content_reader}" ]] ; then
     content_reader=$(pwd)/"${dev_content_reader}"
   else
     echo "Unable to find helper: ${content_reader}, exiting"
     exit 1
   fi
 fi
-if [ "${verbose}" -gt 2 ] ; then
+if [[ "${verbose}" -gt 2 ]] ; then
   echo -n "content_reader: "
   echo "${content_reader}"
 fi
 
 # If one argument given and it's a directory, cd to it and swallow
-if [ $# -eq 1 ] && [ -e "$1" ] && [ -d "$1" ] && [ -x "$1" ] ; then
+if [[ $# -eq 1 ]] && [[ -e "$1" ]] && [[ -d "$1" ]] && [[ -x "$1" ]] ; then
   # 'stat -c ...' is a Linux extension. For FreeBSD use '-f'
   first_st_dev=$( stat -c %d -- "$1" 2> /dev/null )
   if ! cd -- "$1" ; then
@@ -348,10 +348,10 @@ if [ $# -eq 1 ] && [ -e "$1" ] && [ -d "$1" ] && [ -x "$1" ] ; then
   shift
 fi
 
-if [ "${verbose}" -gt 0 ] ; then
+if [[ "${verbose}" -gt 0 ]] ; then
   echo -n "> current working directory: "
   pwd
-  if [ "${verbose}" -gt 1 ] ; then
+  if [[ "${verbose}" -gt 1 ]] ; then
     echo -n "> physical working directory: "
     pwd -P
   fi
@@ -361,22 +361,22 @@ fi
 SAVEIFS=$IFS
 IFS=$'\n'
 
-if [ "${empty}" -eq 1 ] ; then
+if [[ "${empty}" -eq 1 ]] ; then
   lnv_rd_opts+=("-e")
-elif [ "${empty}" -gt 1 ] ; then
+elif [[ "${empty}" -gt 1 ]] ; then
   lnv_rd_opts+=("-ee")
 fi
 
-if [ "${utf8}" -gt 0 ] ; then
+if [[ "${utf8}" -gt 0 ]] ; then
   lnv_rd_opts+=("-u")
 fi
 
-if [ "${verbose}" -eq 1 ] ; then
+if [[ "${verbose}" -eq 3 ]] ; then
   lnv_rd_opts+=("-v")
-elif [ "${verbose}" -gt 1 ] ; then
+elif [[ "${verbose}" -gt 3 ]] ; then
   vv_opt="-v"
   n=${verbose}
-  for (( k=1 ; k<n ; k=k+1 )) ; do
+  for (( k=3 ; k<n ; k=k+1 )) ; do
     vv_opt="${vv_opt}v"   # append a 'v'
   done
   lnv_rd_opts+=("${vv_opt}")
@@ -384,7 +384,7 @@ fi
 lnv_rd_opts+=("--")
 
 n=$#
-if [ $# -gt 0 ] ; then
+if [[ $# -gt 0 ]] ; then
   # place command line arguments into a bash array
   for (( k=0 ; k<n ; k=k+1 )) ; do
     fileArray[k]="$1"
@@ -392,39 +392,39 @@ if [ $# -gt 0 ] ; then
   done
 else
   # Place filenames of current directory in fileArray (a bash array)
-  mapfile -d '' -t fileArray < <( "${ls_args[@]}" )
+  mapfile -d '' -t fileArray < <( "${ls_args[@]}" 2> /dev/null )
 fi
 
 tLen=${#fileArray[@]}
 for (( k=0; k<tLen; k++ )) ; do
   name1="${fileArray[$k]}"
-  if [ "${verbose}" -gt 3 ] ; then
+  if [[ "${verbose}" -gt 3 ]] ; then
     echo ">> fileArray[$k]: ${name1}"
   fi
-  if [ "${first_st_dev}" -eq 0 ] ; then
-    if [ -e "${name1}" ] ; then
+  if [[ "${first_st_dev}" -eq 0 ]] ; then
+    if [[ -e "${name1}" ]] ; then
       first_st_dev=$( stat -c %d -- "${name1}" 2> /dev/null )
     fi
   fi
-  if [ -h "${name1}" ] ; then
+  if [[ -h "${name1}" ]] ; then
     symlnk1=0
-    [ "${nosym}" -gt 0 ]
+    [[ "${nosym}" -gt 0 ]]
     nosym_active1=$?
   else
     symlnk1=1
     nosym_active1=1
   fi
-  if [ "${dir}" -gt 0 ] && [ -d "${name1}" ] && [ -x "${name1}" ] && [ "${nosym_active1}" -ne 0 ] ; then
-    if [ "${otherfs}" -eq 0 ] ; then
-      if [ -e "${name1}" ] ; then
+  if [[ "${dir}" -gt 0 ]] && [[ -d "${name1}" ]] && [[ -x "${name1}" ]] && [[ "${nosym_active1}" -ne 0 ]] ; then
+    if [[ "${otherfs}" -eq 0 ]] ; then
+      if [[ -e "${name1}" ]] ; then
         a_st_dev=$( stat -c %d -- "${name1}" 2> /dev/null )
       fi
     else
       a_st_dev=${first_st_dev}
     fi
-    if [ "${first_st_dev}" -eq "${a_st_dev}" ] ; then
+    if [[ "${first_st_dev}" -eq "${a_st_dev}" ]] ; then
       echo -n ">> enter directory: "
-      if [ -h "${name1}" ] ; then
+      if [[ -h "${name1}" ]] ; then
         echo -n "${name1}"
         echo -n " ---> [ "
         readlink -n "${name1}"
@@ -438,37 +438,37 @@ for (( k=0; k<tLen; k++ )) ; do
         IFS=$SAVEIFS
         exit 1
       fi
-      if [ "${physical}" -gt 0 ] ; then
+      if [[ "${physical}" -gt 0 ]] ; then
         value=$( pwd -P )
         echo "[ ${value} ]"
-      elif [ "${verbose}" -gt 2 ] && [ "${symlnk1}" -eq 0 ] ; then
+      elif [[ "${verbose}" -gt 2 ]] && [[ "${symlnk1}" -eq 0 ]] ; then
         echo -n "  > physical working directory: "
         pwd -P
       fi
       # Place filenames of current directory in fileArray2
-      mapfile -d '' -t fileArray2 < <( "${ls_args[@]}" )
+      mapfile -d '' -t fileArray2 < <( "${ls_args[@]}" 2> /dev/null )
       t2Len=${#fileArray2[@]}
       for (( j=0; j<t2Len; j++ )) ; do
         name2="${fileArray2[$j]}"
-        if [ -h "${name2}" ] ; then
+        if [[ -h "${name2}" ]] ; then
           symlnk2=0
-          [ "${nosym}" -gt 0 ]
+          [[ "${nosym}" -gt 0 ]]
           nosym_active2=$?
         else
           symlnk2=1
           nosym_active2=1
         fi
-        [ "${nosym}" -gt 0 ] && [ -h "${name2}" ]
+        [[ "${nosym}" -gt 0 ]] && [[ -h "${name2}" ]]
         nosym_active2=$?
-        if [ "${dir}" -gt 1 ] && [ -d "${name2}" ] && [ -x "${name2}" ] && [ "${nosym_active2}" -ne 0 ] ; then
-          if [ "${otherfs}" -eq 0 ] ; then
+        if [[ "${dir}" -gt 1 ]] && [[ -d "${name2}" ]] && [[ -x "${name2}" ]] && [[ "${nosym_active2}" -ne 0 ]] ; then
+          if [[ "${otherfs}" -eq 0 ]] ; then
             b_st_dev=$( stat -c %d -- "${name2}" 2> /dev/null )
           else
             b_st_dev=${first_st_dev}
           fi
-          if [ "${first_st_dev}" -eq "${b_st_dev}" ] ; then
+          if [[ "${first_st_dev}" -eq "${b_st_dev}" ]] ; then
             echo -n "    >> enter directory: "
-            if [ -h "${name2}" ] ; then
+            if [[ -h "${name2}" ]] ; then
               echo -n "${name2}"
               echo -n " ---> [ "
               readlink -n "${name2}"
@@ -482,15 +482,15 @@ for (( k=0; k<tLen; k++ )) ; do
               IFS=$SAVEIFS
               exit 1
             fi
-            if [ "${physical}" -gt 0 ] ; then
+            if [[ "${physical}" -gt 0 ]] ; then
               value=$( pwd -P )
               echo "[ ${value} ]"
-            elif [ "${verbose}" -gt 2 ] && [ "${symlnk2}" -eq 0 ] ; then
+            elif [[ "${verbose}" -gt 2 ]] && [[ "${symlnk2}" -eq 0 ]] ; then
               echo -n "  > physical working directory: "
               pwd -P
             fi
             # Place filenames of current directory in fileArray3
-            mapfile -d '' -t fileArray3 < <( "${ls_args[@]}" )
+            mapfile -d '' -t fileArray3 < <( "${ls_args[@]}" 2> /dev/null )
             t3Len=${#fileArray3[@]}
             for (( m=0; m<t3Len; m++ )) ; do
               one_name_value "${fileArray3[m]}" "        "
@@ -504,7 +504,7 @@ for (( k=0; k<tLen; k++ )) ; do
           else
             echo -n "    >> not entering directory: ${name2} : "
             echo -n "<different filesystem"
-            if [ "${verbose}" -gt 0 ] ; then
+            if [[ "${verbose}" -gt 0 ]] ; then
               echo " [st_dev=${b_st_dev}]>"
             else
               echo ">"
@@ -522,7 +522,7 @@ for (( k=0; k<tLen; k++ )) ; do
       # echo ""
     else
       echo -n ">> not entering directory: ${name1} : <different filesystem"
-      if [ "${verbose}" -gt 0 ] ; then
+      if [[ "${verbose}" -gt 0 ]] ; then
         echo " [st_dev=${a_st_dev}]>"
       else
         echo ">"

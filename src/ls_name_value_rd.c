@@ -35,14 +35,17 @@
  * The command line is shown in the usage() and show_help() functions below.
  */
 
-static const char * version_str = "0.33  20260425 [svn: r212]";
+static const char * version_str = "0.33  20260430 [svn: r218]";
 
 static const char * my_name = "ls_name_value_rd";
+
+static const char * op_not_permit = "operation not permiited";
+static const char * permiss_denied = "permission denied";
 
 static int num_retries = 100;    /* 10 milliseconds per try */
 
 #define DEF_BUFF_SZ 256
-#define DEF_NUM_BYTES 80
+#define DEF_CONTENT_NUM_BYTES 80
 
 
 static struct option long_options[] = {
@@ -76,7 +79,7 @@ show_help()
     fprintf(stderr, "    -V | --version  show version string then exit\n");
     fprintf(stderr, "    <filename>      name of file to read\n");
     fprintf(stderr, "    <num_bytes>     maximum number of bytes to ");
-    fprintf(stderr, "read [def: %d]\n\n", DEF_NUM_BYTES);
+    fprintf(stderr, "read [def: %d]\n\n", DEF_CONTENT_NUM_BYTES);
     fprintf(stderr, "Read <num_bytes> from <filename> skipping any null ");
     fprintf(stderr, "characters. Any\nbytes with the top bit set will ");
     fprintf(stderr, "cause <contains non-ASCII chars>\nto be output to ");
@@ -134,7 +137,7 @@ main(int argc, char * argv[])
 {
     int res, c, fd, off, len, b1len, k, j;
     int empty = 0;
-    int num_bytes = DEF_NUM_BYTES;
+    int num_bytes = DEF_CONTENT_NUM_BYTES;
     int utf8 = 0;
     int verbose = 0;
     int err = 0;
@@ -261,21 +264,21 @@ main(int argc, char * argv[])
                 printf("<cannot access>");
         } else if (EPERM == err) {
             if (verbose > 0)
-                fprintf(stderr, "<open: operation not permitted>");
-            printf("<operation not permitted>");
+                fprintf(stderr, "<open: %s>\n", op_not_permit);
+            printf("<%s>", op_not_permit);
         } else if (EINTR == err) {
             if (verbose > 0)
-                fprintf(stderr, "<open: interrupted>");
+                fprintf(stderr, "<open: interrupted>\n");
             printf("<interrupted>");
         } else if (EIO == err) {
             if (verbose > 0)
-                fprintf(stderr, "<open: IO error>");
+                fprintf(stderr, "<open: IO error>\n");
             printf("<IO error>");
         } else if (ELOOP == err)
             printf("<too many symlinks>");
         else if (EINVAL == err) {
             if (verbose > 0)
-                fprintf(stderr, "<open: EINVAL>");
+                fprintf(stderr, "<open: EINVAL>\n");
             printf("<invalid argument>");
             /* printf("<bad character in filename>"); */
         } else
@@ -290,12 +293,12 @@ main(int argc, char * argv[])
             fprintf(stderr, "fstat(): errno=%d\n", err);
         if (EBADF == err) {
             if (verbose > 0)
-                fprintf(stderr, "<fstat() bad file descriptor>");
+                fprintf(stderr, "<fstat() bad file descriptor>\n");
             err = 0;
             goto cleanup;
         } else {
             if (verbose > 0)
-                fprintf(stderr, "<fstat() errno=%d>", err);
+                fprintf(stderr, "<fstat() errno=%d>\n", err);
             printf("<fstat() errno=%d>", err);
             err = 0;
             goto cleanup;
@@ -356,11 +359,23 @@ main(int argc, char * argv[])
                 fprintf(stderr, "read(): errno=%d\n", err);
             if (EBADF == err)
                 printf("<read() bad file descriptor>");
-            else if (EINTR == err)
+            else if (EINTR == err) {
+                if (verbose > 0)
+                    fprintf(stderr, "<read: interrupted system call>\n");
                 printf("<read interrupted>");
-            else if (EIO == err)
+            } else if (EIO == err) {
+                if (verbose > 0)
+                    fprintf(stderr, "<read: IO error>\n");
                 printf("<IO error>");
-            else if (EINVAL == err) {   /* sysfs special, treat like empty */
+            } else if (EPERM == err) {
+                if (verbose > 0)
+                    fprintf(stderr, "<read: %s>\n", op_not_permit);
+                printf("<%s>", op_not_permit);
+            } else if (EACCES == err) {
+                if (verbose > 0)
+                    fprintf(stderr, "<read: %s>\n", permiss_denied);
+                printf("<%s>", permiss_denied);
+            } else if (EINVAL == err) { /* sysfs special, treat like empty */
                 ++read_einval;
                 break;
             } else

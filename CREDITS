@@ -52,9 +52,13 @@ Nate Dailey <Nate dot Dailey at stratus dot com>
 Stefan Richter <stefanr at s5r6 dot in-berlin dot de>
     transport help with ieee1394 [20061231]
 
+Paul Evans <pevans at redhat dot com>
+    See https://github.com/doug-gilbert/lsscsi and Paul is responsible
+    for pulls (consolidated patches) #7 through #14
+
 Tomas Bzatek <tbzatek at redhat dot com>
     NVMe improvements [20200708  svn: r163]
     which SCSI id (--scsi_id) to output [20200821  svn: r163]
 
 Doug Gilbert
-25th April 2021
+26th April 2026
