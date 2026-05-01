@@ -504,7 +504,7 @@ trim_lead_trail(char * s, bool trim_leading, bool trim_trailing)
                 return s ? (int)strlen(s) : 0;
 
         if (trim_trailing) {
-                while (isspace((uint8_t)p[n - 1]))
+                while (n > 0 && isspace((uint8_t)p[n - 1]))
                         p[--n] = 0;
         }
         if (trim_leading) {
