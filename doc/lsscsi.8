@@ -45,32 +45,35 @@ If a \fIH:C:T:L\fR tuple is given as an argument on the command line then
 it acts as a filter and only devices that match it are listed. The colons
 don't have to be present, and '\-', '*', '?' or missing components at the
 end are interpreted as wildcards. The default is '*:*:*:*' which means to
-match devices (i.e.  LU or namespaces). Any filter string using '*' of '?'
-should be surrounded by single or double quotes to stop shell expansions.
-If '\-' is used as a wildcard then the whole filter tuple should be prefixed
-by '\-\- ' to tell this utility there are no more options on the command
-line to be interpreted. The use of '\-\- ' like that is standard Unix
-command line practice. A leading '[' and trailing ']' are permitted (
-e.g. '[1:0:0]' matches all LUNs on 1:0:0). May also be used to filter
-\fI\-\-hosts\fR in which case only the \fIH\fR is active and may be either
-a number or in the form "host<n>" where <n> is a host number.
+match all devices (i.e.  LU or namespaces) currently attached. Any filter
+string using '*' of '?' should be surrounded by single quotes to stop shell
+expansions.  If '\-' is used as a wildcard then the whole filter tuple
+should be prefixed by '\-\- ' to tell this utility there are no more
+options (following the '\-\-') on the command line to be interpreted. The
+use of '\-\- ' like that is standard Unix command line practice. A
+leading '[' and trailing ']' are permitted ( e.g. '[1:0:0]' matches all LUNs
+on 1:0:0). May also be used to filter \fI\-\-hosts\fR in which case only the
+\fIH\fR is active and may be either a number or in the form "host<n>"
+where <n> is a host number.
 .PP
 For NVMe devices and controllers almost all of the previous paragraph
 applies. The main difference is that the letter "N" appears in
 the 'H' (first) position. The 'C' position for NVMe is the controller's
-Linux generated "char" device's minor number which is the first number
-that appears in a typical NVMe controller name, for example: "/dev/nvme2".
-The 'T' position for NVMe is the "CNTLID" value. The final 'L' position
-is the NVMe namespace identifier which is typically a sequential value
-starting at 1. The leading explicit "N" for NVMe devices is converted
-internally into a large value (32,767) that should not interfere with any
-Linux generated SCSI host number; it also means that the numeric sort
-used to show hosts (controllers) and devices (LUs or namespaces) will
-always place NVMe devices and controllers after those that use the SCSI
-subsystem. To filter using a \fIH:C:T:L\fR argument for NVMe controllers,
-"hostN", "hostN:<num>", "N" or "N:<num>" may be used; when no "<num>" is
-given, only NVMe controllers will be listed (i.e. it lists no SCSI
-hosts (HBAs)).
+Linux generated "char" device's minor number. That number is the first
+number that appears in a typical NVMe controller name, for
+example: "/dev/nvme2". The 'T' position for NVMe is the "CNTLID" value.
+The final 'L' position is the NVMe namespace identifier which is
+typically a sequential value starting at 1. The leading explicit "N" for
+NVMe devices is converted internally into a large value (32,767) that
+should not interfere with any Linux generated SCSI host number; it also
+means that the numeric sort used to show hosts (controllers) and
+devices (LUs or namespaces) will always place NVMe devices and
+controllers
+.B after
+those that use the SCSI subsystem. To filter using a \fIH:C:T:L\fR
+argument for NVMe controllers, "hostN", "hostN:<num>", "N" or "N:<num>"
+may be used; when no "<num>" is given, only NVMe controllers will be
+listed (i.e. no SCSI hosts (HBAs) are listed).
 .PP
 By default in this utility device node names (e.g. "/dev/sda"
 or "/dev/root_disk") are obtained by noting the major and minor numbers for
@@ -88,15 +91,15 @@ report disk error messages using the disk's default kernel name.
 Arguments to long options are mandatory for short options as well. The options
 are arranged in alphabetical order based on the \fBlong\fR option name.
 Hyphenated long options can also take underscore, and vice versa (e.g.
-\fI\-\-scsi_id\fR or \fI\-\-scsi\-id\fR are acceptable instead).
+so \fI\-\-scsi_id\fR or \fI\-\-scsi\-id\fR are both acceptable).
 .TP
 \fB\-b\fR, \fB\-\-brief\fR
 reduces one line per device output to the tuple and the primary device name.
 This may simplify scripts that process the output of this utility. With the
 \fI\-\-generic\fR option it will show on each line the tuple (from which
 the bsg pass\-through device name can be deduced), the primary device
-name (which the block subsystem uses) and the sg device name (also a
-pass\-through).
+name (which the block subsystem uses) and the sg device name (i.e. a
+name of the form /dev/sg<n> where <n> starts at 0).
 .br
 When the \fI\-\-pdt\fR option is used together with this option the SCSI
 Peripheral Device Type (PDT) is displayed in hex (with a leading "0x")
@@ -133,7 +136,7 @@ To unclutter the single line per device mode the \fI\-\-brief\fR option
 combined with this option should help.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
-Output the usage message and exit.
+Output the usage message then exit. Note the output is sent to stderr.
 .TP
 \fB\-H\fR, \fB\-\-hosts\fR
 List the SCSI hosts and NVMe controllers currently attached to
@@ -144,9 +147,10 @@ NVMe devices (namespaces) are listed.
 \fB\-j\fR[=\fIJO\fR], \fB\-\-json\fR[=\fIJO\fR]
 output is in JSON format instead of plain text form. Note that arguments
 to the short and long form are themselves optional and if present start
-with "=" and no whitespace is permitted around that "=".
+with "=" and no whitespace is permitted either side of that "=".
 .br
-See the lsscsi_json(8) manpage or use '?' for \fIJO\fR to get a summary.
+See the lsscsi_json(8) manpage or use '?' for \fIJO\fR to get a
+summary (e.g. '\-j=?').
 .TP
 \fB\-J\fR, \fB\-\-js\-file\fR=\fIJFN\fR
 Send the JSON output to a file named \fIJFN\fR instead of stdout. When
@@ -165,15 +169,18 @@ special files under the "/dev" directory) of 'char' or 'block' type
 at startup. This allows user programs to access this storage. One such
 program called udev has the ability to
 .B change
-those special change file names which is what the user will see henceforth
-apart from sysfs which still uses the original name (i.e. the name soon
-after bootup).
+those special file names which is what the user will see henceforth
+apart from sysfs which still uses the original name (i.e. the name issued
+by the kernel when the host/device is detected during bootup).
 .br
 This option should be seldom needed.
 .TP
 \fB\-L\fR, \fB\-\-list\fR
 Output additional information in <attribute_name>=<value> pairs, one pair
 per line preceded by two spaces. This option has the same effect as '\-lll'.
+.br
+Getting JSON output is a more structured way of obtaining parse-able data
+and is encouraged rather than using this option.
 .TP
 \fB\-l\fR, \fB\-\-long\fR
 Output additional information for each SCSI device (host). Can be
@@ -220,7 +227,7 @@ this option excludes NVMe devices and controllers for the output. This option
 may be needed to stop NVMe device output interfering with specific format
 output like that produced when the \fI\-\-classic\fR option is used.
 .br
-To only show NVMe devices, use 'lsscsi N', to only show NVMe controllers,
+To only show NVMe devices, use 'lsscsi N'. To only show NVMe controllers,
 use 'lsscsi \-H N'.
 .TP
 \fB\-D\fR, \fB\-\-pdt\fR
@@ -231,10 +238,16 @@ replaces the device type abbreviation (e.g. "0x0     " replaces "disk    ")
 and appears after the tuple.
 .TP
 \fB\-p\fR, \fB\-\-protection\fR
-Output target (DIF) and initiator (DIX) protection types.
+Output target (DIF) and initiator (DIX) protection types in that
+order to the right in one_line_per_device mode. If there is
+no DIF then '\-' is output, if there is no DIX then 'none' is
+output.
 .TP
 \fB\-P\fR, \fB\-\-protmode\fR
-Output effective protection information mode for each disk device.
+Outputs the effective protection information mode for each disk device.
+This is typically at the end (i.e. right hand side) of the
+one_line_per_device mode; '\-' is output is there is no protection
+information.
 .TP
 \fB\-i\fR, \fB\-\-scsi_id\fR
 outputs the udev derived matching id found in /dev/disk/by\-id/scsi* .

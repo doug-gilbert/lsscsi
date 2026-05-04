@@ -326,7 +326,7 @@ sgj_start_r(const char * util_name, const char * ver_str, int argc,
 }
 
 /* Serializes JSON in-memory tree and writes it to fp (usually stdout) .
- * jsp and fp are assumed to be valid, non-NULL pointers. */ 
+ * jsp and fp are assumed to be valid, non-NULL pointers. */
 void
 sgj_js2file_estr(sgj_state * jsp, sgj_opaque_p jop, int exit_status,
                  const char * estr, FILE * fp)

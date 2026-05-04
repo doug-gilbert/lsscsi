@@ -2,7 +2,6 @@ AC_INIT([lsscsi],[0.33],[dgilbert@interlog.com])
 
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 AM_MAINTAINER_MODE
-# AM_CONFIG_HEADER(config.h)
 AC_CONFIG_HEADERS([config.h])
 
 AC_PROG_CC
@@ -15,8 +14,6 @@ ifdef([AM_PROG_AR], [AM_PROG_AR], [])
 
 AC_CHECK_HEADERS([linux/nvme_ioctl.h], [AC_DEFINE_UNQUOTED(HAVE_NVME, 1, [Found NVMe])], [], [])
 AC_CHECK_HEADERS([byteswap.h], [], [], [])
-
-# AC_PROG_LIBTOOL
 
 AC_ARG_ENABLE([nvme-supp],
   AS_HELP_STRING([--disable-nvme-supp],[remove all or most NVMe code]),

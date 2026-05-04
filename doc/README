@@ -5,12 +5,21 @@ or
 
 It includes many examples and a Download section.
 
+To view the manpage in this directory (rather than the installed one, if
+the package is installed) use:
+    man ./lsscsi.8
+
 Syntax checking
 ===============
-Use 'mandoc -W style {man_page} > /dev/null'
+Use:
+    mandoc -W style lsscsi.8 > /dev/null
+or
+    mandoc -W style ls_name_value.8 > /dev/null
+or
+    mandoc -W style ls_name_value_rd.8 > /dev/null
 
 The: 'cannot parse date, using it verbatim: TH February 2019' warning
 is ignored.
 
 Doug Gilbert
-12th March 2026
+1st May 2026

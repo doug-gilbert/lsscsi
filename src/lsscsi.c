@@ -35,7 +35,7 @@
 #include <sys/types.h>
 #endif
 #include <linux/major.h>
-#include <linux/limits.h>
+#include <linux/limits.h>    /* defines PATH_MAX [4096] and NAME_MAX [255] */
 #include <time.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
@@ -49,7 +49,7 @@
 #include "sg_json.h"
 
 /* Package release number is first number, whole string is version */
-static const char * release_str = "0.33  2026/04/30 [svn: r218]";
+static const char * release_str = "0.33  2026/05/03 [svn: r223]";
 
 /*
  * Some jargon:
