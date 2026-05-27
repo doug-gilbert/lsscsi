@@ -36,8 +36,9 @@ The ./cmake_del_artifacts.sh script cleans up most of that.
 To build static executable(s) instead of 'cmake .' use
     cmake . -DBUILD_SHARED_LIBS=OFF
 
-The following places the executable in the /usr/bin directory and the
-man pages in the /usr/share/man/man8 directory
+The following places the executable in the /usr/bin directory, the man
+pages in the /usr/share/man/man8 directory, and other documentation in
+the /usr/share/doc/lsscsi directory.
  $ sudo cmake  --install . --prefix=/usr
 
 Rather than the last step (i.e. 'cmake --install . ') this invocation:
@@ -76,4 +77,4 @@ There is a build_debian.sh script in the tarball's top level directory
 that does the above.
 
 Douglas Gilbert
-27th April 2026
+18th May 2026

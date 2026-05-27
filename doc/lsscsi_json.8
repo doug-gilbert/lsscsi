@@ -19,13 +19,6 @@ data types: string, integer, boolean and null. Its other data types are JSON
 object and JSON array. The json\-builder library uses the
 SPDX\-License\-Identifier: BSD\-2\-Clause which is the same license as lsscsi.
 .PP
-The json\-builder library is relatively lightweight (700 lines of C code) and
-is 'hidden' fully within the sg3_utils library which this utility shares with
-the sg3_utils package. The author has modified the json\-builder header to
-include what is needed from the json\-parser header so that only the builder
-and not the parser are built. The parser could be added later, but currently
-there seems to be no need for it.
-.PP
 This utility uses the 'snake_case' convention for JSON property/object names:
 all in lower case letters or numerals with individual words joined with a
 single underscore (e.g. "starting_lba"). There should be no leading or

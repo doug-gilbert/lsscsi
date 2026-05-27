@@ -1,6 +1,19 @@
 #!/bin/sh
 
+cd src || exit
+./cmake_del_artifacts.sh
+cd ..
+
+cd doc || exit
+./cmake_del_artifacts.sh
+cd ..
+
+cd scripts || exit
+./cmake_del_artifacts.sh
+cd ..
+
 rm -rf \
+	build \
 	CMakeCache.txt \
 	CMakeFiles \
 	CPackConfig.cmake \
@@ -15,6 +28,8 @@ rm -rf \
 	lsscsi \
 	lsscsi.8.gz \
 	lsscsi_json.8.gz \
+	ls_name_value.8.gz \
+	ls_name_value_rd.8.gz \
 	Testing \
 	Makefile
 
