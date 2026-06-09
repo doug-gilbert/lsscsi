@@ -1,14 +1,9 @@
-
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <string.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <stdbool.h>
-#include <time.h>
-#include <sys/stat.h>
-#include <getopt.h>     /* non-standard, trips up AIX */
+/*
+ * Copyright (c) 2026 Douglas Gilbert.
+ * All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
 
 /*
  * This is a helper C function for the ls_name_value script that has its
@@ -35,7 +30,23 @@
  * The command line is shown in the usage() and show_help() functions below.
  */
 
-static const char * version_str = "0.33  20260527 [svn: r224]";
+#define _XOPEN_SOURCE 600
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE 1
+#endif
+
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <stdbool.h>
+#include <time.h>
+#include <sys/stat.h>
+#include <getopt.h>     /* non-standard, trips up AIX */
+
+static const char * version_str = "0.33  20260608 [svn: r225]";
 
 static const char * my_name = "ls_name_value_rd";
 
