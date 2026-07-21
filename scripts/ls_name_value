@@ -20,7 +20,7 @@
 # (e.g. a directory name should not be passed to that C utility, but if
 # it is <directory> is printed out).
 
-version_str="1.24 20260608"
+version_str="1.25 20260721"
 
 all=0
 dir=0
@@ -149,7 +149,7 @@ one_name_value()
       if [[ "${verbose}" -gt 4 ]] ; then
         echo -n "ls_name_value_rd invocation: "
         echo -n "${content_reader} "
-        echo -n "${lnv_rd_opts[@]}"
+        echo -n "${lnv_rd_opts[@]} "
         echo "${1} ${num_val}"
       fi
       value=$( "${content_reader}" "${lnv_rd_opts[@]}" "${1}" "${num_val}" )

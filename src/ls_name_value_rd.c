@@ -46,7 +46,7 @@
 #include <sys/stat.h>
 #include <getopt.h>     /* non-standard, trips up AIX */
 
-static const char * version_str = "0.33  20260608 [svn: r225]";
+static const char * version_str = "0.33  20260721 [svn: r226]";
 
 static const char * my_name = "ls_name_value_rd";
 
@@ -405,15 +405,15 @@ main(int argc, char * argv[])
         goto cleanup;
     }
     for (k = 0, j = 0; k < len; ++k) {
-        unsigned char c = *(b1p + k);
+        unsigned char cc = *(b1p + k);
 
         incomplete_utf8 = false;
-        if ('\0' == c)
+        if ('\0' == cc)
             continue;   /* squash the null character */
-        if (c < ' ')
+        if (cc < ' ')
             *(b2p + j++) = ' ';/* replace ASCII control characters with ' ' */
-        else if (c > 0x7e) {
-            if (0x7f == c)
+        else if (cc > 0x7e) {
+            if (0x7f == cc)
                 *(b2p + j++) = ' ';
             else {      /* top bit set */
                 if (utf8_valid_seq(b1p + k, len - k, &skip)) {
@@ -427,7 +427,7 @@ main(int argc, char * argv[])
                 }
             }
         } else
-            *(b2p + j++) = c;
+            *(b2p + j++) = cc;
     }                   /* end of for loop over input characters */
     if (non_ascii) {
         printf("<contains non-ASCII chars>");

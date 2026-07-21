@@ -1,8 +1,9 @@
 To build (using autotools):
 ---------------------------
- $ ./autogen.sh
- $ ./configure
- $ make
+The conventional pattern is:
+    # ./autogen.sh
+    # ./configure
+    # make
 
 To install (using autools) call:
  $ make install
@@ -13,43 +14,43 @@ the PREFIX variable in the Makefile. To install executable in the /usr/bin
 directory use './configure --prefix=/usr ' instead.
 
 To uninstall (using autotools) the executable and man pages call:
- $ make uninstall
+    # make uninstall
 
 To clean out object and executable files from the working directory call:
- $ make clean
+    # make clean
 
 To clean out prior to making a tarball (so ./configure needs to be run
 on the target system):
- $ make distclean
+    # make distclean
 
 To build using cmake
 --------------------
 This is experimental: expect some rough edges.
- $ cd {top_level_directory_of_lscsi_package}
- $ cmake  .
- $ cmake  --build .
+    # cd {top_level_directory_of_lscsi_package}
+    # cmake  .
+    # cmake  --build .
 
 The last cmake invocation needs root permissions. 'make clean' does
 the same thing as it does in autotools. There is no 'make distclean'
 so the above sequence leaves a lot of garbage "on the floor".
 The ./cmake_del_artifacts.sh script cleans up most of that.
 To build static executable(s) instead of 'cmake .' use
-    cmake . -DBUILD_SHARED_LIBS=OFF
+    # cmake . -DBUILD_SHARED_LIBS=OFF
 
 The following places the executable in the /usr/bin directory, the man
 pages in the /usr/share/man/man8 directory, and other documentation in
 the /usr/share/doc/lsscsi directory.
- $ sudo cmake  --install . --prefix=/usr
+    # sudo cmake  --install . --prefix=/usr
 
 Rather than the last step (i.e. 'cmake --install . ') this invocation:
-    cpack .
+    # cpack .
 
 will build a "deb" and a "rpm" package and place them in the current
 directory. Root permissions are not required. The package that is
 appropriate for the machine's Linux distribution can be installed with:
-    dpkg -i <package>.deb
+    # dpkg -i <package>.deb
 or
-    rpm -iv <package>.rpm
+    # rpm -iv <package>.rpm
 and that will require root permissions.
 
 Prebuild packages may also be available
@@ -69,12 +70,12 @@ successful that will deposit the binary rpm in the
 
 To build a Linux debian "deb" (binary) package, first untar the tarball,
 then change directory to the top level within the lsscsi source. Then:
- # chmod +x debian/rules
- # dpkg-buildpackage -b -rfakeroot
+    # chmod +x debian/rules
+    # dpkg-buildpackage -b -rfakeroot
 The binary deb packages will be placed in the parent directory (of
 the lsscsi source directory) if all goes well.
 There is a build_debian.sh script in the tarball's top level directory
 that does the above.
 
 Douglas Gilbert
-18th May 2026
+20th June 2026

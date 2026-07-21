@@ -49,7 +49,7 @@
 #include "sg_json.h"
 
 /* Package release number is first number, whole string is version */
-static const char * release_str = "0.33  2026/06/08 [svn: r225]";
+static const char * release_str = "0.33  2026/07/21 [svn: r226]";
 
 /*
  * Some jargon:
@@ -4526,10 +4526,11 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
                         const char * c2p = strrchr(nvme_ns_rel, 'n');
 
                         if (c2p && (c2p > (cposp + 1))) {
-                                strcpy(alt_ns_rel, devfsroot);
+                                sg_strscpy(alt_ns_rel, devfsroot,
+                                           sizeof(alt_ns_rel));
                                 m = cposp - nvme_ns_rel;
                                 memcpy(value, nvme_ns_rel, m);
-                                strcpy(value + m , c2p);
+                                sg_strscpy(value + m , c2p, LMAX_NAME - m);
                                 snprintf(alt_ns_rel, sizeof(alt_ns_rel),
                                          "%s/%.80s", devfsroot, value);
                                 if (get_major_minor(alt_ns_rel, &alt_maj,
@@ -4703,7 +4704,7 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
                 if (as_json)
                         sgj_js_nv_s(jsp, jop, ker_node_s, dev_node);
         } else if (has_alt_ns_rel) {
-                strcpy(dev_node, alt_ns_rel);
+                sg_strscpy(dev_node, alt_ns_rel, sizeof(dev_node));
                 if (as_json)
                         sgj_js_nv_s(jsp, jop, dev_node_s, dev_node);
         } else if (get_dev_node(buff, dev_node, BLK_DEV)) {
@@ -5089,7 +5090,7 @@ one_nhost_entry(const char * dir_name, const char * nvme_ctl_rel,
                         trim_lead_trail(value, true, true);
                         trunc_pad2n(value, 32, true);
                 } else
-                        strcpy(value, nulln1_s);
+                        sg_strscpy(value, nulln1_s, sizeof(value));
                 n += sg_scn3pr(a, alen, n, "  %-32s ", value);
 
                 if (get_value(buff, ser_s, value, vlen) &&
@@ -5098,7 +5099,7 @@ one_nhost_entry(const char * dir_name, const char * nvme_ctl_rel,
                         trim_lead_trail(value, true, true);
                         trunc_pad2n(value, 18, true);
                 } else
-                        strcpy(value, nulln1_s);
+                        sg_strscpy(value, nulln1_s, sizeof(value));
                 n += sg_scn3pr(a, alen, n, " %-18s ", value);
 
                 if (get_value(buff, fr_s, value, vlen) &&
@@ -5107,7 +5108,7 @@ one_nhost_entry(const char * dir_name, const char * nvme_ctl_rel,
                         trim_lead_trail(value, true, true);
                         trunc_pad2n(value, 8, false);
                 } else
-                        strcpy(value, nulln1_s);
+                        sg_strscpy(value, nulln1_s, sizeof(value));
                 n += sg_scn3pr(a, alen, n, " %-8s", value);
         } else {
                 sgj_pr_hr(jsp, "%s\n", a);
@@ -6070,7 +6071,7 @@ main(int argc, char **argv)
                         pr2serr("pre-release: %s\n", release_str);
                         return 0;
                 }
-                strncpy(b, release_str, sizeof(b) - 1);
+                sg_strscpy(b, release_str, sizeof(b));
                 p = (char *)strchr(b, '/');
                 snprintf(p - 4, sizeof(b) - (p - 4 - b), "%d%02d%02d  ",
                          yr, mon, day);
@@ -6194,22 +6195,21 @@ main(int argc, char **argv)
                         }
                 }
                 if (l_sysfsroot) {
-                        if (l_fsroot_sz > 1) {
-                                strncpy(sysfsroot, l_sysfsroot, l_fsroot_sz);
-                                sysfsroot[l_fsroot_sz] = '\0';
-                        }
+                        if (l_fsroot_sz > 1)
+                                sg_strscpy(sysfsroot, l_sysfsroot,
+                                           l_fsroot_sz);
                 } else if (l_root_sz > 1) {
                         int n = l_root_sz;
                         static const char * sysfs_dir = "/sys";
                         static const char * devfs_dir = "/dev";
 
-                        strncpy(sysfsroot, l_sysroot, sysfsroot_sz - 1);
+                        sg_strscpy(sysfsroot, l_sysroot, sysfsroot_sz);
                         if ((n > 1) && ('/' == sysfsroot[n - 1]))
                             --n;
                         memcpy(sysfsroot + n, sysfs_dir, 4);
                         sysfsroot[n + 4] = '\0';
                         n = l_root_sz;
-                        strncpy(devfsroot, l_sysroot, devfsroot_sz - 1);
+                        sg_strscpy(devfsroot, l_sysroot, devfsroot_sz);
                         if ((n > 1) && ('/' == devfsroot[n - 1]))
                             --n;
                         memcpy(devfsroot + n, devfs_dir, 4);
