@@ -4,7 +4,7 @@
 // This file (config.h.in.cmake) is used as a template to generate the
 // config.h file in the first step of a cmake build. This file should be
 // kept under source control (e.g. svn or git) while config.h can be
-// deleted after a suucessful build. After a failed build config.h
+// deleted after a successful build. After a failed build config.h
 // should be examined.
 
 #cmakedefine OS_LINUX  1

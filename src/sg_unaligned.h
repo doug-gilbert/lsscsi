@@ -2,10 +2,8 @@
 #define SG_UNALIGNED_H
 
 /*
- * Copyright (c) 2014-2018 Douglas Gilbert.
+ * Copyright (c) 2014-2026 Douglas Gilbert.
  * All rights reserved.
- * Use of this source code is governed by a BSD-style
- * license that can be found in the BSD_LICENSE file.
  *
  * SPDX-License-Identifier: BSD-2-Clause
  */
@@ -335,8 +333,9 @@ static inline void sg_put_unaligned_le64(uint64_t val, void *p)
 /* Now big endian, get 24+48 then put 24+48 */
 static inline uint32_t sg_get_unaligned_be24(const void *p)
 {
-        return ((const uint8_t *)p)[0] << 16 | ((const uint8_t *)p)[1] << 8 |
-               ((const uint8_t *)p)[2];
+        return (uint32_t)((const uint8_t *)p)[0] << 16 |
+               (uint32_t)((const uint8_t *)p)[1] << 8 |
+               (uint32_t)((const uint8_t *)p)[2];
 }
 
 /* Assume 48 bit value placed in uint64_t */
@@ -373,15 +372,15 @@ static inline void sg_put_unaligned_be24(uint32_t val, void *p)
 /* Assume 48 bit value placed in uint64_t */
 static inline void sg_put_unaligned_be48(uint64_t val, void *p)
 {
-        sg_put_unaligned_be16(val >> 32, p);
-        sg_put_unaligned_be32(val, (uint8_t *)p + 2);
+        sg_put_unaligned_be16((uint16_t)(val >> 32), p);
+        sg_put_unaligned_be32((uint32_t)val, (uint8_t *)p + 2);
 }
 
 /* Now little endian, get 24+48 then put 24+48 */
 static inline uint32_t sg_get_unaligned_le24(const void *p)
 {
         return (uint32_t)sg_get_unaligned_le16(p) |
-               ((const uint8_t *)p)[2] << 16;
+               (uint32_t)((const uint8_t *)p)[2] << 16;
 }
 
 /* Assume 48 bit value placed in uint64_t */
