@@ -46,7 +46,7 @@
 #include <sys/stat.h>
 #include <getopt.h>     /* non-standard, trips up AIX */
 
-static const char * version_str = "0.33  20260721 [svn: r226]";
+static const char * version_str = "0.33  20260913 [svn: r227]";
 
 static const char * my_name = "ls_name_value_rd";
 
@@ -245,8 +245,8 @@ main(int argc, char * argv[])
         return EXDEV;  /* arbitrary error code for internal error */
     }
     if (num_bytes > DEF_BUFF_SZ) {
-        b1p = malloc(num_bytes + 2);
-        b2p = malloc(num_bytes + 2);
+        b1p = (char *)malloc(num_bytes + 2);
+        b2p = (char *)malloc(num_bytes + 2);
         if ((NULL == b1p) || (NULL == b2p)) {
             fprintf(stderr, "%s: out of memory\n", my_name);
             if (b1p)

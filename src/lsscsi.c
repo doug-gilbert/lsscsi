@@ -49,7 +49,7 @@
 #include "sg_json.h"
 
 /* Package release number is first number, whole string is version */
-static const char * release_str = "0.33  2026/09/13 [svn: r227]";
+static const char * release_str = "0.33  2026/09/13 [svn: r228]";
 
 /*
  * Some jargon:
@@ -190,7 +190,7 @@ static const char * uniqi_s = "unique_id";
 static const char * pcie_s = "pcie";
 static const char * none_s = "none";
 
-#if (HAVE_NVME && (! IGNORE_NVME))
+#if (defined(HAVE_NVME) && (! defined(IGNORE_NVME)))
 static const char * class_nvme = "/class/nvme/";
 static const char * dev_node_s = "device_node";
 static const char * ker_node_s = "kernel_node";
@@ -381,7 +381,7 @@ static struct item_t non_sg;
 static struct item_t aa_sg;
 static struct item_t aa_first;
 static struct item_t enclosure_device;
-#if (HAVE_NVME && (! IGNORE_NVME))
+#if (defined(HAVE_NVME) && (! defined(IGNORE_NVME)))
 static struct item_t aa_ng;
 #endif
 
@@ -487,7 +487,7 @@ static const char * const usage_message2 =
         "underscore (and vice versa).\n";
 
 
-#if (HAVE_NVME && (! IGNORE_NVME))
+#if (defined(HAVE_NVME) && (! defined(IGNORE_NVME)))
 
 /* trims leading whitespaces, if trim_leading is true; and trims trailing
  * whitespaces, if trim_trailing is true. Edits s in place. If s is NULL
@@ -611,7 +611,7 @@ clean_up:
         return b;
 }
 
-#endif          /* (HAVE_NVME && (! IGNORE_NVME)) */
+#endif          /* (defined(HAVE_NVME) && (! defined(IGNORE_NVME))) */
 
 /* Returns true if dirent entry is either a symlink or a directory
  * starting_with given name. If starting_with is NULL choose all that are
@@ -765,7 +765,7 @@ tuple2string(const struct addr_hctl * tp, int sel_mask, int blen, char * b)
         return b;
 }
 
-#if (HAVE_NVME && (! IGNORE_NVME))
+#if (defined(HAVE_NVME) && (! defined(IGNORE_NVME)))
 
 static void
 mk_nvme_tuple(struct addr_hctl * tp, int cdev_minor, int cntlid,
@@ -1170,7 +1170,7 @@ sg_scan(const char * dir_name)
         return num;
 }
 
-#if (HAVE_NVME && (! IGNORE_NVME))
+#if (defined(HAVE_NVME) && (! defined(IGNORE_NVME)))
 
 static int
 ng_dir_scan_select(const struct dirent * s)
@@ -1233,13 +1233,13 @@ static int
 sas_low_phy_dir_scan_select(const struct dirent * s)
 {
         int n, m;
-        char * cp;
+        const char * cp;
 
         if (dir_or_link(s, "phy")) {
                 if (0 == strlen(sas_low_phy))
                         my_strcopy(sas_low_phy, s->d_name, LMAX_NAME);
                 else {
-                        cp = (char *)strrchr(s->d_name, ':');
+                        cp = strrchr(s->d_name, ':');
                         if (NULL == cp)
                                 return 0;
                         n = atoi(cp + 1);
@@ -2240,7 +2240,7 @@ parse_colon_list(const char * colon_list, struct addr_hctl * outp)
 
         if ((! colon_list) || (! outp))
                 return false;
-#if (HAVE_NVME && (! IGNORE_NVME))
+#if (defined(HAVE_NVME) && (! defined(IGNORE_NVME)))
         if ('N' == toupper((uint8_t)*colon_list)) {
                 int val;
 
@@ -2402,7 +2402,7 @@ transport_h_init(const char * devname, int b_len, char * b)
 {
         int off;
         char * cp;
-        char buff[LMAX_DEVPATH];
+        char buff[LMAX_PATH];
         char wd[LMAX_PATH];
         struct stat a_stat;
         static const int bufflen = sizeof(buff);
@@ -3685,7 +3685,7 @@ longer_sdev_entry(const char * path_name, const char * devname,
         }
 }
 
-#if (HAVE_NVME && (! IGNORE_NVME))
+#if (defined(HAVE_NVME) && (! defined(IGNORE_NVME)))
 
 /* NVMe longer data for namespace listing */
 static void
@@ -3807,7 +3807,7 @@ longer_nd_entry(const char * path_name, const char * devname,
         }
 }
 
-#endif          /* (HAVE_NVME && (! IGNORE_NVME)) */
+#endif          /* (defined(HAVE_NVME) && (! defined(IGNORE_NVME))) */
 
 /* Leave this function as plain text only (i.e. no JSON rendering) . */
 static void
@@ -4451,7 +4451,7 @@ sdev_dir_scan_select(const struct dirent * s)
         return 0;
 }
 
-#if (HAVE_NVME && (! IGNORE_NVME))
+#if (defined(HAVE_NVME) && (! defined(IGNORE_NVME)))
 
 static bool
 get_major_minor(const char * fname, int * majp, int * minp,
@@ -4491,7 +4491,7 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
         int devname_len = 13;
         int sel_mask = 0xf;
         uint32_t nsid = 0;
-        char * cp;
+        const char * cp;
         const char * ccp;
         const char * cposp;
         sgj_state * jsp = &op->json_st;
@@ -4578,9 +4578,9 @@ one_ndev_entry(const char * nvme_ctl_abs, const char * nvme_ns_rel,
                         cntlid_s, nvme_ctl_abs);
 
 #ifdef __cplusplus
-        cp = strrchr((char *)nvme_ns_rel, 'n');
+        cp = strrchr(nvme_ns_rel, 'n');
 #else
-        cp = (char *)strrchr(nvme_ns_rel, 'n');
+        cp = strrchr(nvme_ns_rel, 'n');
 #endif
         if ((NULL == cp) || ('v' == *(cp + 1)) ||
             (1 != sscanf(cp + 1, "%u", &nsid))) {
@@ -4872,15 +4872,15 @@ ndev_dir_scan_select2(const struct dirent * s)
 {
         int cdev_minor;
         uint32_t nsid;
-        char * cp;
+        const char * cp;
 
         /* What to do about NVMe controller CNTLID field? */
         if (strncmp(s->d_name, "nvme", 4))
                 return 0;
 #ifdef __cplusplus
-        cp = strchr((char *)s->d_name + 4, 'n');
+        cp = strchr(s->d_name + 4, 'n');
 #else
-        cp = (char *)strchr(s->d_name + 4, 'n');
+        cp = strchr(s->d_name + 4, 'n');
 #endif
         if (NULL == cp)
                 return 0;
@@ -5128,7 +5128,7 @@ one_nhost_entry(const char * dir_name, const char * nvme_ctl_rel,
         }
 }
 
-#endif          /* (HAVE_NVME && (! IGNORE_NVME)) */
+#endif          /* (defined(HAVE_NVME) && (! defined(IGNORE_NVME))) */
 
 /* This is a compare function for numeric sort based on hctl tuple.
  * Returns -1 if (a->d_name < b->d_name) ; 0 if they are equal
@@ -5154,7 +5154,7 @@ sdev_scandir_sort(const struct dirent ** a, const struct dirent ** b)
         return cmp_hctl(&left_hctl, &right_hctl);
 }
 
-#if (HAVE_NVME && (! IGNORE_NVME))
+#if (defined(HAVE_NVME) && (! defined(IGNORE_NVME)))
 
 /* This is a compare function for numeric sort based on hctl tuple. Similar
  * to sdev_scandir_sort() but converts entries like "nvme2" into a hctl tuple.
@@ -5205,7 +5205,7 @@ nhost_scandir_sort(const struct dirent ** a, const struct dirent ** b)
         return cmp_hctl(&left_hctl, &right_hctl);
 }
 
-#endif          /* (HAVE_NVME && (! IGNORE_NVME)) */
+#endif          /* (defined(HAVE_NVME) && (! defined(IGNORE_NVME))) */
 
 /* List SCSI devices (LUs). */
 static void
@@ -5261,7 +5261,7 @@ list_sdevices(struct lsscsi_opts * op, sgj_opaque_p jop)
                 free_disk_wwn_node_list();
 }
 
-#if (HAVE_NVME && (! IGNORE_NVME))
+#if (defined(HAVE_NVME) && (! defined(IGNORE_NVME)))
 
 /* List NVME devices (namespaces). */
 static void
@@ -5337,7 +5337,7 @@ list_ndevices(struct lsscsi_opts * op, sgj_opaque_p jop)
                 free_disk_wwn_node_list();
 }
 
-#endif          /* (HAVE_NVME && (! IGNORE_NVME)) */
+#endif          /* (defined(HAVE_NVME) && (! defined(IGNORE_NVME))) */
 
 /* List SCSI host (initiator) attributes when --long given (one or more
  * times). */
@@ -5621,7 +5621,7 @@ list_shosts(struct lsscsi_opts * op, sgj_opaque_p jop)
         free(namelist);
 }
 
-#if (HAVE_NVME && (! IGNORE_NVME))
+#if (defined(HAVE_NVME) && (! defined(IGNORE_NVME)))
 
 /* List NVME hosts (controllers). */
 static void
@@ -5669,7 +5669,7 @@ list_nhosts(struct lsscsi_opts * op, sgj_opaque_p jop)
                 free_disk_wwn_node_list();
 }
 
-#endif          /* (HAVE_NVME && (! IGNORE_NVME)) */
+#endif          /* (defined(HAVE_NVME) && (! defined(IGNORE_NVME))) */
 
 /* Return true if able to decode, otherwise false */
 static bool
@@ -6245,13 +6245,13 @@ main(int argc, char **argv)
                 jop = sgj_start_r("lsscsi", release_str, argc, argv, jsp);
         if (op->do_hosts) {
                 list_shosts(op, jop);
-#if (HAVE_NVME && (! IGNORE_NVME))
+#if (defined(HAVE_NVME) && (! defined(IGNORE_NVME)))
                 if ((! op->no_nvme) && (! op->classic))
                         list_nhosts(op, jop);
 #endif
         } else if (do_sdevices) {
                 list_sdevices(op, jop);
-#if (HAVE_NVME && (! IGNORE_NVME))
+#if (defined(HAVE_NVME) && (! defined(IGNORE_NVME)))
                 if ((! op->no_nvme) && (! op->classic))
                         list_ndevices(op, jop);
 #endif

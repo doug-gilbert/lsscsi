@@ -18,27 +18,13 @@ set ( headerfiles
 add_executable (lsscsi ${sourcefiles} ${headerfiles} )
 add_executable (ls_name_value_rd ls_name_value_rd.c )
 
-target_compile_definitions(lsscsi PRIVATE _LARGEFILE64_SOURCE _FILE_OFFSET_BITS=64)
-target_compile_options(lsscsi PRIVATE -Wall -W)
+l_set_compile_options( lsscsi )
+l_set_compile_options( ls_name_value_rd )
+
 target_include_directories(lsscsi PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_include_directories(lsscsi PRIVATE ${CMAKE_BINARY_DIR})
 
-target_compile_definitions(ls_name_value_rd PRIVATE _LARGEFILE64_SOURCE _FILE_OFFSET_BITS=64)
-target_compile_options(ls_name_value_rd PRIVATE -Wall -W)
-target_include_directories(lsscsi PRIVATE ${CMAKE_BINARY_DIR})
-
-if ( ENABLE_DEBUG )
-  target_compile_definitions(lsscsi PRIVATE DEBUG)
-  target_compile_options(lsscsi PRIVATE
-    -Wextra -Wmisleading-indentation -Wduplicated-cond -Wlogical-op
-    -Wnull-dereference -Wshadow -Wunused -Wsizeof-array-argument
-    -Wduplicated-branches -Wjump-misses-init -Wparentheses)
-  target_compile_definitions(ls_name_value_rd PRIVATE DEBUG)
-  target_compile_options(ls_name_value_rd PRIVATE
-    -Wextra -Wmisleading-indentation -Wduplicated-cond -Wlogical-op
-    -Wnull-dereference -Wshadow -Wunused -Wsizeof-array-argument
-    -Wduplicated-branches -Wjump-misses-init -Wparentheses)
-endif ( ENABLE_DEBUG )
+target_include_directories(ls_name_value_rd PRIVATE ${CMAKE_BINARY_DIR})
 
 if ( BUILD_SHARED_LIBS )
     MESSAGE( STATUS ">> Build using shared libraries (default)" )

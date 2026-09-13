@@ -1,13 +1,13 @@
 cmake_minimum_required ( VERSION 3.10 )
 
-project(lsscsi VERSION 0.32.9 LANGUAGES C )
+project(lsscsi VERSION 0.32.9 LANGUAGES C CXX )
 # Use version number: x.y.9 to indicate pre-release of x.(y+1)
 # Example: VERSION 0.91.9 is pre-release of 0.92.0
 
 set ( CMAKE_C_STANDARD 11 )
 set ( CMAKE_C_STANDARD_REQUIRED ON )
 set ( CMAKE_C_EXTENSIONS OFF )
-set ( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -g -Wall -W -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -DHAVE_CONFIG_H" )
+set ( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -g -Wall -W " )
 
 string(TIMESTAMP BUILD_TIME "%Y%m%d %H:%M:%S")
 
@@ -63,6 +63,75 @@ find_package(Threads)
 
 include(CheckLibraryExists)
 check_library_exists(rt clock_gettime "" NEED_RT_LIB)
+
+set(COMP_GCC 0)
+set(COMP_CLANG 0)
+set(COMP_MSVC 0)
+set(COMP_UNKNOWN 0)
+
+message(STATUS "CMAKE_C_COMPILER     = ${CMAKE_C_COMPILER}")
+message(STATUS "CMAKE_C_COMPILER_ID  = ${CMAKE_C_COMPILER_ID}")
+message(STATUS "CMAKE_C_COMPILER_VERSION = ${CMAKE_C_COMPILER_VERSION}")
+
+if ( $ENV{CC} MATCHES "gcc" )
+    MESSAGE( STATUS ">> GCC compiler selected [ev]" )
+    set(COMP_GCC 1)
+elseif ( $ENV{CC} MATCHES "clang" )
+    MESSAGE( STATUS ">> CLANG compiler selected [ev]" )
+    set(COMP_CLANG 1)
+elseif ( CMAKE_C_COMPILER_ID MATCHES "GNU" )
+    MESSAGE( STATUS ">> GCC compiler detected" )
+    set(COMP_GCC 1)
+elseif (CMAKE_C_COMPILER_ID MATCHES "Clang")
+    MESSAGE( STATUS ">> CLANG compiler detected" )
+    set(COMP_CLANG 1)
+elseif ( MSVC )
+    MESSAGE( STATUS ">> MSVC compiler detected" )
+    set(COMP_MSVC 1)
+else ()
+    MESSAGE( STATUS ">> did NOT detect compiler" )
+    set(COMP_UNKNOWN 1)
+endif ()
+
+if (MSVC)
+    add_compile_definitions ( HAVE_CONFIG_H )
+else ()
+    add_compile_definitions ( _LARGEFILE64_SOURCE _FILE_OFFSET_BITS=64 HAVE_CONFIG_H )
+endif ()
+
+function ( l_set_compile_options util_name )
+
+    # For testing it can be useful to compile C code with a C++ compiler.
+    # That can be done by expanding the project() cmake command at the top of
+    # this file to: project( ...... LANGUAGES C CXX) and uncommenting
+    # the following line:
+    # set_source_files_properties( ${util_name} PROPERTIES LANGUAGE CXX )
+
+    if ( ENABLE_DEBUG )
+        target_compile_definitions(${util_name} PRIVATE DEBUG)
+        if ( COMP_GCC )
+            target_compile_options(${util_name} PRIVATE
+                -Wextra -Wmisleading-indentation -Wduplicated-cond -Wlogical-op
+                -Wnull-dereference -Wshadow -Wunused -Wsizeof-array-argument
+                -Wduplicated-branches -Wparentheses)
+                # -Wjump-misses-init is C++ only
+        elseif ( COMP_CLANG )
+            target_compile_options(${util_name} PRIVATE
+                -Wextra -Wshadow
+                -Wnull-dereference -Wdouble-promotion -Wformat=2 -Wundef
+                -Wimplicit-fallthrough -Woverloaded-virtual -Wnon-virtual-dtor
+                -Wcast-align -Wcast-qual -Wunused -Wno-deprecated
+                -Wunreachable-code)
+                # -Wpedantic -Wconversion -Wsign-conversion -Wold-style-cast
+                # -Weverything # generates way too much nitpicking
+        elseif ( COMP_MSVC )
+            # MESSAGE( STATUS ">> MSVC compiler detected" )
+        else ()
+            # MESSAGE( STATUS ">> did NOT detect compiler" )
+        endif ()
+    endif ( ENABLE_DEBUG )
+
+endfunction ( l_set_compile_options )
 
 configure_file( ${CMAKE_SOURCE_DIR}/config.h.in.cmake ${CMAKE_BINARY_DIR}/config.h )
 
