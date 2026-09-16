@@ -1,6 +1,6 @@
 cmake_minimum_required ( VERSION 3.10 )
 
-project(lsscsi VERSION 0.32.9 LANGUAGES C CXX )
+project(lsscsi VERSION 0.33.0 LANGUAGES C CXX )
 # Use version number: x.y.9 to indicate pre-release of x.(y+1)
 # Example: VERSION 0.91.9 is pre-release of 0.92.0
 
