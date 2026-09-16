@@ -6061,14 +6061,14 @@ main(int argc, char **argv)
                 char b[64];
 
                 if (1 == op->version_count) {
-                        pr2serr("pre-release: %s\n", release_str);
+                        pr2serr("release: %s\n", release_str);
                         return 0;
                 }
                 cp = strchr(release_str, '/');
                 if (cp && (3 == sscanf(cp - 4, "%d/%d/%d", &yr, &mon, &day)))
                         ;
                 else {
-                        pr2serr("pre-release: %s\n", release_str);
+                        pr2serr("release: %s\n", release_str);
                         return 0;
                 }
                 sg_strscpy(b, release_str, sizeof(b));
