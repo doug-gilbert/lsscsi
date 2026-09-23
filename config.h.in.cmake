@@ -61,6 +61,10 @@
 #cmakedefine HAVE_SETMODE 1
 #cmakedefine WIN32_SPT_DIRECT 1
 
+#cmakedefine COMP_GCC 1
+#cmakedefine COMP_CLANG 1
+#cmakedefine COMP_MSVC 1
+#cmakedefine COMP_UNKNOWN 1
 
 #define BUILD_TIME "@BUILD_TIME@"
 

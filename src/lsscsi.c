@@ -48,8 +48,8 @@
 #include "sg_pr2serr.h"
 #include "sg_json.h"
 
-/* Package release number is first number, whole string is version */
-static const char * release_str = "0.33  2026/09/13 [svn: r228]";
+static const char * release_str =
+                 "0.33.5 (pre 0.34)  2026/09/21 [svn: r230]";
 
 /*
  * Some jargon:
@@ -6061,7 +6061,7 @@ main(int argc, char **argv)
                 char b[64];
 
                 if (1 == op->version_count) {
-                        pr2serr("pre-release: %s\n", release_str);
+                        pr2serr("release: %s\n", release_str);
                         return 0;
                 }
                 cp = strchr(release_str, '/');

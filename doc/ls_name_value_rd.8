@@ -1,4 +1,4 @@
-.TH LS_NAME_VALUE_RD "8" "2026-09-13" "lsscsi\-0.33" LSSCSI
+.TH LS_NAME_VALUE_RD "8" "2026-09-21" "lsscsi\-0.33" LSSCSI
 .SH NAME
 ls_name_value_rd \- get an overview of the contents of a file
 .SH SYNOPSIS
@@ -83,7 +83,7 @@ to stdout and exit. Note if any characters were read before that timeout,
 and they are 7 bit ASCII, then they may precede that "<timeout>" string.
 .PP
 This utility "looks through" symbolic links (symlinks). So if \fIfilename\fR
-is to symlink to a directory then "<directory>" is output. In the way
+is a symlink to a directory then "<directory>" is output. In the way
 this utility works with the ls_name_value bash script, that script takes
 care of all the symlink handling. If a symlink is "dangling" then this
 utility outputs "<not found>" to stdout.
@@ -93,9 +93,10 @@ empty command line arguments are ignored. For example in a bash script
 calling this utility with a last argument like "${3}" when there is no
 third argument to the bash script, then that would invoke this utility with
 a "" (empty string) argument. And that would normally be a syntax error.
-This utility just ignores such empty arguments. The utility (like most from
-this author) uses the GNU getopt_long() library function, or from inside a
-bash script uses the getopt(1) command.
+This utility just ignores such empty arguments. This utility (like most from
+this author) uses the GNU getopt_long(3) library function for command
+line (invocation) processing. The ls_name_value bash script uses the
+getopt(1) command which is similar to getopt_long().
 .SH AUTHORS
 Written by D. Gilbert
 .SH COPYRIGHT

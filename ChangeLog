@@ -1,4 +1,9 @@
-Linux utility for listing SCSI devices.
+Linux utility for listing SCSI and NVMe devices.
+
+Changelog for pre-release lsscsi-0.33.5 [20260921] [svn: r230]
+  - ls_name_value_rd: small manpage cleanup
+  - lsscsi: '-V' (show version) still said "pre-release"
+    in the 0.33 release (r228); remove "pre-"
 
 Changelog for release lsscsi-0.33 [20260913] [svn: r228]
   - bounds checking fixes, see lsscsi pull #15 [github]
