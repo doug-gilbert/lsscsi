@@ -49,7 +49,7 @@
 #include "sg_json.h"
 
 static const char * release_str =
-                 "0.33.5 (pre 0.34)  2026/09/21 [svn: r230]";
+                 "0.33.5 (pre 0.34)  2026/09/28 [svn: r231]";
 
 /*
  * Some jargon:

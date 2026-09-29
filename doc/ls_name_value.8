@@ -1,10 +1,10 @@
-.TH LS_NAME_VALUE "8" "2026-09-21" "lsscsi\-0.33" LSSCSI
+.TH LS_NAME_VALUE "8" "2026-09-28" "lsscsi\-0.33" LSSCSI
 .SH NAME
 ls_name_value \- for browsing names and corresponding values in sysfs
 .SH SYNOPSIS
 .B ls_name_value
-[\fI\-\-all\fR] [\fI\-\-dir\fR] [\fI\-\-empty\fR] [\fI\-\-help\fR]
-[\fI\-\-native\fR] [\fI\-\-nosym\fR] [\fI\-\-num=NUM\fR]
+[\fI\-\-absolute\fR] [\fI\-\-all\fR] [\fI\-\-dir\fR] [\fI\-\-empty\fR]
+[\fI\-\-help\fR] [\fI\-\-native\fR] [\fI\-\-nosym\fR] [\fI\-\-num=NUM\fR]
 [\fI\-\-otherfs\fR] [\fI\-\-physical\fR] [\fI\-\-show\fR] \fI\-\-utf8\fR]
 [\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-write\fR] [\fI\-\-\fR]
 [\fINAME\fR ...]
@@ -89,6 +89,20 @@ characters.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well. The
 options are arranged in alphabetical order based on the long option name.
+.TP
+\fB\-A\fR, \fB\-\-absolute\fR
+for symlink targets that are not absolute (i.e. don't start with '/') an
+extra line is added containing the symlink target expressed as an
+absolute path . If the target is a directory then that absolute path is
+prefixed by '\-\-\->  [' together with a trailing ']'. If the target is
+.B not
+a directory then that absolute path is prefixed by '\-\-\-> ' and
+followed by ': <value_or_explanation>'.
+.br
+When this option is given, the \fI\-\-show\fR option is implied (set
+internally). The absolute path shown will not contain any parent
+elements (i.e. no '..') nor any symlinks but may contain non\-existent
+elements.
 .TP
 \fB\-a\fR, \fB\-\-all\fR
 following Unix practice, by default when filenames in a directory are listed,
@@ -242,7 +256,7 @@ the '\-\-' (end of) option(s) will be helpful. This is also the case even
 when there are no [\fINAME\fR ...] arguments on the command line.
 .SH EXAMPLES
 Here is an example of the same location with different combinations of the
-\fI\-\-show\fR option and the \fI\-\-dir\fR option:
+\fI\-\-absolute\fR, \fI\-\-dir\fR and \fI\-\-show\fR options:
 .PP
     $ ls_name_value /sys/class/usb_power_delivery/
 
@@ -270,6 +284,24 @@ Here is an example of the same location with different combinations of the
           device \-\-\-> [../../../USBC000:00]
           [power]
           revision : 2.0
+          ....
+
+    $ ls_name_value /sys/class/usb_power_delivery/ \-A \-d
+      >> enter directory: pd0 \-\-\-> [ ../../devices/platform/USBC000:00/usb_power_delivery/pd0 ]
+              \-\-\-> [ /sys/devices/platform/USBC000:00/usb_power_delivery/pd0 ]
+          device \-\-\-> [../../../USBC000:00 ]
+                  \-\-\-> [ /sys/devices/platform/USBC000:00 ]
+          [power]
+          revision : 2.0
+          [sink\-capabilities]
+          subsystem \-\-\-> [../../../../../class/usb_power_delivery ]
+                  \-\-\-> [ /sys/class/usb_power_delivery ]
+          uevent : DEVTYPE=usb_power_delivery
+      >> enter directory: pd1 \-\-\-> [ ../../devices/platform/USBC000:00/usb_power_delivery/pd1 ]
+              \-\-\-> [ /sys/devices/platform/USBC000:00/usb_power_delivery/pd1 ]
+          device \-\-\-> [../../../USBC000:00 ]
+                  \-\-\-> [ /sys/devices/platform/USBC000:00 ]
+          [power]
           ....
 
 .PP

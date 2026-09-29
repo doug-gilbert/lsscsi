@@ -1,6 +1,9 @@
 Linux utility for listing SCSI and NVMe devices.
 
-Changelog for pre-release lsscsi-0.33.5 [20260921] [svn: r230]
+Changelog for pre-release lsscsi-0.33.5 [20260927] [svn: r231]
+  - ls_name_value: add --absolute option to show symlink's
+    target with an absolute path on following line
+    - small shellcheck cleanup
   - ls_name_value_rd: small manpage cleanup
   - lsscsi: '-V' (show version) still said "pre-release"
     in the 0.33 release (r228); remove "pre-"

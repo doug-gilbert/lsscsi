@@ -20,9 +20,10 @@
 # (e.g. a directory name should not be passed to that C utility, but if
 # it is <directory> is printed out).
 
-version_str="1.27 20260921"
+version_str="1.28 20260928"
 
 all=0
+absolute=0
 dir=0
 empty=0
 native_order=0  # 'ls -f' used for actual (native) directory order
@@ -43,19 +44,22 @@ lnv_rd_opts=() # this is an array holding the command line options to
                # ls_name_value_rd
 
 # The following are for the getopt(1) command from util-linux which
-# follows the function definitions, about 230 lines down.
+# follows the function definitions, at around line 300.
 script_name=$(basename "$0")
-short="adefhn:NopsuvVw"
-long="all,dir,empty,help,native,num:,nosym,otherfs,physical,show,utf8,verbose,version,write"
+short="aAdefhn:NopsuvVw"
+long="all,absolute,dir,empty,help,native,num:,nosym,otherfs,physical,show,utf8,verbose,version,write"
 
 
 usage()
 {
-  echo -n  "Usage: ls_name_value [-a] [-d] [-e] [-f] [-h] [-N] [-n NUM] "
-  echo "[-o] [-p]"
-  echo "                     [-s] [-u] [-v] [-V] [-w] [--] [<name>*]"
+  echo -n  "Usage: ls_name_value [-a] [-A] [-d] [-e] [-f] [-h] [-N] "
+  echo "[-n NUM] [-o]"
+  echo "                     [-p] [-s] [-u] [-v] [-V] [-w] [--] [<name>*]"
   echo -n "  where:  -a, --all         include hidden filenames (starting "
   echo "with '.')"
+  echo -n "          -A, --absolute    symlink targets that are relative "
+  echo "are shown"
+  echo "                            with an absolute path on the next line"
   echo "          -d, --dir         enter directories (descends 1 level)"
   echo "                            if given twice (-dd) descends 2 levels"
   echo -n "          -e, --empty       output <value> as '<empty>' rather "
@@ -137,9 +141,18 @@ one_name_value()
         separ="+"
       fi
       echo -n "${name}"
-      if [[ -h "${1}" ]] ; then
+      if [[ -h "${1}" ]] ; then       # if symlink ...
         echo -n "---> "
-        readlink -n "${1}"
+        p=$( readlink -n "${1}" )
+        if [[ "${absolute}" -gt 0 ]] &&
+           [[ ${#p} -gt 0 ]] && [[ ${p:0:1} != "/" ]] ; then
+          echo ${p}
+          echo -n "${pad}    ---> "
+          t=$( realpath "${p}" )
+          echo -n "${t}"
+        else
+          echo -n ${p}
+        fi
         echo -n " ${separ} "
       else
         echo -n "${separ} "
@@ -149,7 +162,8 @@ one_name_value()
       if [[ "${verbose}" -gt 4 ]] ; then
         echo -n "ls_name_value_rd invocation: "
         echo -n "${content_reader} "
-        echo -n "${lnv_rd_opts[@]} "
+        ## echo -n "${lnv_rd_opts[@]} "
+        echo -n "${lnv_rd_opts[*]} "
         echo "${1} ${num_val}"
       fi
       value=$( "${content_reader}" "${lnv_rd_opts[@]}" "${1}" "${num_val}" )
@@ -171,7 +185,16 @@ one_name_value()
         echo -n "${name}"
         if [[ -h "${1}" ]] ; then
           echo -n "---> "
-          readlink -n "${1}"
+          p=$( readlink -n "${1}" )
+          if [[ "${absolute}" -gt 0 ]] &&
+             [[ ${#p} -gt 0 ]] && [[ ${p:0:1} != "/" ]] ; then
+            echo ${p}
+            echo -n "${pad}    ---> "
+            t=$( realpath "${p}" )
+            echo -n "${t}"
+          else
+            echo -n ${p}
+          fi
           echo -n " ${separ} "
         else
           echo -n "${separ} "
@@ -199,23 +222,36 @@ one_name_value()
         echo "${name} : <cannot access>"
       fi
     fi
-  else      # doesn't exist or irregular
+  else      # if ! (exists and regular)
     if [[ -e "${1}" ]] ; then       # exists so must be irregular
       if [[ "$show" -gt 0 ]] ; then   # irregular file (maybe symlink to ...)
         fin_line=0
         set_name=0
         if [[ -h "${1}" ]] ; then
           echo -n "${name}"
+          p=$( readlink -n "${1}" )
           set_name=1
           if [[ -d "${1}" ]] ; then
             echo -n "---> ["
-            readlink -n "${1}"
-            echo "]"
+            echo "${p} ]"
+            if [[ "${absolute}" -gt 0 ]] &&
+               [[ ${#p} -gt 0 ]] && [[ ${p:0:1} != "/" ]] ; then
+              echo -n "${pad}        ---> [ "
+              t=$( realpath "${p}" )
+              echo "${t} ]"
+            fi
             fin_line=1
           else
             echo -n "---> "
-            readlink -n "${1}"
-            echo -n " :"
+            if [[ "${absolute}" -gt 0 ]] &&
+               [[ ${#p} -gt 0 ]] && [[ ${p:0:1} != "/" ]] ; then
+              echo "${p}"
+              echo -n "${pad}    ---> "
+              t=$( realpath "${p}" )
+              echo "${t} :"
+            else
+              echo -n "${p} :"
+            fi
           fi
         else
           if [[ -d "${1}" ]] ; then
@@ -270,6 +306,7 @@ eval set -- "${TEMP}"
 while :; do
   case "${1}" in
     -a | --all        ) (( all=all+1 )) ;          shift 1 ;;
+    -A | --absolute   ) (( absolute=absolute+1 )) ; shift 1 ;;
     -d | --dir        ) (( dir=dir+1 )) ;          shift 1 ;;
     -e | --empty      ) (( empty=empty+1 )) ;      shift 1 ;;
     -f | --native     ) (( native_order=native_order+1 )) ;  shift 1 ;;
@@ -297,6 +334,8 @@ while :; do
   esac
 done
 
+# Use ls command to iterate through directories. The following builds a
+# ls command invocation adding some options that save this script work.
 if command -v "${ls_bin}" > /dev/null 2>&1 ; then
   ls_bin=$( command -v "${ls_bin}" )
   ls_args+=( "${ls_bin}" )
@@ -346,6 +385,11 @@ if [[ $# -eq 1 ]] && [[ -e "$1" ]] && [[ -d "$1" ]] && [[ -x "$1" ]] ; then
     exit 1
   fi
   shift
+fi
+
+# If --absolute ( -A ) given, it implies the --show option. Make it so.
+if [[ ${absolute} -gt 0 ]] && [[ ${show} -eq 0 ]] ; then
+  show=1
 fi
 
 if [[ "${verbose}" -gt 0 ]] ; then
@@ -427,8 +471,14 @@ for (( k=0; k<tLen; k++ )) ; do
       if [[ -h "${name1}" ]] ; then
         echo -n "${name1}"
         echo -n " ---> [ "
-        readlink -n "${name1}"
-        echo " ]"
+        p=$( readlink -n "${name1}" )
+        echo "${p} ]"
+        if [[ "${absolute}" -gt 0 ]] &&
+           [[ ${#p} -gt 0 ]] && [[ ${p:0:1} != "/" ]] ; then
+          echo -n "${pad}        ---> [ "
+          t=$( realpath "${p}" )
+          echo "${t} ]"
+        fi
       else
         echo "[ ${name1} ]"
       fi
@@ -460,7 +510,8 @@ for (( k=0; k<tLen; k++ )) ; do
         fi
         [[ "${nosym}" -gt 0 ]] && [[ -h "${name2}" ]]
         nosym_active2=$?
-        if [[ "${dir}" -gt 1 ]] && [[ -d "${name2}" ]] && [[ -x "${name2}" ]] && [[ "${nosym_active2}" -ne 0 ]] ; then
+        if [[ "${dir}" -gt 1 ]] && [[ -d "${name2}" ]] &&
+           [[ -x "${name2}" ]] && [[ "${nosym_active2}" -ne 0 ]] ; then
           if [[ "${otherfs}" -eq 0 ]] ; then
             b_st_dev=$( stat -c %d -- "${name2}" 2> /dev/null )
           else
@@ -471,8 +522,14 @@ for (( k=0; k<tLen; k++ )) ; do
             if [[ -h "${name2}" ]] ; then
               echo -n "${name2}"
               echo -n " ---> [ "
-              readlink -n "${name2}"
-              echo " ]"
+              p=$( readlink -n "${name2}" )
+              echo "${p} ]"
+              if [[ "${absolute}" -gt 0 ]] &&
+                 [[ ${#p} -gt 0 ]] && [[ ${p:0:1} != "/" ]] ; then
+                echo -n "${pad}        ---> [ "
+                t=$( realpath "${p}" )
+                echo "${t} ]"
+              fi
             else
               echo "[ ${name2} ]"
             fi
