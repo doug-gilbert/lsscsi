@@ -6197,7 +6197,7 @@ main(int argc, char **argv)
                 if (l_sysfsroot) {
                         if (l_fsroot_sz > 1)
                                 sg_strscpy(sysfsroot, l_sysfsroot,
-                                           l_fsroot_sz);
+                                           sysfsroot_sz);
                 } else if (l_root_sz > 1) {
                         int n = l_root_sz;
                         static const char * sysfs_dir = "/sys";
