@@ -55,7 +55,7 @@ fi
 
 
 %changelog
-* Mon Sep 28 2026 - dgilbert at interlog dot com
+* Tue Sep 29 2026 - dgilbert at interlog dot com
 - start of lsscsi-0.34 development cycle
   * lsscsi-0.33.5
 * Sun Sep 13 2026 - dgilbert at interlog dot com
