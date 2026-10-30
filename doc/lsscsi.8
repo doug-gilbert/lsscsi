@@ -1,4 +1,4 @@
-.TH LSSCSI "8" "2026-09-29" "lsscsi\-0.33" LSSCSI
+.TH LSSCSI "8" "2026-10-30" "lsscsi\-0.33" LSSCSI
 .SH NAME
 lsscsi \- list SCSI devices (or hosts), list NVMe devices
 .SH SYNOPSIS
@@ -171,7 +171,7 @@ program called udev has the ability to
 .B change
 those special file names which is what the user will see henceforth
 apart from sysfs which still uses the original name (i.e. the name issued
-by the kernel when the host/device is detected during bootup).
+by the kernel when the host/device is detected during boot\-up).
 .br
 This option should be seldom needed.
 .TP
@@ -679,7 +679,7 @@ devices that share the same mode (i.e. char or block) and the same major
 number. Traditionally Unix major numbers were fixed (e.g. the sg driver
 is char device 21) but as Linux grew it was obvious that the "fixed major
 number" scheme would not scale. So now device node major numbers are
-allocated dynamically (i.e. at bootup) and the mapping between the driver
+allocated dynamically (i.e. at boot\-up) and the mapping between the driver
 name and its major number can be found in the output of "/proc/devices".
 .PP
 Why explain this? The reason is that all SCSI (and ATA) device nodes in

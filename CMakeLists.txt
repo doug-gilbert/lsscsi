@@ -56,7 +56,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     endif ()
 endif ()
 
-# Locate platform's thread support, and set complier linker flags. See
+# Locate platform's thread support, and set compiler linker flags. See
 # /usr/share/doc/cmake-data/html/module/FindThreads.html when
 # cmake-doc package is installed.
 find_package(Threads)

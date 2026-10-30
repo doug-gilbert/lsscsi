@@ -49,7 +49,7 @@
 #include "sg_json.h"
 
 static const char * release_str =
-                 "0.33.5 (pre 0.34)  2026/09/29 [svn: r232]";
+                 "0.33.5 (pre 0.34)  2026/10/30 [svn: r233]";
 
 /*
  * Some jargon:
@@ -586,7 +586,7 @@ name_eq2value(const char * dirp, const char * fname, const char * name,
                 snprintf(b, b_len, "%s", bad_arg);
                 goto clean_up;
         }
-        /* Re-use full_name as filename no longer needed */
+        /* Reuse full_name as filename no longer needed */
         snprintf(full_name, len - 1, "%s=", name);
         n = strlen(full_name);
 
