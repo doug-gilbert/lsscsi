@@ -1,8 +1,10 @@
 Linux utility for listing SCSI and NVMe devices.
 
-Changelog for pre-release lsscsi-0.33.5 [20261030] [svn: r233]
+Changelog for pre-release lsscsi-0.33.5 [20261031] [svn: r234]
   - lsscsi: fix off-by-one in --sysfsroot sg_strscpy
     Paul Evans github PR #19
+  - lsscsi: fix uninitialized buffer printed in -lll/-L
+    output, Paul Evans github PR #20
   - ls_name_value: add --absolute option to show symlink's
     target with an absolute path on following line
     - small shellcheck cleanup

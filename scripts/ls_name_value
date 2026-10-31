@@ -20,7 +20,7 @@
 # (e.g. a directory name should not be passed to that C utility, but if
 # it is <directory> is printed out).
 
-version_str="1.29 20261030"
+version_str="1.29 20261031"
 
 all=0
 absolute=0

@@ -1,8 +1,8 @@
-lsscsi (0.33-5.20261030) unstable; urgency=low
+lsscsi (0.33-5.20261031) unstable; urgency=low
 
   * new upstream version
 
- -- Douglas Gilbert <dgilbert@interlog.com>  Fri, 30 Oct 2026 17:00:00 -0400
+ -- Douglas Gilbert <dgilbert@interlog.com>  Sat, 31 Oct 2026 01:00:00 -0400
 
 lsscsi (0.33-0.1) unstable; urgency=low
 

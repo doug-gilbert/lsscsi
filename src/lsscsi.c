@@ -49,7 +49,7 @@
 #include "sg_json.h"
 
 static const char * release_str =
-                 "0.33.5 (pre 0.34)  2026/10/30 [svn: r233]";
+                 "0.33.5 (pre 0.34)  2026/10/31 [svn: r234]";
 
 /*
  * Some jargon:
@@ -3612,8 +3612,11 @@ longer_sdev_entry(const char * path_name, const char * devname,
                         sgj_pr_hr(jsp, "  %s=?\n", ty_s);
                 if (get_value(path_name, uniqi_s, value, vlen))
                         sgj_haj_vs(jsp, jop, 2, uniqi_s, SEP_EQ_NO_SP, value);
-                rend_prot_protmode(path_name, b, blen, false, "  ", op, jop);
-                sgj_pr_hr(jsp, "%s", b);
+                if (op->protection || op->protmode) {
+                        rend_prot_protmode(path_name, b, blen, false, "  ",
+                                           op, jop);
+                        sgj_pr_hr(jsp, "%s", b);
+                }
                 return;
         }
 

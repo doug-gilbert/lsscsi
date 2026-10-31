@@ -47,7 +47,7 @@
 #include <getopt.h>     /* non-standard, trips up AIX */
 
 static const char * version_str = 
-                     "0.33.5 (pre 0.34)  20261030 [svn: r234]";
+                     "0.33.5 (pre 0.34)  20261031 [svn: r234]";
 
 static const char * my_name = "ls_name_value_rd";
 
