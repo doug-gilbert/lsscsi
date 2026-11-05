@@ -49,7 +49,7 @@
 #include "sg_json.h"
 
 static const char * release_str =
-                 "0.33.5 (pre 0.34)  2026/10/31 [svn: r234]";
+                 "0.33.5 (pre 0.34)  2026/11/05 [svn: r235]";
 
 /*
  * Some jargon:
@@ -5403,6 +5403,7 @@ longer_sh_entry(const char * path_name, struct lsscsi_opts * op,
                         sgj_haj_vs(jsp, jop, 2, ubm_s, SEP_EQ_NO_SP, value);
         } else if (op->long_opt > 0) {
                 n = 0;
+                b[0] = '\0';
                 if (get_value(path_name, cpl_s, value, vlen)) {
                         n += sg_scn3pr(b, blen, n, "  %s=%-4s ", cpl_s,
                                        value);
@@ -5434,6 +5435,7 @@ longer_sh_entry(const char * path_name, struct lsscsi_opts * op,
 
                 if (2 == op->long_opt) {
                         n = 0;
+                        b[0] = '\0';
                         if (get_value(path_name, cq_s, value, vlen)) {
                                 n += sg_scn3pr(b, blen, n, "  %s=%-4s ", cq_s,
                                                value);

@@ -47,7 +47,7 @@
 #include <getopt.h>     /* non-standard, trips up AIX */
 
 static const char * version_str = 
-                     "0.33.5 (pre 0.34)  20261031 [svn: r234]";
+                     "0.33.5 (pre 0.34)  20261105 [svn: r235]";
 
 static const char * my_name = "ls_name_value_rd";
 
@@ -399,9 +399,10 @@ main(int argc, char * argv[])
     b1len = len;
     if (k >= num_retries) {
         err = 0;
-        if (len > 0)
+        if (len > 0) {
+            b1p[len] = '\0';    /* NUL terminate; room reserved in buffer */
             printf("%.*s <timeout>", len, b1p);
-        else
+        } else
             printf("<timeout>");
         goto cleanup;
     }
