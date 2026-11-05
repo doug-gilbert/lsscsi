@@ -399,9 +399,10 @@ main(int argc, char * argv[])
     b1len = len;
     if (k >= num_retries) {
         err = 0;
-        if (len > 0)
+        if (len > 0) {
+            b1p[len] = '\0';    /* NUL terminate; room reserved in buffer */
             printf("%.*s <timeout>", len, b1p);
-        else
+        } else
             printf("<timeout>");
         goto cleanup;
     }
